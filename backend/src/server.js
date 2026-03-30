@@ -16,7 +16,7 @@ require("./socket.io")(io);
 
 app.set("io", io);
 
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 1811;
 
 server.listen(PORT, () => {
   console.log("servidor corriendo");

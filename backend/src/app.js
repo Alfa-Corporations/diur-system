@@ -3,6 +3,9 @@ const express = require('express');
 const morgan = require('morgan');
 const cors = require('cors');
 const db = require('./utils/database');
+const initModels = require('./models/initModels');
+const seedDatabase = require('./seeders/seedDatabase');
+const routes = require('./routes');
 const hendleError = require('./middlewares/error.middleware');
 
 const app = express();
@@ -12,17 +15,29 @@ app.use(morgan('dev'));
 app.use(cors());
 
 db.authenticate()
-    .then(() => console.log('Authenticate complete'))
-    .catch(error => console.log(error));
-    
-db.sync({ force: false })
-    .then(() => console.log('Synchronized database'))
-    .catch(error => console.log(error));
+    .then(() => console.log('Database authentication successful'))
+    .catch(error => console.log('Database authentication failed:', error));
 
+db.sync({ force: false, alter: process.env.NODE_ENV !== 'production' })
+    .then(() => {
+        console.log('Database synchronized');
+        initModels(); // Inicializar asociaciones después de sincronizar
+        // Ejecutar seeding en desarrollo
+        if (process.env.NODE_ENV !== 'production') {
+            seedDatabase();
+        }
+    })
+    .catch(error => console.log('Database sync failed:', error));
+
+// Rutas de la API
+app.use('/api/v1', routes);
+
+// Ruta de bienvenida
 app.get('/', (req, res) => {
-    console.log('Bienvenido al server');
+    res.json({ message: 'Bienvenido al API del Sistema de Facturación DIUR' });
 });
 
+// Middleware de manejo de errores
 app.use(hendleError);
 
 module.exports = app;
