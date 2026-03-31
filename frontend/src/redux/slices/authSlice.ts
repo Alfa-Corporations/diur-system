@@ -13,10 +13,28 @@ interface AuthState {
   error: string | null;
 }
 
+const getStoredUser = (): User | null => {
+  if (typeof window === 'undefined') return null;
+
+  const storedUser = localStorage.getItem('authUser');
+  if (!storedUser) return null;
+
+  try {
+    return JSON.parse(storedUser) as User;
+  } catch (error) {
+    console.error('Error restoring stored user:', error);
+    localStorage.removeItem('authUser');
+    return null;
+  }
+};
+
+const storedUser = getStoredUser();
+const storedToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
 const initialState: AuthState = {
-  user: null,
-  token: null,
-  isAuthenticated: false,
+  user: storedUser,
+  token: storedToken,
+  isAuthenticated: Boolean(storedUser && storedToken),
   loading: false,
   error: null
 };
@@ -29,14 +47,23 @@ const authSlice = createSlice({
       state.loading = true;
       state.error = null;
     },
+    restoreSession: (state, action: PayloadAction<{ user: User; token: string }>) => {
+      state.user = action.payload.user;
+      state.token = action.payload.token;
+      state.isAuthenticated = true;
+      state.loading = false;
+      state.error = null;
+      localStorage.setItem('token', action.payload.token);
+      localStorage.setItem('authUser', JSON.stringify(action.payload.user));
+    },
     loginSuccess: (state, action: PayloadAction<LoginResponse>) => {
       state.loading = false;
       state.user = action.payload.user;
       state.token = action.payload.token;
       state.isAuthenticated = true;
       state.error = null;
-      // Guardar token en localStorage
       localStorage.setItem('token', action.payload.token);
+      localStorage.setItem('authUser', JSON.stringify(action.payload.user));
     },
     loginFailure: (state, action: PayloadAction<string>) => {
       state.loading = false;
@@ -44,6 +71,8 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.user = null;
       state.token = null;
+      localStorage.removeItem('token');
+      localStorage.removeItem('authUser');
     },
     logout: state => {
       state.user = null;
@@ -52,9 +81,11 @@ const authSlice = createSlice({
       state.loading = false;
       state.error = null;
       localStorage.removeItem('token');
+      localStorage.removeItem('authUser');
     },
     updateProfile: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
+      localStorage.setItem('authUser', JSON.stringify(action.payload));
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
@@ -65,6 +96,6 @@ const authSlice = createSlice({
   }
 });
 
-export const { loginStart, loginSuccess, loginFailure, logout, updateProfile, setLoading, clearError } = authSlice.actions;
+export const { loginStart, restoreSession, loginSuccess, loginFailure, logout, updateProfile, setLoading, clearError } = authSlice.actions;
 
 export default authSlice.reducer;

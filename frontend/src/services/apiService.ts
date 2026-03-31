@@ -2,7 +2,10 @@ import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import { store } from '../redux/store';
 import { logout } from '../redux/slices/authSlice';
-import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, User, Product, Invoice } from '../../../shared/types';
+import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, CreateInvoiceRequest, User, Product, Invoice } from '../../../shared/types';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+const BACKEND_BASE_HINT = API_BASE_URL.replace(/\/api\/v1$/, '');
 
 /**
  * Servicio API
@@ -13,8 +16,8 @@ class ApiService {
 
   constructor() {
     this.api = axios.create({
-      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1',
-      timeout: 10000,
+      baseURL: API_BASE_URL,
+      timeout: 30000,
       headers: {
         'Content-Type': 'application/json'
       }
@@ -44,6 +47,12 @@ class ApiService {
           store.dispatch(logout());
         }
 
+        if (error.code === 'ECONNABORTED') {
+          error.message = `La solicitud tardó demasiado. Verifica que el backend esté encendido en ${BACKEND_BASE_HINT}.`;
+        } else if (!error.response) {
+          error.message = `No se pudo conectar con el backend. Revisa VITE_API_URL o inicia el servidor en ${BACKEND_BASE_HINT}.`;
+        }
+
         return Promise.reject(error);
       }
     );
@@ -56,13 +65,18 @@ class ApiService {
   }
 
   async register(userData: RegisterRequest): Promise<User> {
-    const response = await this.api.post<User>('/auth/register', userData);
-    return response.data;
+    const response = await this.api.post<{ user: User }>('/auth/register', userData);
+    return response.data.user;
+  }
+
+  async createUser(userData: RegisterRequest): Promise<User> {
+    const response = await this.api.post<{ user: User }>('/users', userData);
+    return response.data.user;
   }
 
   async getProfile(): Promise<User> {
-    const response = await this.api.get<User>('/auth/profile');
-    return response.data;
+    const response = await this.api.get<{ user: User }>('/auth/profile');
+    return response.data.user;
   }
 
   async logout(): Promise<void> {
@@ -116,18 +130,19 @@ class ApiService {
     return response.data.invoice;
   }
 
-  async createInvoice(invoiceData: { items: Array<{ productId: number; quantity: number }>; customerName?: string; customerEmail?: string }): Promise<Invoice> {
+  async createInvoice(invoiceData: CreateInvoiceRequest): Promise<Invoice> {
     const response = await this.api.post<{ invoice: Invoice }>('/invoices', invoiceData);
     return response.data.invoice;
   }
 
-  async updateInvoice(id: number, invoiceData: { items: Array<{ productId: number; quantity: number }>; customerName?: string; customerEmail?: string }): Promise<Invoice> {
+  async updateInvoice(id: number, invoiceData: CreateInvoiceRequest): Promise<Invoice> {
     const response = await this.api.put<{ invoice: Invoice }>(`/invoices/${id}`, invoiceData);
     return response.data.invoice;
   }
 
-  async deleteInvoice(id: number): Promise<void> {
-    await this.api.delete(`/invoices/${id}`);
+  async deleteInvoice(id: number): Promise<Invoice> {
+    const response = await this.api.delete<{ invoice: Invoice }>(`/invoices/${id}`);
+    return response.data.invoice;
   }
 
   async updateInvoiceStatus(
@@ -144,6 +159,11 @@ class ApiService {
       status,
       ...paymentData
     });
+    return response.data.invoice;
+  }
+
+  async sendInvoiceEmail(id: number, email?: string): Promise<Invoice> {
+    const response = await this.api.post<{ invoice: Invoice }>(`/invoices/${id}/send-email`, { email });
     return response.data.invoice;
   }
 

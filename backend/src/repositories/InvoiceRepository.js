@@ -1,4 +1,5 @@
-const { Invoice, InvoiceItem, User } = require('../models');
+const { Op } = require('sequelize');
+const { Invoice, InvoiceItem, User, Customer } = require('../models');
 
 /**
  * Repositorio para operaciones de Factura
@@ -30,6 +31,7 @@ class InvoiceRepository {
     return await Invoice.findByPk(id, {
       include: [
         { model: User, as: 'user', attributes: ['id', 'username', 'email', 'role'] },
+        { model: Customer, as: 'customer' },
         { model: InvoiceItem, as: 'items', include: ['product'] }
       ]
     });
@@ -45,6 +47,7 @@ class InvoiceRepository {
       where: { invoiceNumber },
       include: [
         { model: User, as: 'user', attributes: ['id', 'username', 'email', 'role'] },
+        { model: Customer, as: 'customer' },
         { model: InvoiceItem, as: 'items', include: ['product'] }
       ]
     });
@@ -59,7 +62,8 @@ class InvoiceRepository {
   async update(id, updateData) {
     const invoice = await Invoice.findByPk(id);
     if (!invoice) throw new Error('Invoice not found');
-    return await invoice.update(updateData);
+    await invoice.update(updateData);
+    return await this.findById(id);
   }
 
   /**
@@ -84,7 +88,12 @@ class InvoiceRepository {
   async findAll(filters = {}, limit = 10, offset = 0) {
     const where = {};
     if (filters.userId) where.userId = filters.userId;
-    if (filters.status) where.status = filters.status;
+    if (filters.customerId) where.customerId = filters.customerId;
+    if (filters.status) {
+      where.status = Array.isArray(filters.status) ? { [Op.in]: filters.status } : filters.status;
+    } else if (filters.excludeStatuses?.length) {
+      where.status = { [Op.notIn]: filters.excludeStatuses };
+    }
     return await Invoice.findAll({
       where,
       limit,
@@ -92,6 +101,7 @@ class InvoiceRepository {
       order: [['createdAt', 'DESC']],
       include: [
         { model: User, as: 'user', attributes: ['id', 'username', 'email', 'role'] },
+        { model: Customer, as: 'customer' },
         { model: InvoiceItem, as: 'items', include: ['product'] }
       ]
     });

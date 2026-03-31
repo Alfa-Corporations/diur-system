@@ -60,7 +60,24 @@ const syncSlice = createSlice({
       state.error = action.payload;
     },
     addNotification: (state, action: PayloadAction<Notification>) => {
-      state.notifications.unshift(action.payload); // Agregar al inicio
+      const incoming = action.payload;
+      const incomingData = typeof incoming.data === 'object' && incoming.data !== null ? (incoming.data as { invoiceId?: number | string; status?: string }) : {};
+      const incomingTime = new Date(incoming.timestamp).getTime();
+
+      const isDuplicate = state.notifications.some(notification => {
+        const existingData = typeof notification.data === 'object' && notification.data !== null ? (notification.data as { invoiceId?: number | string; status?: string }) : {};
+        const existingTime = new Date(notification.timestamp).getTime();
+
+        return (
+          notification.type === incoming.type && String(existingData.invoiceId ?? '') === String(incomingData.invoiceId ?? '') && String(existingData.status ?? '') === String(incomingData.status ?? '') && Math.abs(existingTime - incomingTime) < 4000
+        );
+      });
+
+      if (isDuplicate) {
+        return;
+      }
+
+      state.notifications.unshift(incoming);
       // Mantener solo las últimas 50 notificaciones
       if (state.notifications.length > 50) {
         state.notifications = state.notifications.slice(0, 50);

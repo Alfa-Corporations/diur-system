@@ -6,6 +6,7 @@ const db = require('./utils/database');
 const initModels = require('./models/initModels');
 const seedDatabase = require('./seeders/seedDatabase');
 const routes = require('./routes');
+const swaggerDocs = require('../swagger');
 const hendleError = require('./middlewares/error.middleware');
 
 const app = express();
@@ -13,6 +14,7 @@ const app = express();
 app.use(express.json());
 app.use(morgan('dev'));
 app.use(cors());
+swaggerDocs(app);
 
 db.authenticate()
     .then(() => console.log('Database authentication successful'))

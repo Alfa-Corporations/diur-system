@@ -1,6 +1,7 @@
 
 const User = require('./User');
 const Product = require('./Product');
+const Customer = require('./Customer');
 const Invoice = require('./Invoice');
 const InvoiceItem = require('./InvoiceItem');
 const Order = require('./Order');
@@ -11,8 +12,12 @@ const initModels = () => {
   User.hasMany(Order, { foreignKey: 'userId', as: 'orders' });
   User.hasMany(Order, { foreignKey: 'deliveryUserId', as: 'deliveries' });
 
+  // Asociaciones de Cliente
+  Customer.hasMany(Invoice, { foreignKey: 'customerId', as: 'invoices' });
+
   // Asociaciones de Factura
   Invoice.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+  Invoice.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
   Invoice.hasMany(InvoiceItem, { foreignKey: 'invoiceId', as: 'items' });
 
   // Asociaciones de Item de Factura

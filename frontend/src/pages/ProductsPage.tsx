@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure, createProductSuccess, updateProductSuccess, deleteProductSuccess } from '../redux/slices/productSlice';
 import apiService from '../services/apiService';
@@ -10,6 +11,7 @@ import type { Product } from '../../../shared/types';
  * Lista, crea, edita y elimina productos
  */
 const ProductsPage: React.FC = () => {
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { products, loading, error } = useAppSelector(state => state.products);
   const { isOnline } = useAppSelector(state => state.sync);
@@ -26,36 +28,39 @@ const ProductsPage: React.FC = () => {
     category: ''
   });
 
-  // Cargar productos al montar el componente
-  useEffect(() => {
-    loadProducts();
-  }, []);
+  const shouldFallbackToOffline = (error: unknown) => typeof error === 'object' && error !== null && 'response' in error && !(error as { response?: unknown }).response;
 
   const loadProducts = async () => {
     dispatch(fetchProductsStart());
 
     try {
-      if (isOnline) {
-        // Cargar desde API y guardar en local
-        const { products: apiProducts } = await apiService.getProducts();
-        await localDBService.saveProducts(apiProducts);
-        dispatch(fetchProductsSuccess({ products: apiProducts, totalCount: apiProducts.length }));
-      } else {
-        // Cargar desde local storage
+      const pendingEvents = await localDBService.getPendingEvents();
+      const shouldPreferLocal = !isOnline || pendingEvents.length > 0;
+
+      if (shouldPreferLocal) {
         const localProducts = await localDBService.getProducts();
         dispatch(fetchProductsSuccess({ products: localProducts, totalCount: localProducts.length }));
+        return;
       }
+
+      const { products: apiProducts } = await apiService.getProducts();
+      await localDBService.saveProducts(apiProducts);
+      dispatch(fetchProductsSuccess({ products: apiProducts, totalCount: apiProducts.length }));
     } catch (error: any) {
       dispatch(fetchProductsFailure(error.message));
-      // Intentar cargar desde local como fallback
+
       try {
         const localProducts = await localDBService.getProducts();
         dispatch(fetchProductsSuccess({ products: localProducts, totalCount: localProducts.length }));
-      } catch (localError) {
+      } catch {
         dispatch(fetchProductsFailure('Error al cargar productos'));
       }
     }
   };
+
+  useEffect(() => {
+    void loadProducts();
+  }, [isOnline]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,60 +74,72 @@ const ProductsPage: React.FC = () => {
       category: formData.category || undefined
     };
 
+    const timestamp = new Date();
+    const timestampIso = timestamp.toISOString();
+
     try {
       if (editingProduct) {
-        // Actualizar producto
         if (isOnline) {
           const updatedProduct = await apiService.updateProduct(editingProduct.id, productData);
           await localDBService.saveProduct(updatedProduct);
           dispatch(updateProductSuccess(updatedProduct));
         } else {
-          // Guardar como evento pendiente
-          const eventId = `update_product_${Date.now()}`;
-          await localDBService.addPendingEvent({
-            id: eventId,
-            type: 'update_product',
-            data: { id: editingProduct.id, ...productData },
-            timestamp: new Date().toISOString(),
-            synced: false
-          });
-          // Actualizar localmente
-          const updatedProduct = { ...editingProduct, ...productData, updatedAt: new Date().toISOString() };
-          await localDBService.saveProduct(updatedProduct);
-          dispatch(updateProductSuccess(updatedProduct));
+          throw new Error('OFFLINE_FALLBACK');
         }
       } else {
-        // Crear producto
         if (isOnline) {
           const newProduct = await apiService.createProduct(productData);
           await localDBService.saveProduct(newProduct);
           dispatch(createProductSuccess(newProduct));
         } else {
-          // Guardar como evento pendiente
-          const eventId = `create_product_${Date.now()}`;
-          await localDBService.addPendingEvent({
-            id: eventId,
-            type: 'create_product',
-            data: productData,
-            timestamp: new Date().toISOString(),
-            synced: false
-          });
-          // Crear localmente con ID temporal
-          const tempProduct: Product = {
-            ...productData,
-            id: Date.now(), // ID temporal
-            isActive: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          } as Product;
-          await localDBService.saveProduct(tempProduct);
-          dispatch(createProductSuccess(tempProduct));
+          throw new Error('OFFLINE_FALLBACK');
         }
       }
 
       setShowModal(false);
       resetForm();
     } catch (error: any) {
+      if (!isOnline || error.message === 'OFFLINE_FALLBACK' || shouldFallbackToOffline(error)) {
+        if (editingProduct) {
+          await localDBService.addPendingEvent({
+            id: `update_product_${editingProduct.id}_${timestamp.getTime()}`,
+            type: 'update_product',
+            data: { id: editingProduct.id, ...productData },
+            timestamp: timestampIso,
+            synced: false
+          });
+
+          const updatedProduct = { ...editingProduct, ...productData, updatedAt: timestampIso } as Product;
+          await localDBService.saveProduct(updatedProduct);
+          dispatch(updateProductSuccess(updatedProduct));
+        } else {
+          const localId = timestamp.getTime();
+          const tempProduct: Product = {
+            ...productData,
+            id: localId,
+            isActive: true,
+            createdAt: timestampIso,
+            updatedAt: timestampIso
+          } as Product;
+
+          await localDBService.addPendingEvent({
+            id: `create_product_${localId}`,
+            type: 'create_product',
+            data: { ...productData, localId },
+            timestamp: timestampIso,
+            synced: false
+          });
+
+          await localDBService.saveProduct(tempProduct);
+          dispatch(createProductSuccess(tempProduct));
+        }
+
+        setShowModal(false);
+        resetForm();
+        alert('El servidor no está disponible. El cambio quedó guardado localmente y se sincronizará al reconectar.');
+        return;
+      }
+
       alert(error.message);
     }
   };
@@ -143,24 +160,32 @@ const ProductsPage: React.FC = () => {
   const handleDelete = async (id: number) => {
     if (!confirm('¿Está seguro de eliminar este producto?')) return;
 
+    const timestampIso = new Date().toISOString();
+
     try {
       if (isOnline) {
         await apiService.deleteProduct(id);
         await localDBService.deleteProduct(id);
         dispatch(deleteProductSuccess(id));
-      } else {
-        // Marcar para eliminación pendiente
+        return;
+      }
+
+      throw new Error('OFFLINE_FALLBACK');
+    } catch (error: any) {
+      if (!isOnline || error.message === 'OFFLINE_FALLBACK' || shouldFallbackToOffline(error)) {
         await localDBService.addPendingEvent({
           id: `delete_product_${id}_${Date.now()}`,
           type: 'delete_product',
           data: { id },
-          timestamp: new Date().toISOString(),
+          timestamp: timestampIso,
           synced: false
         });
         await localDBService.deleteProduct(id);
         dispatch(deleteProductSuccess(id));
+        alert('Producto eliminado localmente. Se sincronizará cuando el servidor vuelva.');
+        return;
       }
-    } catch (error: any) {
+
       alert(error.message);
     }
   };
@@ -191,6 +216,9 @@ const ProductsPage: React.FC = () => {
           <p className='mb-0'>Consulta, crea y edita productos con una vista limpia y adaptable.</p>
         </div>
         <div className='page-actions'>
+          <button className='btn btn-outline-dark' onClick={() => navigate(-1)}>
+            ← Volver
+          </button>
           <button className='btn btn-outline-secondary' onClick={() => void loadProducts()}>
             Actualizar
           </button>

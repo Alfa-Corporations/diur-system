@@ -83,6 +83,7 @@ class ProductService {
    * @param {number} offset - Desplazamiento
    * @returns {Promise<Array>} Lista de productos
    */
+
   async getProducts(filters = {}, limit = 10, offset = 0) {
     return await ProductRepository.findAll(filters, limit, offset);
   }

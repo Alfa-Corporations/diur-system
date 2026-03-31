@@ -38,15 +38,45 @@ export interface InvoiceItem {
   updatedAt: string;
 }
 
+export interface Customer {
+  id: number;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  identificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
+  identificationNumber?: string | null;
+  address?: string | null;
+  isFinalConsumer: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type InvoiceDocumentType = 'consumer_final' | 'sales_note' | 'sri_invoice';
+
 export interface Invoice {
   id: number;
   invoiceNumber: string;
   userId: number;
+  customerId?: number | null;
   total: number;
   status: 'pending' | 'paid' | 'cancelled';
+  documentType?: InvoiceDocumentType;
+  sriStatus?: 'not_applicable' | 'pending' | 'authorized' | 'rejected';
+  sriAuthorizationNumber?: string;
+  paymentMethod?: 'cash' | 'card' | 'check' | 'transfer' | 'other';
+  paymentReference?: string;
+  amountReceived?: number;
+  changeAmount?: number;
+  paidAt?: string;
   customerName?: string;
   customerEmail?: string;
+  customerPhone?: string;
+  customerIdentificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
+  customerIdentification?: string;
+  customerAddress?: string;
+  emailSentAt?: string;
   user?: User;
+  customer?: Customer;
   items?: InvoiceItem[];
   createdAt: string;
   updatedAt: string;
@@ -96,6 +126,15 @@ export interface CreateInvoiceRequest {
     productId: number;
     quantity: number;
   }>;
+  documentType?: InvoiceDocumentType;
+  customer?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    identificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
+    identificationNumber?: string;
+    address?: string;
+  };
   customerName?: string;
   customerEmail?: string;
 }
@@ -113,7 +152,7 @@ export interface SyncEvent {
 }
 
 export interface Notification {
-  type: 'invoice_created' | 'inventory_updated' | 'order_created' | 'order_updated' | 'order_assigned';
+  type: 'invoice_created' | 'invoice_paid' | 'invoice_deleted' | 'inventory_updated' | 'order_created' | 'order_updated' | 'order_assigned';
   message: string;
   data: unknown;
   timestamp: string | Date;

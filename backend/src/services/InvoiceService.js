@@ -1,5 +1,6 @@
 const InvoiceRepository = require('../repositories/InvoiceRepository');
 const ProductService = require('./ProductService');
+const { Customer } = require('../models');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -8,6 +9,52 @@ const { v4: uuidv4 } = require('uuid');
  * Incluye creación, cálculo de totales y validaciones de stock.
  */
 class InvoiceService {
+  async resolveCustomer(customerData = {}, documentType = 'consumer_final') {
+    if (documentType === 'consumer_final') {
+      const [customer] = await Customer.findOrCreate({
+        where: { name: 'Consumidor Final', isFinalConsumer: true },
+        defaults: {
+          email: null,
+          phone: null,
+          identificationType: 'none',
+          identificationNumber: '9999999999999',
+          address: 'N/A',
+          isFinalConsumer: true,
+        },
+      });
+
+      return customer;
+    }
+
+    const normalizedEmail = customerData.email?.trim()?.toLowerCase() || null;
+    const normalizedIdentification = customerData.identificationNumber?.trim() || null;
+
+    const where = normalizedIdentification
+      ? { identificationNumber: normalizedIdentification }
+      : normalizedEmail
+        ? { email: normalizedEmail }
+        : null;
+
+    let customer = where ? await Customer.findOne({ where }) : null;
+
+    const payload = {
+      name: customerData.name?.trim() || 'Cliente ocasional',
+      email: normalizedEmail,
+      phone: customerData.phone?.trim() || null,
+      identificationType: customerData.identificationType || 'none',
+      identificationNumber: normalizedIdentification,
+      address: customerData.address?.trim() || null,
+      isFinalConsumer: false,
+    };
+
+    if (customer) {
+      await customer.update(payload);
+      return customer;
+    }
+
+    return await Customer.create(payload);
+  }
+
   /**
    * Crea una nueva factura
    * @param {Object} invoiceData - Datos de la factura
@@ -15,10 +62,11 @@ class InvoiceService {
    * @returns {Promise<Object>} Factura creada
    */
   async createInvoice(invoiceData, items) {
-    // Generar número de factura único
-    const invoiceNumber = `INV-${Date.now()}-${uuidv4().slice(0, 8).toUpperCase()}`;
+    const { customer: customerData = {}, documentType = 'consumer_final', ...baseInvoiceData } = invoiceData;
 
-    // Calcular total y validar stock
+    const invoiceNumber = `INV-${Date.now()}-${uuidv4().slice(0, 8).toUpperCase()}`;
+    const customer = await this.resolveCustomer(customerData, documentType);
+
     let total = 0;
     for (const item of items) {
       const product = await ProductService.getProductById(item.productId);
@@ -30,14 +78,34 @@ class InvoiceService {
       total += item.total;
     }
 
-    // Crear factura
+    const customerSnapshot = documentType === 'consumer_final'
+      ? {
+        customerName: 'Consumidor Final',
+        customerEmail: null,
+        customerPhone: null,
+        customerIdentificationType: 'none',
+        customerIdentification: '9999999999999',
+        customerAddress: 'N/A',
+      }
+      : {
+        customerName: customerData.name?.trim() || customer.name,
+        customerEmail: customerData.email?.trim()?.toLowerCase() || customer.email,
+        customerPhone: customerData.phone?.trim() || customer.phone,
+        customerIdentificationType: customerData.identificationType || customer.identificationType || 'none',
+        customerIdentification: customerData.identificationNumber?.trim() || customer.identificationNumber,
+        customerAddress: customerData.address?.trim() || customer.address,
+      };
+
     const invoice = await InvoiceRepository.create({
-      ...invoiceData,
+      ...baseInvoiceData,
       invoiceNumber,
+      customerId: customer.id,
+      documentType,
+      sriStatus: documentType === 'sri_invoice' ? 'pending' : 'not_applicable',
       total,
+      ...customerSnapshot,
     }, items);
 
-    // Actualizar stock
     for (const item of items) {
       await ProductService.updateStock(item.productId, -item.quantity);
     }
@@ -83,6 +151,14 @@ class InvoiceService {
     return await InvoiceRepository.update(id, updateData);
   }
 
+  async markInvoiceEmailSent(id, email) {
+    const invoice = await this.getInvoiceById(id);
+    return await InvoiceRepository.update(id, {
+      customerEmail: email || invoice.customerEmail,
+      emailSentAt: new Date(),
+    });
+  }
+
   /**
    * Lista facturas con filtros
    * @param {Object} filters - Filtros opcionales
@@ -105,7 +181,6 @@ class InvoiceService {
       throw new Error('Invoice already cancelled');
     }
 
-    // Restaurar stock
     for (const item of invoice.items) {
       await ProductService.updateStock(item.productId, item.quantity);
     }

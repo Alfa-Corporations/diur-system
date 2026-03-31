@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../hooks/redux';
 import { logout } from '../redux/slices/authSlice';
 import socketService from '../services/socketService';
-import { addNotification } from '../redux/slices/syncSlice';
+import apiService from '../services/apiService';
+import type { RegisterRequest, User } from '../../../shared/types';
 
 /**
  * Componente Dashboard
@@ -14,26 +15,20 @@ const Dashboard: React.FC = () => {
   const dispatch = useAppDispatch();
   const { user, isAuthenticated } = useAppSelector(state => state.auth);
   const { notifications } = useAppSelector(state => state.sync);
+  const [userForm, setUserForm] = useState<RegisterRequest>({
+    username: '',
+    email: '',
+    password: '',
+    role: 'cashier'
+  });
+  const [userMessage, setUserMessage] = useState<{ type: 'success' | 'danger'; text: string } | null>(null);
+  const [creatingUser, setCreatingUser] = useState(false);
 
-  // Verificar autenticación
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
     }
   }, [isAuthenticated, navigate]);
-
-  // Escuchar notificaciones de Socket.IO
-  useEffect(() => {
-    const handleNotification = (event: CustomEvent) => {
-      dispatch(addNotification(event.detail));
-    };
-
-    window.addEventListener('socket-notification', handleNotification as EventListener);
-
-    return () => {
-      window.removeEventListener('socket-notification', handleNotification as EventListener);
-    };
-  }, [dispatch]);
 
   const handleLogout = () => {
     socketService.disconnect();
@@ -41,8 +36,52 @@ const Dashboard: React.FC = () => {
     navigate('/login');
   };
 
+  const handleUserFormChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setUserForm(prev => ({
+      ...prev,
+      [event.target.name]: event.target.value
+    }));
+  };
+
+  const handleCreateUser = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (user?.role !== 'admin') {
+      setUserMessage({ type: 'danger', text: 'Solo el administrador puede crear usuarios.' });
+      return;
+    }
+
+    setCreatingUser(true);
+    setUserMessage(null);
+
+    try {
+      const createdUser = await apiService.createUser(userForm);
+      setUserMessage({ type: 'success', text: `Usuario ${createdUser.username} creado correctamente.` });
+      setUserForm({
+        username: '',
+        email: '',
+        password: '',
+        role: 'cashier'
+      });
+    } catch (error: unknown) {
+      let message = 'No se pudo crear el usuario.';
+
+      if (typeof error === 'object' && error !== null && 'response' in error) {
+        const apiError = error as { response?: { data?: { message?: string } } };
+        message = apiError.response?.data?.message || message;
+      } else if (error instanceof Error) {
+        message = error.message;
+      }
+
+      setUserMessage({ type: 'danger', text: message });
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
   if (!user) return null;
 
+  const isAdmin = user.role === 'admin';
   const menuItems = [
     { label: 'Productos', path: '/products', icon: '📦', helper: 'Inventario y stock' },
     { label: 'Facturas', path: '/invoices', icon: '🧾', helper: 'Ventas y cobros' }
@@ -129,6 +168,50 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {isAdmin && (
+              <div className='section-card mt-4'>
+                <div className='d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3'>
+                  <div>
+                    <h5 className='mb-1'>Crear usuario</h5>
+                    <p className='mb-0'>Solo administradores pueden registrar nuevos accesos.</p>
+                  </div>
+                  <span className='badge text-bg-primary'>ADMIN</span>
+                </div>
+
+                {userMessage && <div className={`alert alert-${userMessage.type}`}>{userMessage.text}</div>}
+
+                <form className='row g-3' onSubmit={handleCreateUser}>
+                  <div className='col-12 col-md-3'>
+                    <label className='form-label'>Usuario</label>
+                    <input className='form-control' name='username' value={userForm.username} onChange={handleUserFormChange} required />
+                  </div>
+                  <div className='col-12 col-md-3'>
+                    <label className='form-label'>Email</label>
+                    <input type='email' className='form-control' name='email' value={userForm.email} onChange={handleUserFormChange} required />
+                  </div>
+                  <div className='col-12 col-md-3'>
+                    <label className='form-label'>Contraseña</label>
+                    <input type='password' className='form-control' name='password' value={userForm.password} onChange={handleUserFormChange} required minLength={6} />
+                  </div>
+                  <div className='col-12 col-md-2'>
+                    <label className='form-label'>Rol</label>
+                    <select className='form-select' name='role' value={userForm.role} onChange={handleUserFormChange}>
+                      {(['admin', 'cashier', 'warehouse', 'delivery'] as User['role'][]).map(role => (
+                        <option key={role} value={role}>
+                          {role}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className='col-12 col-md-1 d-flex align-items-end'>
+                    <button type='submit' className='btn btn-primary w-100' disabled={creatingUser}>
+                      {creatingUser ? '...' : 'Crear'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
 
             <div className='section-card mt-4'>
               <div className='d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3'>

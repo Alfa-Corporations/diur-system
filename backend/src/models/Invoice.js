@@ -26,6 +26,28 @@ const Invoice = db.define('Invoice', {
       key: 'id',
     },
   },
+  customerId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'customers',
+      key: 'id',
+    },
+  },
+  documentType: {
+    type: DataTypes.ENUM('consumer_final', 'sales_note', 'sri_invoice'),
+    allowNull: false,
+    defaultValue: 'consumer_final',
+  },
+  sriStatus: {
+    type: DataTypes.ENUM('not_applicable', 'pending', 'authorized', 'rejected'),
+    allowNull: false,
+    defaultValue: 'not_applicable',
+  },
+  sriAuthorizationNumber: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   total: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
@@ -61,6 +83,27 @@ const Invoice = db.define('Invoice', {
   },
   customerEmail: {
     type: DataTypes.STRING,
+    allowNull: true,
+  },
+  customerPhone: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  customerIdentificationType: {
+    type: DataTypes.ENUM('none', 'cedula', 'ruc', 'passport'),
+    allowNull: false,
+    defaultValue: 'none',
+  },
+  customerIdentification: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  customerAddress: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  emailSentAt: {
+    type: DataTypes.DATE,
     allowNull: true,
   },
 }, {

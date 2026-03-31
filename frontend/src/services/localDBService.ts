@@ -29,6 +29,11 @@ export const db = new LocalDatabase();
  * Proporciona métodos para gestionar datos offline
  */
 class LocalDBService {
+  private async syncPendingEventsMirror(): Promise<void> {
+    const pendingEvents = await db.pendingSync.toArray();
+    localStorage.setItem('pendingEvents', JSON.stringify(pendingEvents));
+  }
+
   // Productos
   async saveProducts(products: Product[]): Promise<void> {
     await db.products.bulkPut(products);
@@ -74,24 +79,35 @@ class LocalDBService {
   // Eventos de sincronización pendientes
   async addPendingEvent(event: SyncEvent): Promise<void> {
     await db.pendingSync.put(event);
+    await this.syncPendingEventsMirror();
   }
 
   async getPendingEvents(): Promise<SyncEvent[]> {
-    return await db.pendingSync.where('synced').equals(0).toArray();
+    const events = await db.pendingSync.toArray();
+    return events.filter(event => !event.synced).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }
 
   async markEventSynced(eventId: string): Promise<void> {
     await db.pendingSync.update(eventId, { synced: true });
+    await this.syncPendingEventsMirror();
   }
 
   async removeSyncedEvents(): Promise<void> {
-    await db.pendingSync.where('synced').equals(1).delete();
+    const syncedEvents = await db.pendingSync.toArray();
+    const syncedIds = syncedEvents.filter(event => event.synced).map(event => event.id);
+
+    if (syncedIds.length > 0) {
+      await db.pendingSync.bulkDelete(syncedIds);
+    }
+
+    await this.syncPendingEventsMirror();
   }
 
   async clearAllData(): Promise<void> {
     await db.products.clear();
     await db.invoices.clear();
     await db.pendingSync.clear();
+    localStorage.removeItem('pendingEvents');
   }
 
   // Utilidades

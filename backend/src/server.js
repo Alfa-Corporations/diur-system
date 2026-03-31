@@ -1,7 +1,6 @@
 
 const app = require("./app");
 const http = require("http");
-const swaggerDocs = require("../swagger");
 const socketIO = require("socket.io");
 
 const server = http.createServer(app);
@@ -15,10 +14,10 @@ require("dotenv").config();
 require("./socket.io")(io);
 
 app.set("io", io);
+global.io = io;
 
 const PORT = process.env.PORT || 1811;
 
 server.listen(PORT, () => {
-  console.log("servidor corriendo");
-  swaggerDocs(app, PORT);
+  console.log(`servidor corriendo en el puerto ${PORT}`);
 });

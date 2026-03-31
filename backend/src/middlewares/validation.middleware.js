@@ -55,7 +55,7 @@ const validateProductData = (req, res, next) => {
  * Valida datos de factura
  */
 const validateInvoiceData = (req, res, next) => {
-  const { items } = req.body;
+  const { items, documentType = 'consumer_final', customer = {}, customerEmail } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: 'At least one item is required' });
@@ -65,6 +65,19 @@ const validateInvoiceData = (req, res, next) => {
     if (!item.productId || !item.quantity || item.quantity <= 0) {
       return res.status(400).json({ message: 'Valid productId and quantity required for each item' });
     }
+  }
+
+  if (!['consumer_final', 'sales_note', 'sri_invoice'].includes(documentType)) {
+    return res.status(400).json({ message: 'Invalid document type' });
+  }
+
+  if ((documentType === 'sales_note' || documentType === 'sri_invoice') && (!customer.name || typeof customer.name !== 'string' || customer.name.trim().length < 3)) {
+    return res.status(400).json({ message: 'Customer name is required for notes or future SRI invoices' });
+  }
+
+  const emailToValidate = customer.email || customerEmail;
+  if (emailToValidate && !isValidEmail(emailToValidate)) {
+    return res.status(400).json({ message: 'Invalid customer email format' });
   }
 
   next();

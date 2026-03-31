@@ -8,95 +8,170 @@ import type { Notification as AppNotification } from '../../../shared/types';
  */
 class SocketService {
   private socket: Socket | null = null;
-  private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
+  private currentUserData: { id: number; role: string } | null = null;
+  private heartbeatInterval: number | null = null;
+  private isManuallyDisconnected = false;
+  private recentNotifications = new Map<string, number>();
+
+  private clearHeartbeat(): void {
+    if (this.heartbeatInterval !== null) {
+      window.clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  private startHeartbeat(): void {
+    this.clearHeartbeat();
+
+    this.heartbeatInterval = window.setInterval(() => {
+      if (this.socket?.connected) {
+        this.socket.emit('ping');
+      }
+    }, 30000);
+  }
 
   /**
    * Conecta al servidor Socket.IO
    */
   connect(userData?: { id: number; role: string }): void {
-    if (this.socket?.connected) return;
+    if (userData) {
+      this.currentUserData = userData;
+    }
 
+    const activeUser = userData ?? this.currentUserData;
     const token = localStorage.getItem('token');
+
     if (!token) return;
 
-    this.socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:8001', {
+    this.isManuallyDisconnected = false;
+
+    if (this.socket) {
+      this.socket.auth = { token };
+
+      if (this.socket.connected) {
+        if (activeUser) {
+          this.socket.emit('join', activeUser);
+          this.socket.emit('join_user_room', activeUser.id);
+        }
+        this.startHeartbeat();
+        return;
+      }
+
+      this.socket.connect();
+      return;
+    }
+
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL?.replace(/\/api\/v1$/, '') || 'http://localhost:8001';
+
+    this.socket = io(socketUrl, {
       auth: { token },
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: this.maxReconnectAttempts,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 30000
     });
 
     this.socket.on('connect', () => {
       console.log('Connected to Socket.IO server');
-      this.reconnectAttempts = 0;
+      this.startHeartbeat();
 
-      // Unirse a salas basadas en el rol
-      if (userData) {
-        this.socket?.emit('join', userData);
-        this.socket?.emit('join_user_room', userData.id);
+      if (activeUser) {
+        this.socket?.emit('join', activeUser);
+        this.socket?.emit('join_user_room', activeUser.id);
       }
     });
 
     this.socket.on('disconnect', reason => {
       console.log('Disconnected from Socket.IO server:', reason);
-      this.handleReconnect();
+      this.clearHeartbeat();
+
+      if (this.isManuallyDisconnected || reason === 'io client disconnect') {
+        return;
+      }
     });
 
     this.socket.on('connect_error', error => {
       console.error('Socket.IO connection error:', error);
-      this.handleReconnect();
+      this.clearHeartbeat();
     });
 
-    // Escuchar notificaciones
     this.socket.on('notification', (notification: AppNotification) => {
       this.handleNotification(notification);
     });
-
-    // Mantener conexión activa
-    setInterval(() => {
-      if (this.socket?.connected) {
-        this.socket.emit('ping');
-      }
-    }, 30000); // Ping cada 30 segundos
   }
 
   /**
    * Desconecta del servidor
    */
   disconnect(): void {
+    this.isManuallyDisconnected = true;
+    this.clearHeartbeat();
+
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
     }
+
+    this.currentUserData = null;
   }
 
-  /**
-   * Maneja reconexión automática
-   */
-  private handleReconnect(): void {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-      console.log(`Attempting to reconnect in ${delay}ms...`);
-
-      setTimeout(() => {
-        this.connect();
-      }, delay);
-    } else {
-      console.error('Max reconnection attempts reached');
+  private getNotificationTypeLabel(type: AppNotification['type']): string {
+    switch (type) {
+      case 'invoice_created':
+        return 'Factura creada';
+      case 'invoice_paid':
+        return 'Factura pagada';
+      case 'invoice_deleted':
+        return 'Factura eliminada';
+      case 'inventory_updated':
+        return 'Inventario actualizado';
+      case 'order_created':
+        return 'Pedido creado';
+      case 'order_updated':
+        return 'Pedido actualizado';
+      case 'order_assigned':
+        return 'Pedido asignado';
+      default:
+        return 'Notificación del sistema';
     }
+  }
+
+  private isDuplicateNotification(notification: AppNotification): boolean {
+    const payload = typeof notification.data === 'object' && notification.data !== null ? (notification.data as { invoiceId?: number | string; status?: string }) : {};
+    const key = `${notification.type}:${payload.invoiceId ?? 'na'}:${payload.status ?? 'na'}:${notification.message}`;
+    const now = Date.now();
+
+    for (const [storedKey, timestamp] of this.recentNotifications.entries()) {
+      if (now - timestamp > 10000) {
+        this.recentNotifications.delete(storedKey);
+      }
+    }
+
+    const lastSeen = this.recentNotifications.get(key);
+    if (lastSeen && now - lastSeen < 4000) {
+      return true;
+    }
+
+    this.recentNotifications.set(key, now);
+    return false;
   }
 
   /**
    * Maneja notificaciones entrantes
    */
   private handleNotification(notification: AppNotification): void {
-    // Emitir evento personalizado para que los componentes lo escuchen
+    if (this.isDuplicateNotification(notification)) {
+      return;
+    }
+
     window.dispatchEvent(new CustomEvent('socket-notification', { detail: notification }));
 
-    // Mostrar notificación del navegador si es soportado
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification(notification.message, {
-        body: `Tipo: ${notification.type}`,
+        body: `Evento: ${this.getNotificationTypeLabel(notification.type)}`,
         icon: '/favicon.ico'
       });
     }
