@@ -63,8 +63,6 @@ const InvoicesPage: React.FC = () => {
   const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
   const [invoiceViewMode, setInvoiceViewMode] = useState<'active' | 'deleted'>('active');
 
-  const shouldFallbackToOffline = (error: unknown) => typeof error === 'object' && error !== null && 'response' in error && !(error as { response?: unknown }).response;
-
   const adjustLocalProductStock = async (items: InvoiceItem[], multiplier: 1 | -1) => {
     const currentProducts = await localDBService.getProducts();
     const updatedProducts = currentProducts

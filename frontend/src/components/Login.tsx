@@ -104,7 +104,6 @@ const Login: React.FC = () => {
               </div>
             </div>
           </div>
-
           <div className='col-12 col-md-8 col-lg-5'>
             <div className='login-card card border-0'>
               <div className='card-body'>

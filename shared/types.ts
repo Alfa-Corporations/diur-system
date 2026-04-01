@@ -9,6 +9,7 @@ export interface User {
   username: string;
   email: string;
   role: 'admin' | 'cashier' | 'warehouse' | 'delivery';
+  permissions?: Permission[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -23,6 +24,7 @@ export interface Product {
   stock: number;
   category?: string;
   sku: string;
+  barcode?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -90,14 +92,50 @@ export interface Invoice {
 export interface Order {
   id: number;
   userId: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  type: 'purchase' | 'sale';
+  status: 'pending' | 'partial' | 'completed' | 'cancelled';
   total: number;
   customerName?: string;
   customerAddress?: string;
   deliveryUserId?: number;
+  user?: User;
   deliveryUser?: User;
+  items?: OrderItem[];
   createdAt: string;
   updatedAt: string;
+}
+
+// Item de pedido
+export interface OrderItem {
+  id: number;
+  orderId: number;
+  productId: number;
+  quantityRequested: number;
+  quantityProcessed: number;
+  status: 'pending' | 'in_transit' | 'in_warehouse' | 'delivered' | 'invoiced';
+  unitPrice: number;
+  product?: Product;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Permiso
+export interface Permission {
+  id: number;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Notificación
+export interface Notification {
+  id: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  title: string;
+  message: string;
+  timestamp: string;
+  read?: boolean;
 }
 
 // DTOs para API
@@ -152,14 +190,14 @@ export interface UpdateStockRequest {
 // Eventos de sincronización
 export interface SyncEvent {
   id: string;
-  type: 'create_product' | 'update_product' | 'delete_product' | 'create_invoice' | 'update_invoice' | 'delete_invoice';
+  type: 'create_product' | 'update_product' | 'delete_product' | 'create_invoice' | 'update_invoice' | 'delete_invoice' | 'create_order' | 'update_order' | 'delete_order';
   data: unknown;
   timestamp: string;
   synced: boolean;
 }
 
 // Notificaciones en tiempo real
-export interface Notification {
+export interface RealtimeNotification {
   type: 'invoice_created' | 'invoice_paid' | 'invoice_deleted' | 'inventory_updated' | 'order_created' | 'order_updated' | 'order_assigned';
   message: string;
   data: unknown;

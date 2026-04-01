@@ -16,6 +16,11 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import ProductsPage from './pages/ProductsPage';
 import InvoicesPage from './pages/InvoicesPage';
+import UserManagementPage from './pages/UserManagementPage';
+import OrdersDashboardPage from './pages/OrdersDashboardPage';
+import POSPage from './pages/POSPage';
+import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
+import SalesOrdersPage from './pages/SalesOrdersPage';
 
 /**
  * Componente principal de la aplicación
@@ -138,6 +143,11 @@ const AppContent: React.FC = () => {
           <Route path='/dashboard' element={isAuthenticated ? <Dashboard /> : <Navigate to='/login' />} />
           <Route path='/products' element={isAuthenticated ? <ProductsPage /> : <Navigate to='/login' />} />
           <Route path='/invoices' element={isAuthenticated ? <InvoicesPage /> : <Navigate to='/login' />} />
+          <Route path='/users' element={isAuthenticated ? <UserManagementPage /> : <Navigate to='/login' />} />
+          <Route path='/orders/dashboard' element={isAuthenticated ? <OrdersDashboardPage /> : <Navigate to='/login' />} />
+          <Route path='/orders/purchase' element={isAuthenticated ? <PurchaseOrdersPage /> : <Navigate to='/login' />} />
+          <Route path='/orders/sale' element={isAuthenticated ? <SalesOrdersPage /> : <Navigate to='/login' />} />
+          <Route path='/pos' element={isAuthenticated ? <POSPage /> : <Navigate to='/login' />} />
           <Route path='/' element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
         </Routes>
       </div>

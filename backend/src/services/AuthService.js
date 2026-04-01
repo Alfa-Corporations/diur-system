@@ -44,10 +44,16 @@ class AuthService {
    * @returns {Promise<Object>} Token y datos del usuario
    */
   async login(identifier, password) {
-    // Buscar usuario por email o username
-    let user = await UserRepository.findByEmail(identifier);
+    if (!identifier || !password) {
+      throw new Error('Identifier and password are required');
+    }
+
+    const normalizedIdentifier = identifier.trim();
+
+    // Buscar usuario por email o username (case-insensitive)
+    let user = await UserRepository.findByEmail(normalizedIdentifier);
     if (!user) {
-      user = await UserRepository.findByUsername(identifier);
+      user = await UserRepository.findByUsername(normalizedIdentifier);
     }
     if (!user) {
       throw new Error('Invalid credentials');

@@ -5,6 +5,9 @@ const Customer = require('./Customer');
 const Invoice = require('./Invoice');
 const InvoiceItem = require('./InvoiceItem');
 const Order = require('./Order');
+const OrderItem = require('./OrderItem');
+const Permission = require('./Permission');
+const UserPermission = require('./UserPermission');
 
 const initModels = () => {
   // Asociaciones de Usuario
@@ -27,6 +30,18 @@ const initModels = () => {
   // Asociaciones de Pedido
   Order.belongsTo(User, { foreignKey: 'userId', as: 'user' });
   Order.belongsTo(User, { foreignKey: 'deliveryUserId', as: 'deliveryUser' });
+  Order.hasMany(OrderItem, { foreignKey: 'orderId', as: 'items' });
+
+  // Asociaciones de Item de Pedido
+  OrderItem.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
+  OrderItem.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+
+  // Asociaciones de Permisos
+  User.belongsToMany(Permission, { through: UserPermission, foreignKey: 'userId', as: 'permissions' });
+  Permission.belongsToMany(User, { through: UserPermission, foreignKey: 'permissionId', as: 'users' });
+
+  // Asociación adicional para InvoiceItem con OrderItem
+  InvoiceItem.belongsTo(OrderItem, { foreignKey: 'orderItemId', as: 'orderItem' });
 };
 
 module.exports = initModels;

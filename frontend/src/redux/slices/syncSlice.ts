@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { SyncEvent, Notification } from '../../../../shared/types';
+import type { SyncEvent, RealtimeNotification } from '../../../../shared/types';
 
 /**
  * Slice de sincronización offline/online
@@ -8,7 +8,7 @@ import type { SyncEvent, Notification } from '../../../../shared/types';
 interface SyncState {
   isOnline: boolean;
   pendingEvents: SyncEvent[];
-  notifications: Notification[];
+  notifications: RealtimeNotification[];
   syncing: boolean;
   lastSync: string | null;
   error: string | null;
@@ -59,7 +59,7 @@ const syncSlice = createSlice({
       state.syncing = false;
       state.error = action.payload;
     },
-    addNotification: (state, action: PayloadAction<Notification>) => {
+    addNotification: (state, action: PayloadAction<RealtimeNotification>) => {
       const incoming = action.payload;
       const incomingData = typeof incoming.data === 'object' && incoming.data !== null ? (incoming.data as { invoiceId?: number | string; status?: string }) : {};
       const incomingTime = new Date(incoming.timestamp).getTime();

@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import type { Notification as AppNotification } from '../../../shared/types';
+import type { RealtimeNotification } from '../../../shared/types';
 
 /**
  * Servicio de Socket.IO
@@ -97,7 +97,7 @@ class SocketService {
       this.clearHeartbeat();
     });
 
-    this.socket.on('notification', (notification: AppNotification) => {
+    this.socket.on('notification', (notification: RealtimeNotification) => {
       this.handleNotification(notification);
     });
   }
@@ -118,7 +118,7 @@ class SocketService {
     this.currentUserData = null;
   }
 
-  private getNotificationTypeLabel(type: AppNotification['type']): string {
+  private getNotificationTypeLabel(type: RealtimeNotification['type']): string {
     switch (type) {
       case 'invoice_created':
         return 'Factura creada';
@@ -139,7 +139,7 @@ class SocketService {
     }
   }
 
-  private isDuplicateNotification(notification: AppNotification): boolean {
+  private isDuplicateNotification(notification: RealtimeNotification): boolean {
     const payload = typeof notification.data === 'object' && notification.data !== null ? (notification.data as { invoiceId?: number | string; status?: string }) : {};
     const key = `${notification.type}:${payload.invoiceId ?? 'na'}:${payload.status ?? 'na'}:${notification.message}`;
     const now = Date.now();
@@ -162,7 +162,7 @@ class SocketService {
   /**
    * Maneja notificaciones entrantes
    */
-  private handleNotification(notification: AppNotification): void {
+  private handleNotification(notification: RealtimeNotification): void {
     if (this.isDuplicateNotification(notification)) {
       return;
     }

@@ -21,8 +21,13 @@ const Order = db.define('Order', {
       key: 'id',
     },
   },
+  type: {
+    type: DataTypes.ENUM('purchase', 'sale'),
+    allowNull: false,
+    defaultValue: 'sale',
+  },
   status: {
-    type: DataTypes.ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled'),
+    type: DataTypes.ENUM('pending', 'partial', 'completed', 'cancelled'),
     allowNull: false,
     defaultValue: 'pending',
   },

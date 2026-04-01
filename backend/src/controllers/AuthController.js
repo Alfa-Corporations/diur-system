@@ -1,4 +1,5 @@
 const AuthService = require('../services/AuthService');
+const UserRepository = require('../repositories/UserRepository');
 const { validateRequired } = require('../middlewares/validation.middleware');
 
 /**
@@ -24,18 +25,75 @@ class AuthController {
   }
 
   /**
+   * Lista usuarios
+   * GET /users
+   */
+  async listUsers(req, res) {
+    try {
+      const limit = parseInt(req.query.limit, 10) || 50;
+      const offset = parseInt(req.query.offset, 10) || 0;
+      const users = await UserRepository.findAll(limit, offset);
+      const usersWithoutPassword = users.map(({ password, ...user }) => user);
+      res.json({ users: usersWithoutPassword });
+    } catch (error) {
+      res.status(500).json({ message: error.message || 'Error listing users' });
+    }
+  }
+
+  /**
+   * Actualiza usuario por ID
+   * PUT /users/:id
+   */
+  async updateUser(req, res) {
+    try {
+      const userId = Number(req.params.id);
+      const updateData = { ...req.body };
+
+      if (updateData.password) {
+        const bcrypt = require('bcrypt');
+        updateData.password = await bcrypt.hash(updateData.password, 10);
+      }
+
+      const updatedUser = await UserRepository.update(userId, updateData);
+      const { password, ...userWithoutPassword } = updatedUser.toJSON();
+      res.json({ user: userWithoutPassword });
+    } catch (error) {
+      res.status(400).json({ message: error.message || 'Error updating user' });
+    }
+  }
+
+  /**
+   * Elimina usuario por ID
+   * DELETE /users/:id
+   */
+  async deleteUser(req, res) {
+    try {
+      const userId = Number(req.params.id);
+      const deleted = await UserRepository.delete(userId);
+      if (!deleted) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: error.message || 'Error deleting user' });
+    }
+  }
+
+  /**
    * Inicia sesión de usuario
    * POST /auth/login
    */
   async login(req, res) {
     try {
       const { identifier, password } = req.body;
+      console.log('AuthController.login request:', { identifier });
       const result = await AuthService.login(identifier, password);
       res.json({
         message: 'Login successful',
         ...result,
       });
     } catch (error) {
+      console.error('AuthController.login failed:', error);
       res.status(401).json({ message: error.message });
     }
   }

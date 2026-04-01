@@ -1,4 +1,5 @@
-const { User } = require('../models');
+const { User, Permission } = require('../models');
+const { Op } = require('sequelize');
 
 /**
  * Repositorio para operaciones de Usuario
@@ -21,7 +22,9 @@ class UserRepository {
    * @returns {Promise<User|null>} Usuario encontrado o null
    */
   async findById(id) {
-    return await User.findByPk(id);
+    return await User.findByPk(id, {
+      include: [{ model: Permission, as: 'permissions', through: { attributes: [] } }]
+    });
   }
 
   /**
@@ -30,7 +33,14 @@ class UserRepository {
    * @returns {Promise<User|null>} Usuario encontrado o null
    */
   async findByEmail(email) {
-    return await User.findOne({ where: { email } });
+    return await User.findOne({
+      where: {
+        email: {
+          [Op.iLike]: email,
+        },
+      },
+      include: [{ model: Permission, as: 'permissions', through: { attributes: [] } }]
+    });
   }
 
   /**
@@ -39,7 +49,14 @@ class UserRepository {
    * @returns {Promise<User|null>} Usuario encontrado o null
    */
   async findByUsername(username) {
-    return await User.findOne({ where: { username } });
+    return await User.findOne({
+      where: {
+        username: {
+          [Op.iLike]: username,
+        },
+      },
+      include: [{ model: Permission, as: 'permissions', through: { attributes: [] } }]
+    });
   }
 
   /**
@@ -73,7 +90,11 @@ class UserRepository {
    * @returns {Promise<Array<User>>} Lista de usuarios
    */
   async findAll(limit = 10, offset = 0) {
-    return await User.findAll({ limit, offset });
+    return await User.findAll({
+      limit,
+      offset,
+      include: [{ model: Permission, as: 'permissions', through: { attributes: [] } }]
+    });
   }
 }
 

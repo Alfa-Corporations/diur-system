@@ -1,6 +1,6 @@
 import apiService from './apiService';
 import localDBService from './localDBService';
-import type { CreateInvoiceRequest, Invoice, Product, SyncEvent } from '../../../shared/types';
+import type { CreateInvoiceRequest, Invoice, Product } from '../../../shared/types';
 
 interface SyncFailure {
   eventId: string;

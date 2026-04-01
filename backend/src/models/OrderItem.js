@@ -2,22 +2,22 @@ const { DataTypes } = require('sequelize');
 const db = require('../utils/database');
 
 /**
- * Modelo de Item de Factura
- * Define la estructura de la tabla 'invoice_items' en la base de datos.
- * Relaciona productos con facturas, incluyendo cantidad y precio.
+ * Modelo de Item de Pedido
+ * Define la estructura de la tabla 'order_items' en la base de datos.
+ * Cada item tiene cantidad solicitada, procesada y estado individual.
  */
-const InvoiceItem = db.define('InvoiceItem', {
+const OrderItem = db.define('OrderItem', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true,
     allowNull: false,
   },
-  invoiceId: {
+  orderId: {
     type: DataTypes.INTEGER,
     allowNull: false,
     references: {
-      model: 'invoices',
+      model: 'orders',
       key: 'id',
     },
   },
@@ -29,29 +29,27 @@ const InvoiceItem = db.define('InvoiceItem', {
       key: 'id',
     },
   },
-  orderItemId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'order_items',
-      key: 'id',
-    },
-  },
-  quantity: {
+  quantityRequested: {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
-  price: {
-    type: DataTypes.DECIMAL(10, 2),
+  quantityProcessed: {
+    type: DataTypes.INTEGER,
     allowNull: false,
+    defaultValue: 0,
   },
-  total: {
+  status: {
+    type: DataTypes.ENUM('pending', 'in_transit', 'in_warehouse', 'delivered', 'invoiced'),
+    allowNull: false,
+    defaultValue: 'pending',
+  },
+  unitPrice: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
   },
 }, {
   timestamps: true,
-  tableName: 'invoice_items',
+  tableName: 'order_items',
 });
 
-module.exports = InvoiceItem;
+module.exports = OrderItem;

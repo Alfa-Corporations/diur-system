@@ -1,4 +1,5 @@
 const AuthService = require('../services/AuthService');
+const PermissionService = require('../services/PermissionService');
 
 /**
  * Middleware de autenticación JWT
@@ -23,21 +24,24 @@ const authenticate = async (req, res, next) => {
 };
 
 /**
- * Middleware de autorización por roles
- * Verifica si el usuario tiene uno de los roles permitidos.
- * @param {...string} allowedRoles - Roles permitidos
+ * Middleware de autorización por permisos
+ * Verifica si el usuario tiene al menos uno de los permisos requeridos.
+ * @param {...string} requiredPermissions - Permisos requeridos
  */
-const authorize = (...allowedRoles) => {
-  return (req, res, next) => {
+const authorize = (...requiredPermissions) => {
+  return async (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ message: 'Insufficient permissions' });
+    for (const permission of requiredPermissions) {
+      const hasPermission = await PermissionService.userHasPermission(req.user.id, permission);
+      if (hasPermission) {
+        return next();
+      }
     }
 
-    next();
+    return res.status(403).json({ message: 'Insufficient permissions' });
   };
 };
 

@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import type { Table } from 'dexie';
-import type { Product, Invoice, SyncEvent } from '../../../shared/types';
+import type { Product, Invoice, SyncEvent, Order } from '../../../shared/types';
 
 /**
  * Base de datos local IndexedDB
@@ -9,6 +9,7 @@ import type { Product, Invoice, SyncEvent } from '../../../shared/types';
 export class LocalDatabase extends Dexie {
   products!: Table<Product>;
   invoices!: Table<Invoice>;
+  orders!: Table<Order>;
   pendingSync!: Table<SyncEvent>;
 
   constructor() {
@@ -17,6 +18,7 @@ export class LocalDatabase extends Dexie {
     this.version(1).stores({
       products: 'id, name, sku, category, isActive, updatedAt',
       invoices: 'id, invoiceNumber, userId, status, total, createdAt, updatedAt',
+      orders: 'id, userId, type, status, total, createdAt, updatedAt',
       pendingSync: 'id, type, timestamp, synced'
     });
   }
@@ -74,6 +76,27 @@ class LocalDBService {
 
   async deleteInvoice(id: number): Promise<void> {
     await db.invoices.delete(id);
+  }
+
+  // Pedidos
+  async saveOrders(orders: Order[]): Promise<void> {
+    await db.orders.bulkPut(orders);
+  }
+
+  async getOrders(): Promise<Order[]> {
+    return await db.orders.toArray();
+  }
+
+  async getOrderById(id: number): Promise<Order | undefined> {
+    return await db.orders.get(id);
+  }
+
+  async saveOrder(order: Order): Promise<void> {
+    await db.orders.put(order);
+  }
+
+  async deleteOrder(id: number): Promise<void> {
+    await db.orders.delete(id);
   }
 
   // Eventos de sincronización pendientes

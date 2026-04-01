@@ -2,9 +2,9 @@ import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import { store } from '../redux/store';
 import { logout } from '../redux/slices/authSlice';
-import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, CreateInvoiceRequest, User, Product, Invoice } from '../../../shared/types';
+import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, CreateInvoiceRequest, User, Product, Invoice, Order, OrderItem } from '../../../shared/types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://diur-system.onrender.com/api/v1';
 const BACKEND_BASE_HINT = API_BASE_URL.replace(/\/api\/v1$/, '');
 
 /**
@@ -72,6 +72,20 @@ class ApiService {
   async createUser(userData: RegisterRequest): Promise<User> {
     const response = await this.api.post<{ user: User }>('/users', userData);
     return response.data.user;
+  }
+
+  async getUsers(params?: { limit?: number; offset?: number }): Promise<User[]> {
+    const response = await this.api.get<{ users: User[] }>('/users', { params });
+    return response.data.users;
+  }
+
+  async updateUser(id: number, userData: Partial<RegisterRequest> & { isActive?: boolean }): Promise<User> {
+    const response = await this.api.put<{ user: User }>(`/users/${id}`, userData);
+    return response.data.user;
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    await this.api.delete(`/users/${id}`);
   }
 
   async getProfile(): Promise<User> {
@@ -170,6 +184,48 @@ class ApiService {
   async cancelInvoice(id: number): Promise<Invoice> {
     const response = await this.api.post<{ invoice: Invoice }>(`/invoices/${id}/cancel`);
     return response.data.invoice;
+  }
+
+  // Métodos de pedidos
+  async getOrders(params?: { limit?: number; offset?: number; status?: string; type?: string }): Promise<{ orders: Order[]; totalCount: number }> {
+    const response = await this.api.get('/orders', { params });
+    return {
+      orders: response.data.orders,
+      totalCount: response.data.totalCount || response.data.orders.length
+    };
+  }
+
+  async getOrderById(id: number): Promise<Order> {
+    const response = await this.api.get<{ order: Order }>(`/orders/${id}`);
+    return response.data.order;
+  }
+
+  async createOrder(orderData: { type: 'purchase' | 'sale'; items: Array<{ productId: number; quantityRequested: number }>; customerName?: string; customerAddress?: string }): Promise<Order> {
+    const response = await this.api.post<{ order: Order }>('/orders', orderData);
+    return response.data.order;
+  }
+
+  async updateOrder(id: number, orderData: Partial<Order>): Promise<Order> {
+    const response = await this.api.put<{ order: Order }>(`/orders/${id}`, orderData);
+    return response.data.order;
+  }
+
+  async updateOrderStatus(id: number, status: Order['status']): Promise<Order> {
+    const response = await this.api.patch<{ order: Order }>(`/orders/${id}/status`, { status });
+    return response.data.order;
+  }
+
+  async updateOrderItemStatus(orderId: number, itemId: number, status: OrderItem['status']): Promise<Order> {
+    const response = await this.api.patch<{ order: Order }>(`/orders/${orderId}/items/${itemId}/status`, { status });
+    return response.data.order;
+  }
+
+  async cancelOrder(id: number): Promise<Order> {
+    return this.updateOrderStatus(id, 'cancelled');
+  }
+
+  async deleteOrder(id: number): Promise<void> {
+    await this.api.delete(`/orders/${id}`);
   }
 
   // Métodos de sincronización

@@ -39,6 +39,11 @@ const Product = db.define('Product', {
     allowNull: false,
     unique: true,
   },
+  barcode: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true,
+  },
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,

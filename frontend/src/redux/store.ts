@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import productReducer from './slices/productSlice';
 import invoiceReducer from './slices/invoiceSlice';
+import orderReducer from './slices/orderSlice';
 import syncReducer from './slices/syncSlice';
 
 /**
@@ -13,6 +14,7 @@ export const store = configureStore({
     auth: authReducer,
     products: productReducer,
     invoices: invoiceReducer,
+    orders: orderReducer,
     sync: syncReducer
   },
   middleware: getDefaultMiddleware =>
