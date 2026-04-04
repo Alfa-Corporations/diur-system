@@ -26,12 +26,18 @@ const authenticate = async (req, res, next) => {
 /**
  * Middleware de autorización por permisos
  * Verifica si el usuario tiene al menos uno de los permisos requeridos.
+ * Los usuarios con rol 'admin' tienen acceso automático a todas las rutas.
  * @param {...string} requiredPermissions - Permisos requeridos
  */
 const authorize = (...requiredPermissions) => {
   return async (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    // Si el usuario es admin, permitir acceso automático
+    if (req.user.role === 'admin') {
+      return next();
     }
 
     for (const permission of requiredPermissions) {

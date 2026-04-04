@@ -45,9 +45,9 @@ router.post('/invoices/:id/cancel', InvoiceController.cancelInvoice);
 // Rutas de pedidos
 router.post('/orders', authorize('create_order'), OrderController.createOrder);
 router.get('/orders', OrderController.getOrders);
-router.get('/orders/:id', OrderController.getOrder);
-router.put('/orders/:orderId/items/:productId/status', authorize('manage_inventory'), OrderController.updateOrderItemStatus);
+router.patch('/orders/:orderId/items/:productId/status', authorize('manage_inventory'), OrderController.updateOrderItemStatus);
 router.put('/orders/:id/cancel', authorize('cancel_order'), OrderController.cancelOrder);
+router.get('/orders/:id', OrderController.getOrder);
 
 // Rutas de permisos
 router.get('/permissions', PermissionController.getPermissions);

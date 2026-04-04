@@ -33,9 +33,14 @@ class AuthController {
       const limit = parseInt(req.query.limit, 10) || 50;
       const offset = parseInt(req.query.offset, 10) || 0;
       const users = await UserRepository.findAll(limit, offset);
-      const usersWithoutPassword = users.map(({ password, ...user }) => user);
+      const usersWithoutPassword = users.map(user => {
+        const plainUser = user.toJSON();
+        delete plainUser.password;
+        return plainUser;
+      });
       res.json({ users: usersWithoutPassword });
     } catch (error) {
+      console.error('Error in listUsers:', error);
       res.status(500).json({ message: error.message || 'Error listing users' });
     }
   }

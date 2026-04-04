@@ -36,9 +36,15 @@ const initModels = () => {
   OrderItem.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
   OrderItem.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 
-  // Asociaciones de Permisos
+  // Asociaciones de Permisos - muchos a muchos
   User.belongsToMany(Permission, { through: UserPermission, foreignKey: 'userId', as: 'permissions' });
   Permission.belongsToMany(User, { through: UserPermission, foreignKey: 'permissionId', as: 'users' });
+
+  // Asociaciones directas en tabla de unión UserPermission
+  UserPermission.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+  UserPermission.belongsTo(Permission, { foreignKey: 'permissionId', as: 'permission' });
+  User.hasMany(UserPermission, { foreignKey: 'userId', as: 'userPermissions' });
+  Permission.hasMany(UserPermission, { foreignKey: 'permissionId', as: 'userPermissions' });
 
   // Asociación adicional para InvoiceItem con OrderItem
   InvoiceItem.belongsTo(OrderItem, { foreignKey: 'orderItemId', as: 'orderItem' });

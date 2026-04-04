@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../hooks/redux';
 import apiService from '../services/apiService';
-import type { User } from '../../../shared/types';
+import type { User, Permission } from '../../../shared/types';
 
 const UserManagementPage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +15,12 @@ const UserManagementPage: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formState, setFormState] = useState({ username: '', email: '', role: 'cashier' as User['role'], isActive: true });
+
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [selectedPermissionUser, setSelectedPermissionUser] = useState<User | null>(null);
+  const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>([]);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [permissionLoading, setPermissionLoading] = useState(false);
 
   const currentUserRole = user?.role;
   const isAdmin = currentUserRole === 'admin';
@@ -41,6 +47,19 @@ const UserManagementPage: React.FC = () => {
   useEffect(() => {
     void loadUsers();
   }, [isOnline]);
+
+  useEffect(() => {
+    const loadPermissions = async () => {
+      try {
+        const allPermissions = await apiService.getPermissions();
+        setPermissions(allPermissions);
+      } catch (err: unknown) {
+        console.error('Error cargando permisos:', err);
+      }
+    };
+
+    void loadPermissions();
+  }, []);
 
   const resetForm = () => {
     setEditingUser(null);
@@ -103,6 +122,61 @@ const UserManagementPage: React.FC = () => {
       const message = err instanceof Error ? err.message : 'Error eliminando usuario';
       setError(message);
     }
+  };
+
+  const startPermissionSession = async (targetUser: User) => {
+    if (!isAdmin) {
+      setPermissionError('Solo administradores pueden gestionar permisos.');
+      return;
+    }
+
+    setPermissionLoading(true);
+    setPermissionError(null);
+    setSelectedPermissionUser(targetUser);
+
+    try {
+      const userPermissions = await apiService.getUserPermissions(targetUser.id);
+      setSelectedPermissionIds(userPermissions.map(p => p.id));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al cargar permisos del usuario.';
+      setPermissionError(message);
+    } finally {
+      setPermissionLoading(false);
+    }
+  };
+
+  const togglePermission = (permissionId: number) => {
+    setSelectedPermissionIds(prev => (prev.includes(permissionId) ? prev.filter(id => id !== permissionId) : [...prev, permissionId]));
+  };
+
+  const savePermissions = async () => {
+    if (!selectedPermissionUser) return;
+    if (!isAdmin) {
+      setPermissionError('Solo administradores pueden guardar permisos.');
+      return;
+    }
+
+    setPermissionLoading(true);
+    setPermissionError(null);
+
+    try {
+      await apiService.assignPermissions(selectedPermissionUser.id, selectedPermissionIds);
+      setError(null);
+      setSelectedPermissionUser(null);
+      setSelectedPermissionIds([]);
+      await loadUsers();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error guardando permisos.';
+      setPermissionError(message);
+    } finally {
+      setPermissionLoading(false);
+    }
+  };
+
+  const cancelPermissionSession = () => {
+    setSelectedPermissionUser(null);
+    setSelectedPermissionIds([]);
+    setPermissionError(null);
   };
 
   return (
@@ -173,6 +247,45 @@ const UserManagementPage: React.FC = () => {
         )}
       </div>
 
+      {selectedPermissionUser && (
+        <div className='section-card mb-3'>
+          <div className='d-flex justify-content-between align-items-center mb-2'>
+            <h4>Asignar permisos a {selectedPermissionUser.username}</h4>
+            <button className='btn btn-sm btn-outline-secondary' onClick={cancelPermissionSession}>
+              Cancelar
+            </button>
+          </div>
+
+          {permissionError && <div className='alert alert-danger'>{permissionError}</div>}
+
+          {permissionLoading ? (
+            <div>Cargando permisos del usuario...</div>
+          ) : (
+            <div className='row g-2'>
+              {permissions.map(permission => (
+                <div key={permission.id} className='col-6 col-md-4'>
+                  <div className='form-check'>
+                    <input id={`perm-${permission.id}`} type='checkbox' className='form-check-input' checked={selectedPermissionIds.includes(permission.id)} onChange={() => togglePermission(permission.id)} />
+                    <label htmlFor={`perm-${permission.id}`} className='form-check-label'>
+                      {permission.name}
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className='mt-3'>
+            <button className='btn btn-success me-2' disabled={permissionLoading} onClick={savePermissions}>
+              Guardar permisos
+            </button>
+            <button className='btn btn-outline-secondary' onClick={cancelPermissionSession}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className='section-card'>
         <div className='table-responsive'>
           <table className='table table-hover table-modern mb-0'>
@@ -206,6 +319,9 @@ const UserManagementPage: React.FC = () => {
                     <td>{u.role}</td>
                     <td>{u.isActive ? 'Activo' : 'Inactivo'}</td>
                     <td>
+                      <button className='btn btn-sm btn-outline-primary me-2' onClick={() => startPermissionSession(u)}>
+                        Permisos
+                      </button>
                       <button className='btn btn-sm btn-outline-secondary me-2' onClick={() => handleUserClick(u)}>
                         Editar
                       </button>

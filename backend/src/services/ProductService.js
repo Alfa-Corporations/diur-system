@@ -46,14 +46,8 @@ class ProductService {
    * @returns {Promise<Object>} Producto actualizado
    */
   async updateProduct(id, updateData) {
-    // Si se actualiza SKU, verificar unicidad
-    if (updateData.sku) {
-      const existingProduct = await ProductRepository.findBySku(updateData.sku);
-      if (existingProduct && existingProduct.id !== id) {
-        throw new Error('SKU already exists');
-      }
-    }
-
+    delete updateData.sku
+    delete updateData.stock
     return await ProductRepository.update(id, updateData);
   }
 

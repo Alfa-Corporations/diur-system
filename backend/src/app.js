@@ -25,9 +25,9 @@ db.sync({ force: false, alter: process.env.NODE_ENV !== 'production' })
         console.log('Database synchronized');
         initModels(); // Inicializar asociaciones después de sincronizar
         // Ejecutar seeding en desarrollo
-        if (process.env.NODE_ENV !== 'production') {
-            seedDatabase();
-        }
+        // if (process.env.NODE_ENV !== 'production') {
+        //     seedDatabase();
+        // }
     })
     .catch(error => console.log('Database sync failed:', error));
 

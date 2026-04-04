@@ -39,7 +39,7 @@ const Dashboard: React.FC = () => {
     { label: 'Usuarios', path: '/users', icon: '👥', helper: 'Administración de accesos', permission: 'crud_users' }
   ];
 
-  const availableMenuItems = menuItems.filter(item => !item.permission || hasPermission(item.permission));
+  const availableMenuItems = menuItems.filter(item => !item.permission || hasPermission(item.permission) || user.role === 'admin');
 
   return (
     <div className='app-shell'>

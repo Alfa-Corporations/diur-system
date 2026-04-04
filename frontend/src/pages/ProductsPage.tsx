@@ -323,8 +323,8 @@ const ProductsPage: React.FC = () => {
                     <input type='text' className='form-control' value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                   </div>
                   <div className='mb-3'>
-                    <label className='form-label'>SKU *</label>
-                    <input type='text' className='form-control' value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })} required />
+                    <label className='form-label'>SKU</label>
+                    <input type='text' className='form-control' disabled value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })} required />
                   </div>
                   <div className='mb-3'>
                     <label className='form-label'>Descripción</label>
@@ -336,8 +336,8 @@ const ProductsPage: React.FC = () => {
                       <input type='number' step='0.01' className='form-control' value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} required />
                     </div>
                     <div className='col-12 col-md-6 mb-3'>
-                      <label className='form-label'>Stock *</label>
-                      <input type='number' className='form-control' value={formData.stock} onChange={e => setFormData({ ...formData, stock: e.target.value })} required />
+                      <label className='form-label'>Stock</label>
+                      <input type='number' className='form-control' disabled value={formData.stock} onChange={e => setFormData({ ...formData, stock: e.target.value })} required />
                     </div>
                   </div>
                   <div className='mb-3'>

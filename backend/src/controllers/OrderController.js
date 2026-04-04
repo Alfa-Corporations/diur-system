@@ -74,7 +74,7 @@ class OrderController {
 
   /**
    * Actualiza el estado de un item de pedido
-   * PUT /orders/:orderId/items/:productId/status
+   * PATCH /orders/:orderId/items/:productId/status
    */
   async updateOrderItemStatus(req, res) {
     try {

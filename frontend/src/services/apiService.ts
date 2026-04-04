@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import { store } from '../redux/store';
 import { logout } from '../redux/slices/authSlice';
-import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, CreateInvoiceRequest, User, Product, Invoice, Order, OrderItem } from '../../../shared/types';
+import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, CreateInvoiceRequest, User, Product, Invoice, Order, OrderItem, Permission } from '../../../shared/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://diur-system.onrender.com/api/v1';
 const BACKEND_BASE_HINT = API_BASE_URL.replace(/\/api\/v1$/, '');
@@ -91,6 +91,20 @@ class ApiService {
   async getProfile(): Promise<User> {
     const response = await this.api.get<{ user: User }>('/auth/profile');
     return response.data.user;
+  }
+
+  async getPermissions(): Promise<Permission[]> {
+    const response = await this.api.get<{ permissions: Permission[] }>('/permissions');
+    return response.data.permissions;
+  }
+
+  async getUserPermissions(userId: number): Promise<Permission[]> {
+    const response = await this.api.get<{ permissions: Permission[] }>(`/permissions/user/${userId}`);
+    return response.data.permissions;
+  }
+
+  async assignPermissions(userId: number, permissionIds: number[]): Promise<void> {
+    await this.api.post('/permissions/assign', { userId, permissionIds });
   }
 
   async logout(): Promise<void> {
@@ -215,8 +229,8 @@ class ApiService {
     return response.data.order;
   }
 
-  async updateOrderItemStatus(orderId: number, itemId: number, status: OrderItem['status']): Promise<Order> {
-    const response = await this.api.patch<{ order: Order }>(`/orders/${orderId}/items/${itemId}/status`, { status });
+  async updateOrderItemStatus(orderId: number, productId: number, status: OrderItem['status']): Promise<Order> {
+    const response = await this.api.patch<{ order: Order }>(`/orders/${orderId}/items/${productId}/status`, { status });
     return response.data.order;
   }
 
