@@ -102,8 +102,8 @@ const ProductsPage: React.FC = () => {
       if (!isOnline || error.message === 'OFFLINE_FALLBACK' || shouldFallbackToOffline(error)) {
         if (editingProduct) {
           await localDBService.addPendingEvent({
-            id: `update_product_${editingProduct.id}_${timestamp.getTime()}`,
-            type: 'update_product',
+            id: `actualizar_producto_${editingProduct.id}_${timestamp.getTime()}`,
+            type: 'actualizar_producto',
             data: { id: editingProduct.id, ...productData },
             timestamp: timestampIso,
             synced: false
@@ -123,8 +123,8 @@ const ProductsPage: React.FC = () => {
           } as Product;
 
           await localDBService.addPendingEvent({
-            id: `create_product_${localId}`,
-            type: 'create_product',
+            id: `crear_producto_${localId}`,
+            type: 'crear_producto',
             data: { ...productData, localId },
             timestamp: timestampIso,
             synced: false
@@ -174,8 +174,8 @@ const ProductsPage: React.FC = () => {
     } catch (error: any) {
       if (!isOnline || error.message === 'OFFLINE_FALLBACK' || shouldFallbackToOffline(error)) {
         await localDBService.addPendingEvent({
-          id: `delete_product_${id}_${Date.now()}`,
-          type: 'delete_product',
+          id: `eliminar_producto_${id}_${Date.now()}`,
+          type: 'eliminar_producto',
           data: { id },
           timestamp: timestampIso,
           synced: false
@@ -202,7 +202,7 @@ const ProductsPage: React.FC = () => {
     setEditingProduct(null);
   };
 
-  const canManageProducts = user?.role === 'admin' || user?.role === 'warehouse';
+  const canManageProducts = user?.permissions?.some(p => ['crear_producto', 'actualizar_producto', 'eliminar_producto'].includes(p.name));
   const activeProducts = products.filter(product => product.isActive).length;
   const lowStockProducts = products.filter(product => product.stock <= 10).length;
   const totalUnits = products.reduce((sum, product) => sum + product.stock, 0);
@@ -324,7 +324,7 @@ const ProductsPage: React.FC = () => {
                   </div>
                   <div className='mb-3'>
                     <label className='form-label'>SKU</label>
-                    <input type='text' className='form-control' disabled value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })} required />
+                    <input type='text' className='form-control' disabled={Boolean(editingProduct)} value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })} required />
                   </div>
                   <div className='mb-3'>
                     <label className='form-label'>Descripción</label>
@@ -337,7 +337,7 @@ const ProductsPage: React.FC = () => {
                     </div>
                     <div className='col-12 col-md-6 mb-3'>
                       <label className='form-label'>Stock</label>
-                      <input type='number' className='form-control' disabled value={formData.stock} onChange={e => setFormData({ ...formData, stock: e.target.value })} required />
+                      <input type='number' className='form-control' disabled={Boolean(editingProduct)} value={formData.stock} onChange={e => setFormData({ ...formData, stock: e.target.value })} required />
                     </div>
                   </div>
                   <div className='mb-3'>

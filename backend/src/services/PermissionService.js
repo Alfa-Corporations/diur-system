@@ -66,8 +66,8 @@ class PermissionService {
    */
   async initializeDefaultPermissions() {
     const defaultPermissions = [
-      { name: 'create_order', description: 'Crear pedidos' },
-      { name: 'cancel_order', description: 'Cancelar pedidos' },
+      { name: 'crear_orden', description: 'Crear pedidos' },
+      { name: 'cancelar_orden', description: 'Cancelar pedidos' },
       { name: 'invoice_order', description: 'Facturar pedidos' },
       { name: 'crud_products', description: 'CRUD productos' },
       { name: 'close_day', description: 'Cierre de día' },

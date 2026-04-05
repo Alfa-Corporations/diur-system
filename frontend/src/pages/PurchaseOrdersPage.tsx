@@ -109,7 +109,7 @@ const PurchaseOrdersPage: React.FC = () => {
         // Guardar como evento pendiente
         await localDBService.addPendingEvent({
           id: `sync_${Date.now()}`,
-          type: 'create_order',
+          type: 'crear_orden',
           data: { orderData, items: orderData.items },
           timestamp: new Date().toISOString(),
           synced: false
@@ -148,7 +148,7 @@ const PurchaseOrdersPage: React.FC = () => {
       } else {
         await localDBService.addPendingEvent({
           id: `sync_${Date.now()}`,
-          type: 'update_order',
+          type: 'actualizar_orden',
           data: { orderId, productId, status: newStatus },
           timestamp: new Date().toISOString(),
           synced: false
@@ -179,7 +179,7 @@ const PurchaseOrdersPage: React.FC = () => {
       } else {
         await localDBService.addPendingEvent({
           id: `sync_${Date.now()}`,
-          type: 'update_order',
+          type: 'actualizar_orden',
           data: { orderId, status: 'cancelled' },
           timestamp: new Date().toISOString(),
           synced: false

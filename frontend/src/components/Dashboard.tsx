@@ -30,11 +30,11 @@ const Dashboard: React.FC = () => {
   if (!user) return null;
 
   const menuItems = [
-    { label: 'Productos', path: '/products', icon: '📦', helper: 'Inventario y stock', permission: 'crud_products' },
-    { label: 'Pedidos de Compra', path: '/orders/purchase', icon: '📥', helper: 'Gestión de compras', permission: 'create_order' },
-    { label: 'Pedidos de Venta', path: '/orders/sale', icon: '📤', helper: 'Gestión de ventas', permission: 'create_order' },
-    { label: 'Punto de Venta', path: '/pos', icon: '🛒', helper: 'Venta en local', permission: 'create_order' },
-    { label: 'Dashboard Pedidos', path: '/orders/dashboard', icon: '📊', helper: 'Vista global de pedidos', permission: 'create_order' },
+    { label: 'Productos', path: '/products', icon: '📦', helper: 'Inventario y stock', permission: 'gestionar_productos' },
+    { label: 'Pedidos de Compra', path: '/orders/purchase', icon: '📥', helper: 'Gestión de compras', permission: 'crear_orden' },
+    { label: 'Pedidos de Venta', path: '/orders/sale', icon: '📤', helper: 'Gestión de ventas', permission: 'crear_orden' },
+    { label: 'Punto de Venta', path: '/pos', icon: '🛒', helper: 'Venta en local', permission: 'crear_orden' },
+    { label: 'Dashboard Pedidos', path: '/orders/dashboard', icon: '📊', helper: 'Vista global de pedidos', permission: 'crear_orden' },
     { label: 'Facturas', path: '/invoices', icon: '🧾', helper: 'Ventas y cobros', permission: 'invoice_order' },
     { label: 'Usuarios', path: '/users', icon: '👥', helper: 'Administración de accesos', permission: 'crud_users' }
   ];

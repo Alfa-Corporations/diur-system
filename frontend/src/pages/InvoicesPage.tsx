@@ -337,8 +337,8 @@ const InvoicesPage: React.FC = () => {
 
         if (!isOnline) {
           await localDBService.addPendingEvent({
-            id: `update_invoice_${eventId}`,
-            type: 'update_invoice',
+            id: `actualizar_factura_${eventId}`,
+            type: 'actualizar_factura',
             data: { id: editingInvoice.id, ...invoiceData, status: targetStatus, paymentMethod, paymentReference, amountReceived: receivedAmount, changeAmount: computedChange },
             timestamp: eventTimestampIso,
             synced: false
@@ -368,8 +368,8 @@ const InvoicesPage: React.FC = () => {
 
         if (!isOnline) {
           await localDBService.addPendingEvent({
-            id: `create_invoice_${eventId}`,
-            type: 'create_invoice',
+            id: `crear_factura_${eventId}`,
+            type: 'crear_factura',
             data: { localId: eventId, ...invoiceData, status: targetStatus, paymentMethod, paymentReference, amountReceived: receivedAmount, changeAmount: computedChange },
             timestamp: eventTimestampIso,
             synced: false
@@ -543,7 +543,7 @@ const InvoicesPage: React.FC = () => {
       if (!isOnline) {
         await localDBService.addPendingEvent({
           id: `pay_invoice_${invoiceToPay.id}_${paymentTimestamp.getTime()}`,
-          type: 'update_invoice',
+          type: 'actualizar_factura',
           data: { id: invoiceToPay.id, status: 'paid', paymentMethod, paymentReference, amountReceived: receivedAmount, changeAmount: computedChange },
           timestamp: paymentTimestampIso,
           synced: false

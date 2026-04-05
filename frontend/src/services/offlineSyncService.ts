@@ -86,9 +86,9 @@ class OfflineSyncService {
         const payload = typeof event.data === 'object' && event.data !== null ? ({ ...event.data } as Record<string, unknown>) : {};
 
         switch (event.type) {
-          case 'create_product': {
+          case 'crear_producto': {
             const createdProduct = await apiService.createProduct(this.sanitizeProductPayload(payload) as Product);
-            const localId = Number(payload.localId ?? this.extractLocalId(event.id, 'create_product_'));
+            const localId = Number(payload.localId ?? this.extractLocalId(event.id, 'crear_producto_'));
 
             if (Number.isFinite(localId)) {
               productIdMap.set(localId, createdProduct.id);
@@ -99,24 +99,24 @@ class OfflineSyncService {
             break;
           }
 
-          case 'update_product': {
+          case 'actualizar_producto': {
             const targetId = this.resolveMappedId(payload.id, productIdMap);
             const updatedProduct = await apiService.updateProduct(targetId, this.sanitizeProductPayload(payload));
             await localDBService.saveProduct(updatedProduct);
             break;
           }
 
-          case 'delete_product': {
+          case 'eliminar_producto': {
             const targetId = this.resolveMappedId(payload.id, productIdMap);
             await apiService.deleteProduct(targetId);
             await localDBService.deleteProduct(targetId);
             break;
           }
 
-          case 'create_invoice': {
+          case 'crear_factura': {
             const invoicePayload = this.buildInvoicePayload(payload);
             let createdInvoice = await apiService.createInvoice(invoicePayload);
-            const localId = Number(payload.localId ?? this.extractLocalId(event.id, 'create_invoice_'));
+            const localId = Number(payload.localId ?? this.extractLocalId(event.id, 'crear_factura_'));
 
             if (payload.status === 'paid') {
               createdInvoice = await apiService.updateInvoiceStatus(createdInvoice.id, 'paid', {
@@ -136,7 +136,7 @@ class OfflineSyncService {
             break;
           }
 
-          case 'update_invoice': {
+          case 'actualizar_factura': {
             const targetId = this.resolveMappedId(payload.id, invoiceIdMap);
 
             if (payload.status === 'paid') {

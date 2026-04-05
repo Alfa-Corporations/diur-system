@@ -7,13 +7,13 @@ const PermissionService = require("../services/PermissionService");
 initModels();
 
 const permissions = [
-    { name: 'create_order', description: 'Crear pedidos' },
-    { name: 'cancel_order', description: 'Cancelar pedidos' },
+    { name: 'crear_orden', description: 'Crear pedidos' },
+    { name: 'cancelar_orden', description: 'Cancelar pedidos' },
     { name: 'invoice_order', description: 'Facturar pedidos' },
     { name: 'crud_products', description: 'CRUD productos' },
     { name: 'close_day', description: 'Cierre de día' },
     { name: 'crud_users', description: 'CRUD usuarios' },
-    { name: 'view_reports', description: 'Ver reportes' },
+    { name: 'ver_reportes', description: 'Ver reportes' },
     { name: 'manage_inventory', description: 'Gestionar inventario' },
 ];
 
@@ -43,11 +43,11 @@ const users = [
 
 const userPermissions = [
     // Admin tiene todos los permisos
-    { userIndex: 0, permissions: ['create_order', 'cancel_order', 'invoice_order', 'crud_products', 'close_day', 'crud_users', 'view_reports', 'manage_inventory'] },
+    { userIndex: 0, permissions: ['crear_orden', 'cancelar_orden', 'invoice_order', 'crud_products', 'close_day', 'crud_users', 'ver_reportes', 'manage_inventory'] },
     // Cashier puede crear pedidos de venta, facturar, gestionar productos básicos
-    { userIndex: 1, permissions: ['create_order', 'invoice_order', 'crud_products'] },
+    { userIndex: 1, permissions: ['crear_orden', 'invoice_order', 'crud_products'] },
     // Warehouse puede gestionar inventario y pedidos de compra
-    { userIndex: 2, permissions: ['create_order', 'manage_inventory', 'crud_products'] },
+    { userIndex: 2, permissions: ['crear_orden', 'manage_inventory', 'crud_products'] },
 ];
 
 async function seedDatabase() {

@@ -8,7 +8,7 @@ export interface User {
   id: number;
   username: string;
   email: string;
-  role: 'admin' | 'cashier' | 'warehouse' | 'delivery';
+  role: 'admin' | 'caja' | 'bodega' | 'vendedor';
   permissions?: Permission[];
   isActive: boolean;
   createdAt: string;
@@ -190,7 +190,7 @@ export interface UpdateStockRequest {
 // Eventos de sincronización
 export interface SyncEvent {
   id: string;
-  type: 'create_product' | 'update_product' | 'delete_product' | 'create_invoice' | 'update_invoice' | 'delete_invoice' | 'create_order' | 'update_order' | 'delete_order';
+  type: 'crear_producto' | 'actualizar_producto' | 'eliminar_producto' | 'crear_factura' | 'actualizar_factura' | 'delete_invoice' | 'crear_orden' | 'actualizar_orden' | 'delete_order';
   data: unknown;
   timestamp: string;
   synced: boolean;

@@ -14,7 +14,7 @@ const UserManagementPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [formState, setFormState] = useState({ username: '', email: '', role: 'cashier' as User['role'], isActive: true });
+  const [formState, setFormState] = useState({ username: '', email: '', role: 'caja' as User['role'], isActive: true });
 
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [selectedPermissionUser, setSelectedPermissionUser] = useState<User | null>(null);
@@ -63,7 +63,7 @@ const UserManagementPage: React.FC = () => {
 
   const resetForm = () => {
     setEditingUser(null);
-    setFormState({ username: '', email: '', role: 'cashier', isActive: true });
+    setFormState({ username: '', email: '', role: 'caja', isActive: true });
   };
 
   const handleUserClick = (selected: User) => {
@@ -92,7 +92,7 @@ const UserManagementPage: React.FC = () => {
         const created = await apiService.createUser({
           username: formState.username,
           email: formState.email,
-          password: '123456',
+          password: `${formState.username}123`,
           role: formState.role
         });
         setUsers(prev => [created, ...prev]);
@@ -226,9 +226,9 @@ const UserManagementPage: React.FC = () => {
               <label className='form-label'>Rol</label>
               <select value={formState.role} onChange={e => setFormState(prev => ({ ...prev, role: e.target.value as User['role'] }))} className='form-select'>
                 <option value='admin'>admin</option>
-                <option value='cashier'>cashier</option>
-                <option value='warehouse'>warehouse</option>
-                <option value='delivery'>delivery</option>
+                <option value='caja'>caja</option>
+                <option value='bodega'>bodega</option>
+                <option value='vendedor'>vendedor</option>
               </select>
             </div>
             <div className='col-12 col-md-2'>

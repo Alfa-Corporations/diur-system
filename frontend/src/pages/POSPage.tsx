@@ -139,7 +139,7 @@ const POSPage: React.FC = () => {
       } else {
         await localDBService.addPendingEvent({
           id: `order_${Date.now()}`,
-          type: 'create_order',
+          type: 'crear_orden',
           data: orderData,
           timestamp: new Date().toISOString(),
           synced: false

@@ -23,6 +23,7 @@ class AuthService {
       throw new Error('User already exists');
     }
 
+
     // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -31,6 +32,7 @@ class AuthService {
       ...userInfo,
       password: hashedPassword,
     });
+
 
     // Retornar usuario sin contraseña
     const { password: _, ...userWithoutPassword } = user.toJSON();

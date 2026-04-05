@@ -145,7 +145,7 @@ export interface UpdateStockRequest {
 
 export interface SyncEvent {
   id: string;
-  type: 'create_product' | 'update_product' | 'delete_product' | 'create_invoice' | 'update_invoice' | 'delete_invoice';
+  type: 'crear_producto' | 'actualizar_producto' | 'eliminar_producto' | 'crear_factura' | 'actualizar_factura' | 'delete_invoice';
   data: unknown;
   timestamp: string;
   synced: boolean;

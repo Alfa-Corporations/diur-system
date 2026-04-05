@@ -43,10 +43,10 @@ router.post('/invoices/:id/send-email', InvoiceController.sendInvoiceEmail);
 router.post('/invoices/:id/cancel', InvoiceController.cancelInvoice);
 
 // Rutas de pedidos
-router.post('/orders', authorize('create_order'), OrderController.createOrder);
+router.post('/orders', authorize('crear_orden'), OrderController.createOrder);
 router.get('/orders', OrderController.getOrders);
 router.patch('/orders/:orderId/items/:productId/status', authorize('manage_inventory'), OrderController.updateOrderItemStatus);
-router.put('/orders/:id/cancel', authorize('cancel_order'), OrderController.cancelOrder);
+router.put('/orders/:id/cancel', authorize('cancelar_orden'), OrderController.cancelOrder);
 router.get('/orders/:id', OrderController.getOrder);
 
 // Rutas de permisos
