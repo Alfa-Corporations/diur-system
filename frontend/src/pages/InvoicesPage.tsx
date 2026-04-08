@@ -674,7 +674,7 @@ const InvoicesPage: React.FC = () => {
 
   const canCreateInvoices = Boolean(user);
   const canPayInvoices = Boolean(user);
-  const canEditInvoices = user?.role === 'admin' || user?.role === 'cashier';
+  const canEditInvoices = user?.role === 'admin' || user?.role === 'caja';
   const isDeletedView = isAdmin && invoiceViewMode === 'deleted';
   const visibleInvoices = isDeletedView ? invoices.filter(invoice => invoice.status === 'cancelled') : invoices.filter(invoice => invoice.status !== 'cancelled');
   const createdInvoices = visibleInvoices.filter(invoice => invoice.status === 'pending').length;
