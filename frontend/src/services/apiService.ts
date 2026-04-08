@@ -4,7 +4,7 @@ import { store } from '../redux/store';
 import { logout } from '../redux/slices/authSlice';
 import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, CreateInvoiceRequest, User, Product, Invoice, Order, OrderItem, Permission } from '../../../shared/types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://diur-system.onrender.com/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://diursystem.alfauzcat.com/api/v1';
 const BACKEND_BASE_HINT = API_BASE_URL.replace(/\/api\/v1$/, '');
 
 /**
