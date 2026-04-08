@@ -1,15 +1,18 @@
+// src/seeders/seedDatabase.js
 const bcrypt = require('bcrypt');
+const db = require('../utils/database');
+const initModels = require('../models/initModels');
 const { User, Product, Permission, UserPermission } = require('../models');
 
-/**
- * Seeder para datos iniciales
- * Crea usuarios, productos, y permisos de prueba
- */
+initModels(); // Inicializa relaciones entre modelos
+
 const seedDatabase = async () => {
   try {
-    console.log('🌱 Iniciando seeding de base de datos...');
+    console.log('🌱 Sincronizando base de datos...');
+    await db.sync({ force: true }); // Borra y crea tablas
+    console.log('✅ Base de datos sincronizada.');
 
-    // Definir todos los permisos disponibles en el sistema
+    // --- PERMISOS ---
     const permissionsData = [
       { name: 'gestionar_productos', description: 'Gestionar productos' },
       { name: 'crear_producto', description: 'Crear productos' },
@@ -37,135 +40,61 @@ const seedDatabase = async () => {
       { name: 'acceso_administrativo', description: 'Acceso administrativo completo' },
     ];
 
-
-    // Crear permisos
     const permissions = [];
     for (const permData of permissionsData) {
-      const [permission, created] = await Permission.findOrCreate({
+      const [permission] = await Permission.findOrCreate({
         where: { name: permData.name },
         defaults: permData,
       });
       permissions.push(permission);
-      if (created) {
-        console.log(`✅ Permiso creado: ${permission.name}`);
-      }
+      console.log(`✅ Permiso procesado: ${permission.name}`);
     }
 
-    // Crear usuarios de prueba
-    const hashedPassword = await bcrypt.hash('admin123', 10);
-
-    const users = [
-      {
-        username: 'admin',
-        email: 'admin@diur.com',
-        password: hashedPassword,
-        role: 'admin',
-      },
-      {
-        username: 'cashier',
-        email: 'cashier@diur.com',
-        password: await bcrypt.hash('cashier123', 10),
-        role: 'caja',
-      },
-      {
-        username: 'warehouse',
-        email: 'warehouse@diur.com',
-        password: await bcrypt.hash('warehouse123', 10),
-        role: 'bodega',
-      },
+    // --- USUARIOS ---
+    const usersData = [
+      { username: 'admin', email: 'admin@diur.com', password: await bcrypt.hash('admin123', 10), role: 'admin' },
+      { username: 'cashier', email: 'cashier@diur.com', password: await bcrypt.hash('cashier123', 10), role: 'caja' },
+      { username: 'warehouse', email: 'warehouse@diur.com', password: await bcrypt.hash('warehouse123', 10), role: 'bodega' },
     ];
 
-    let adminUser = null;
-    for (const userData of users) {
-      const [user, created] = await User.findOrCreate({
+    const users = [];
+    for (const userData of usersData) {
+      const [user] = await User.findOrCreate({
         where: { email: userData.email },
         defaults: userData,
       });
-      if (user.role === 'admin') {
-        adminUser = user;
-      }
-      if (created) {
-        console.log(`✅ Usuario creado: ${user.email}`);
-      } else {
-        console.log(`⚠️ Usuario ya existe: ${user.email}`);
-      }
+      users.push(user);
+      console.log(`✅ Usuario procesado: ${user.email}`);
     }
 
-    // Asignar TODOS los permisos al usuario admin
+    // --- ASIGNAR PERMISOS AL ADMIN ---
+    const adminUser = users.find(u => u.role === 'admin');
     if (adminUser) {
       for (const permission of permissions) {
-        const [userPermission, created] = await UserPermission.findOrCreate({
-          where: {
-            userId: adminUser.id,
-            permissionId: permission.id,
-          },
+        await UserPermission.findOrCreate({
+          where: { userId: adminUser.id, permissionId: permission.id },
         });
-        if (created) {
-          console.log(`✅ Permiso asignado al admin: ${permission.name}`);
-        }
       }
+      console.log('✅ Todos los permisos asignados al admin.');
     }
 
-
-    // Crear productos de prueba
-    const products = [
-      {
-        name: 'Martillo de carpintero',
-        description: 'Martillo profesional de 16 oz',
-        price: 25.50,
-        stock: 50,
-        sku: 'HAM-001',
-        category: 'Herramientas manuales',
-      },
-      {
-        name: 'Destornillador Phillips',
-        description: 'Set de destornilladores Phillips #2',
-        price: 12.75,
-        stock: 30,
-        sku: 'SCR-001',
-        category: 'Herramientas manuales',
-      },
-      {
-        name: 'Cinta métrica 5m',
-        description: 'Cinta métrica retráctil de 5 metros',
-        price: 8.90,
-        stock: 40,
-        sku: 'MEA-001',
-        category: 'Medición',
-      },
-      {
-        name: 'Taladro inalámbrico',
-        description: 'Taladro percutor 18V con batería',
-        price: 89.99,
-        stock: 15,
-        sku: 'DRL-001',
-        category: 'Herramientas eléctricas',
-      },
-      {
-        name: 'Pintura latex blanca 1L',
-        description: 'Pintura latex premium blanca 1 litro',
-        price: 15.25,
-        stock: 25,
-        sku: 'PNT-001',
-        category: 'Pinturas',
-      },
+    // --- PRODUCTOS ---
+    const productsData = [
+      { name: 'Martillo de carpintero', description: 'Martillo profesional de 16 oz', price: 25.5, stock: 50, sku: 'HAM-001', category: 'Herramientas manuales' },
+      { name: 'Destornillador Phillips', description: 'Set de destornilladores Phillips #2', price: 12.75, stock: 30, sku: 'SCR-001', category: 'Herramientas manuales' },
+      { name: 'Cinta métrica 5m', description: 'Cinta métrica retráctil de 5 metros', price: 8.9, stock: 40, sku: 'MEA-001', category: 'Medición' },
+      { name: 'Taladro inalámbrico', description: 'Taladro percutor 18V con batería', price: 89.99, stock: 15, sku: 'DRL-001', category: 'Herramientas eléctricas' },
+      { name: 'Pintura latex blanca 1L', description: 'Pintura latex premium blanca 1 litro', price: 15.25, stock: 25, sku: 'PNT-001', category: 'Pinturas' },
     ];
 
-    for (const productData of products) {
-      const [product, created] = await Product.findOrCreate({
-        where: { sku: productData.sku },
-        defaults: productData,
-      });
-      if (created) {
-        console.log(`✅ Producto creado: ${product.name}`);
-      } else {
-        console.log(`⚠️ Producto ya existe: ${product.name}`);
-      }
+    for (const productData of productsData) {
+      await Product.findOrCreate({ where: { sku: productData.sku }, defaults: productData });
+      console.log(`✅ Producto procesado: ${productData.name}`);
     }
 
     console.log('🎉 Seeding completado exitosamente!');
   } catch (error) {
-    console.error('❌ Error durante el seeding:', error);
+    console.error('❌ Error en seeding:', error);
   }
 };
 
