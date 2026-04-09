@@ -55,14 +55,14 @@ const options = {
                 },
                 ProductRequest: {
                     type: "object",
-                    required: ["name", "price", "stock", "sku"],
+                    required: ["name", "price", "stock", "partnumber"],
                     properties: {
                         name: { type: "string", example: "Laptop Lenovo" },
                         description: { type: "string", example: "Laptop Ryzen 7" },
                         price: { type: "number", example: 850 },
                         stock: { type: "integer", example: 12 },
                         category: { type: "string", example: "Tecnología" },
-                        sku: { type: "string", example: "LAP-001" }
+                        partnumber: { type: "string", example: "LAP-001" }
                     }
                 },
                 InvoiceRequest: {

@@ -35,19 +35,19 @@ class ProductRepository {
   }
 
   /**
-   * Encuentra un producto por SKU
-   * @param {string} sku - SKU del producto
+   * Encuentra un producto por partnumber
+   * @param {string} partnumber - partnumber del producto
    * @returns {Promise<Product|null>} Producto encontrado o null
    */
-  async findBySku(sku) {
-    return await Product.findOne({ where: { sku } });
+  async findBypartnumber(partnumber) {
+    return await Product.findOne({ where: { partnumber } });
   }
 
-  async findBySkus(skus) {
+  async findBypartnumbers(partnumbers) {
     return await Product.findAll({
       where: {
         partnumber: {
-          [Op.in]: skus
+          [Op.in]: partnumbers
         }
       }
     });

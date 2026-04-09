@@ -75,12 +75,12 @@ const POSPage: React.FC = () => {
   };
 
   const addProductByBarcode = (barcode: string) => {
-    const product = products.find(p => p.barcode === barcode || p.sku === barcode);
+    const product = products.find(p => p.barcode === barcode || p.partnumber === barcode);
     if (product) {
       addToCart(product);
     } else {
-      // Intentar buscar por nombre/SKU parcial
-      const found = products.find(p => p.name.toLowerCase().includes(barcode.toLowerCase()) || p.sku.toLowerCase().includes(barcode.toLowerCase()));
+      // Intentar buscar por nombre/partnumber parcial
+      const found = products.find(p => p.name.toLowerCase().includes(barcode.toLowerCase()) || p.partnumber.toLowerCase().includes(barcode.toLowerCase()));
       if (found) {
         addToCart(found);
       } else {
@@ -154,7 +154,7 @@ const POSPage: React.FC = () => {
   };
 
   const filteredProducts = products.filter(
-    product => product.name.toLowerCase().includes(searchTerm.toLowerCase()) || product.sku.toLowerCase().includes(searchTerm.toLowerCase()) || (product.barcode && product.barcode.toLowerCase().includes(searchTerm.toLowerCase()))
+    product => product.name.toLowerCase().includes(searchTerm.toLowerCase()) || product.partnumber.toLowerCase().includes(searchTerm.toLowerCase()) || (product.barcode && product.barcode.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -216,7 +216,7 @@ const POSPage: React.FC = () => {
                           <Card.Text>
                             <strong>${product.price}</strong>
                             <br />
-                            <small className='text-muted'>SKU: {product.sku}</small>
+                            <small className='text-muted'>partnumber: {product.partnumber}</small>
                             <br />
                             {product.barcode && <small className='text-muted'>Código: {product.barcode}</small>}
                           </Card.Text>

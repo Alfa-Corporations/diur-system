@@ -94,33 +94,33 @@ const FileImporter = () => {
     reader.readAsText(file);
   };
 
- const transformData = () => {
-   return data.map((item, i) => {
-     const base = {
-       // 🔥 CAMPOS CLAVE (los que tu backend necesita sí o sí)
-       partnumber: item.partnumber || item.codigo || `SKU-${i}`,
-       name: item.name || item.nombre || `Producto ${i}`,
-       price: Number(item.price || item.precio || 0),
-       stock: Number(item.stock || 0),
+  const transformData = () => {
+    return data.map((item, i) => {
+      const base = {
+        // 🔥 CAMPOS CLAVE (los que tu backend necesita sí o sí)
+        partnumber: item.partnumber || item.codigo || `partnumber-${i}`,
+        name: item.name || item.nombre || `Producto ${i}`,
+        price: Number(item.price || item.precio || 0),
+        stock: Number(item.stock || 0),
 
-       cost: Number(item.costavg || item.costlast || item.costo || 0),
+        cost: Number(item.costavg || item.costlast || item.costo || 0),
 
-       brand: item.brand || 'Genérico',
-       category: item.grupo || item.categoria || 'General',
+        brand: item.brand || 'Genérico',
+        category: item.grupo || item.categoria || 'General',
 
-       iva: Boolean(item.iva),
-       isservice: Boolean(item.isservice),
+        iva: Boolean(item.iva),
+        isservice: Boolean(item.isservice),
 
-       interno: item.interno || i
-     };
+        interno: item.interno || i
+      };
 
-     // 🔥 IMPORTANTE: mantener TODOS los demás campos
-     return {
-       ...item, // 👈 conserva TODO el JSON original
-       ...base // 👈 sobreescribe lo importante normalizado
-     };
-   });
- };
+      // 🔥 IMPORTANTE: mantener TODOS los demás campos
+      return {
+        ...item, // 👈 conserva TODO el JSON original
+        ...base // 👈 sobreescribe lo importante normalizado
+      };
+    });
+  };
 
   // 🚀 Enviar a API usando apiService
   const sendToAPI = async () => {
@@ -188,6 +188,6 @@ const FileImporter = () => {
       <pre style={{ maxHeight: 300, overflow: 'auto', background: '#eee', padding: 10 }}>{JSON.stringify(data, null, 2)}</pre>
     </div>
   );
-};;
+};
 
 export default FileImporter;

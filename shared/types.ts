@@ -162,7 +162,7 @@ export interface CreateProductRequest {
   price: number;
   stock: number;
   category?: string;
-  sku: string;
+  partnumber: string;
 }
 
 export interface CreateInvoiceRequest {

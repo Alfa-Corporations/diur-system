@@ -80,15 +80,15 @@ const seedDatabase = async () => {
 
     // --- PRODUCTOS ---
     /* const productsData = [
-      { name: 'Martillo de carpintero', description: 'Martillo profesional de 16 oz', price: 25.5, stock: 50, sku: 'HAM-001', category: 'Herramientas manuales' },
-      { name: 'Destornillador Phillips', description: 'Set de destornilladores Phillips #2', price: 12.75, stock: 30, sku: 'SCR-001', category: 'Herramientas manuales' },
-      { name: 'Cinta métrica 5m', description: 'Cinta métrica retráctil de 5 metros', price: 8.9, stock: 40, sku: 'MEA-001', category: 'Medición' },
-      { name: 'Taladro inalámbrico', description: 'Taladro percutor 18V con batería', price: 89.99, stock: 15, sku: 'DRL-001', category: 'Herramientas eléctricas' },
-      { name: 'Pintura latex blanca 1L', description: 'Pintura latex premium blanca 1 litro', price: 15.25, stock: 25, sku: 'PNT-001', category: 'Pinturas' },
+      { name: 'Martillo de carpintero', description: 'Martillo profesional de 16 oz', price: 25.5, stock: 50, partnumber: 'HAM-001', category: 'Herramientas manuales' },
+      { name: 'Destornillador Phillips', description: 'Set de destornilladores Phillips #2', price: 12.75, stock: 30, partnumber: 'SCR-001', category: 'Herramientas manuales' },
+      { name: 'Cinta métrica 5m', description: 'Cinta métrica retráctil de 5 metros', price: 8.9, stock: 40, partnumber: 'MEA-001', category: 'Medición' },
+      { name: 'Taladro inalámbrico', description: 'Taladro percutor 18V con batería', price: 89.99, stock: 15, partnumber: 'DRL-001', category: 'Herramientas eléctricas' },
+      { name: 'Pintura latex blanca 1L', description: 'Pintura latex premium blanca 1 litro', price: 15.25, stock: 25, partnumber: 'PNT-001', category: 'Pinturas' },
     ];
 
     for (const productData of productsData) {
-      await Product.findOrCreate({ where: { sku: productData.sku }, defaults: productData });
+      await Product.findOrCreate({ where: { partnumber: productData.partnumber }, defaults: productData });
       console.log(`✅ Producto procesado: ${productData.name}`);
     } */
 

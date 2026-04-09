@@ -325,7 +325,7 @@ const SalesOrdersPage: React.FC = () => {
                   <option value=''>Seleccionar producto</option>
                   {products.map(product => (
                     <option key={product.id} value={product.id}>
-                      {product.name} - {product.sku}
+                      {product.name} - {product.partnumber}
                     </option>
                   ))}
                 </Form.Select>

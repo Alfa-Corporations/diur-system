@@ -13,14 +13,14 @@ class ProductService {
    */
   async createProduct(productData) {
     // Validaciones
-    if (!productData.name || !productData.price || !productData.sku) {
-      throw new Error('Name, price and SKU are required');
+    if (!productData.name || !productData.price || !productData.partnumber) {
+      throw new Error('Name, price and partnumber are required');
     }
 
-    // Verificar SKU único
-    const existingProduct = await ProductRepository.findBySku(productData.sku);
+    // Verificar partnumber único
+    const existingProduct = await ProductRepository.findBypartnumber(productData.partnumber);
     if (existingProduct) {
-      throw new Error('SKU already exists');
+      throw new Error('partnumber already exists');
     }
 
     return await ProductRepository.create(productData);
@@ -31,31 +31,31 @@ class ProductService {
  * @param {Array} productsData
  * @returns {Promise<Array>}
   */
- async createProducts(productsData) {
-   if (!Array.isArray(productsData) || productsData.length === 0) {
-     throw new Error('Debe enviar un array de productos');
+  async createProducts(productsData) {
+    if (!Array.isArray(productsData) || productsData.length === 0) {
+      throw new Error('Debe enviar un array de productos');
     }
-    
+
     // ✅ Validar productos
     const invalidProducts = productsData.filter(
       p => !p.name || !p.price || !p.partnumber
     );
-    
+
     if (invalidProducts.length > 0) {
       throw new Error(`Hay ${invalidProducts.length} productos inválidos (name, price, partnumber requeridos)`);
     }
-    
-    // ✅ Obtener SKUs
-   const skus = productsData.map(p => p.partnumber);
-    
+
+    // ✅ Obtener partnumbers
+    const partnumbers = productsData.map(p => p.partnumber);
+
     // ✅ Buscar duplicados en BD
-    const existingProducts = await ProductRepository.findBySkus(skus);
-    
+    const existingProducts = await ProductRepository.findBypartnumbers(partnumbers);
+
     if (existingProducts.length > 0) {
-      const existingSkus = existingProducts.map(p => p.partnumber);
-      throw new Error(`SKUs ya existentes: ${existingSkus.join(', ')}`);
+      const existingpartnumbers = existingProducts.map(p => p.partnumber);
+      throw new Error(`partnumbers ya existentes: ${existingpartnumbers.join(', ')}`);
     }
-    
+
     // ✅ Crear productos masivamente
     const createdProducts = await ProductRepository.bulkCreate(productsData);
 
@@ -82,7 +82,7 @@ class ProductService {
    * @returns {Promise<Object>} Producto actualizado
    */
   async updateProduct(id, updateData) {
-    delete updateData.sku
+    delete updateData.partnumber
     delete updateData.stock
     return await ProductRepository.update(id, updateData);
   }

@@ -34,7 +34,7 @@ const isValidEmail = (email) => {
  * Valida datos de producto
  */
 const validateProductData = (req, res, next) => {
-  const { name, price, sku } = req.body;
+  const { name, price, partnumber } = req.body;
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return res.status(400).json({ message: 'Valid name is required' });
@@ -44,8 +44,8 @@ const validateProductData = (req, res, next) => {
     return res.status(400).json({ message: 'Valid price is required' });
   }
 
-  if (!sku || typeof sku !== 'string' || sku.trim().length === 0) {
-    return res.status(400).json({ message: 'Valid SKU is required' });
+  if (!partnumber || typeof partnumber !== 'string' || partnumber.trim().length === 0) {
+    return res.status(400).json({ message: 'Valid partnumber is required' });
   }
 
   next();

@@ -27,7 +27,7 @@ const ProductsPage: React.FC = () => {
     name: '',
     price: '',
     stock: '',
-    sku: ''
+    partnumber: ''
   });
 
   // =========================
@@ -147,7 +147,7 @@ const ProductsPage: React.FC = () => {
       name: formData.name,
       price: parseFloat(formData.price),
       stock: parseInt(formData.stock),
-      sku: formData.sku
+      partnumber: formData.partnumber
     };
 
     if (editingProduct) {
@@ -213,7 +213,7 @@ const ProductsPage: React.FC = () => {
             <div className='card shadow-sm'>
               <div className='card-body'>
                 <h5>{p.name}</h5>
-                <p>SKU: {p.partnumber}</p>
+                <p>partnumber: {p.partnumber}</p>
                 <p>💲 {p.price}</p>
                 <p>Stock: {p.stock}</p>
 
@@ -249,7 +249,7 @@ const ProductsPage: React.FC = () => {
               <form onSubmit={handleSubmit}>
                 <div className='modal-body'>
                   <input className='form-control mb-2' placeholder='Nombre' onChange={e => setFormData({ ...formData, name: e.target.value })} />
-                  <input className='form-control mb-2' placeholder='SKU' onChange={e => setFormData({ ...formData, sku: e.target.value })} />
+                  <input className='form-control mb-2' placeholder='partnumber' onChange={e => setFormData({ ...formData, partnumber: e.target.value })} />
                   <input className='form-control mb-2' type='number' placeholder='Precio' onChange={e => setFormData({ ...formData, price: e.target.value })} />
                   <input className='form-control mb-2' type='number' placeholder='Stock' onChange={e => setFormData({ ...formData, stock: e.target.value })} />
                 </div>

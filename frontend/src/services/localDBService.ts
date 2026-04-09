@@ -16,7 +16,7 @@ export class LocalDatabase extends Dexie {
     super('DiurSystemDB');
 
     this.version(1).stores({
-      products: 'id, name, sku, category, isActive, updatedAt',
+      products: 'id, name, partnumber, category, isActive, updatedAt',
       invoices: 'id, invoiceNumber, userId, status, total, createdAt, updatedAt',
       orders: 'id, userId, type, status, total, createdAt, updatedAt',
       pendingSync: 'id, type, timestamp, synced'

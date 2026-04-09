@@ -20,7 +20,7 @@ export interface Product {
   price: number;
   stock: number;
   category?: string;
-  sku: string;
+  partnumber: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -118,7 +118,7 @@ export interface CreateProductRequest {
   price: number;
   stock: number;
   category?: string;
-  sku: string;
+  partnumber: string;
 }
 
 export interface CreateInvoiceRequest {

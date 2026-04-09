@@ -167,7 +167,7 @@ const InvoicesPage: React.FC = () => {
     const term = productSearch.trim().toLowerCase();
 
     return products.filter(product => {
-      const searchableText = `${product.name} ${product.sku} ${product.category ?? ''}`.toLowerCase();
+      const searchableText = `${product.name} ${product.partnumber} ${product.category ?? ''}`.toLowerCase();
       return product.isActive && searchableText.includes(term);
     });
   }, [products, productSearch]);
@@ -985,7 +985,7 @@ const InvoicesPage: React.FC = () => {
 
                   <div className='row g-2 mb-3'>
                     <div className='col-12 col-md-5'>
-                      <input type='text' className='form-control' placeholder='Buscar producto por código/SKU, nombre o categoría...' value={productSearch} onChange={e => setProductSearch(e.target.value)} />
+                      <input type='text' className='form-control' placeholder='Buscar producto por código/partnumber, nombre o categoría...' value={productSearch} onChange={e => setProductSearch(e.target.value)} />
                     </div>
                     <div className='col-12 col-md-4'>
                       <select className='form-select' value={selectedProductId} onChange={e => setSelectedProductId(e.target.value)}>
@@ -997,7 +997,7 @@ const InvoicesPage: React.FC = () => {
                         ) : (
                           filteredProducts.map(product => (
                             <option key={product.id} value={product.id}>
-                              [{product.sku}] {product.name} - {formatCurrency(product.price)} (Stock: {product.stock})
+                              [{product.partnumber}] {product.name} - {formatCurrency(product.price)} (Stock: {product.stock})
                             </option>
                           ))
                         )}
