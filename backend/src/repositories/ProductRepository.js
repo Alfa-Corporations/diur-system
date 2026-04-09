@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { Product } = require('../models');
 
 /**
@@ -16,6 +17,15 @@ class ProductRepository {
   }
 
   /**
+   * Crea un nuevo producto
+   * @param {Array} productData - Datos del producto
+   * @returns {Promise<Product>} Producto creado
+   */
+  async bulkCreate(productData) {
+    return await Product.bulkCreate(productData);
+  }
+
+  /**
    * Encuentra un producto por ID
    * @param {number} id - ID del producto
    * @returns {Promise<Product|null>} Producto encontrado o null
@@ -31,6 +41,16 @@ class ProductRepository {
    */
   async findBySku(sku) {
     return await Product.findOne({ where: { sku } });
+  }
+
+  async findBySkus(skus) {
+    return await Product.findAll({
+      where: {
+        partnumber: {
+          [Op.in]: skus
+        }
+      }
+    });
   }
 
   /**

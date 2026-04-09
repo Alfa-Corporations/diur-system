@@ -11,7 +11,7 @@ const UserPermission = require('./UserPermission');
 
 const initModels = () => {
   // Asociaciones de Usuario
-  User.hasMany(Invoice, { foreignKey: 'userId', as: 'invoices' });
+  //User.hasMany(Invoice, { foreignKey: 'userId', as: 'userInvoices' });
   User.hasMany(Order, { foreignKey: 'userId', as: 'orders' });
   User.hasMany(Order, { foreignKey: 'deliveryUserId', as: 'deliveries' });
 

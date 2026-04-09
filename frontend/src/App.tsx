@@ -21,6 +21,7 @@ import OrdersDashboardPage from './pages/OrdersDashboardPage';
 import POSPage from './pages/POSPage';
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
 import SalesOrdersPage from './pages/SalesOrdersPage';
+import FileImporter from './components/FileImporter';
 
 /**
  * Componente principal de la aplicación
@@ -142,6 +143,7 @@ const AppContent: React.FC = () => {
           <Route path='/login' element={isAuthenticated ? <Navigate to='/dashboard' /> : <Login />} />
           <Route path='/dashboard' element={isAuthenticated ? <Dashboard /> : <Navigate to='/login' />} />
           <Route path='/products' element={isAuthenticated ? <ProductsPage /> : <Navigate to='/login' />} />
+          <Route path='/products/importer' element={isAuthenticated ? <FileImporter /> : <Navigate to='/login' />} />
           <Route path='/invoices' element={isAuthenticated ? <InvoicesPage /> : <Navigate to='/login' />} />
           <Route path='/users' element={isAuthenticated ? <UserManagementPage /> : <Navigate to='/login' />} />
           <Route path='/orders/dashboard' element={isAuthenticated ? <OrdersDashboardPage /> : <Navigate to='/login' />} />

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure, createProductSuccess, updateProductSuccess, deleteProductSuccess } from '../redux/slices/productSlice';
@@ -6,55 +7,83 @@ import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
 import type { Product } from '../../../shared/types';
 
-/**
- * Página de Gestión de Productos
- * Lista, crea, edita y elimina productos
- */
+const LOCAL_STORAGE_KEY = 'products_cache';
+
 const ProductsPage: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { products, loading, error } = useAppSelector(state => state.products);
+
+  const { products } = useAppSelector(state => state.products);
   const { isOnline } = useAppSelector(state => state.sync);
   const { user } = useAppSelector(state => state.auth);
 
   const [showModal, setShowModal] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  const [filters, setFilters] = useState({ search: '' });
+
   const [formData, setFormData] = useState({
     name: '',
-    description: '',
     price: '',
     stock: '',
-    sku: '',
-    category: ''
+    sku: ''
   });
 
-  const shouldFallbackToOffline = (error: unknown) => typeof error === 'object' && error !== null && 'response' in error && !(error as { response?: unknown }).response;
+  // =========================
+  // LOCAL STORAGE
+  // =========================
+  const saveToLocal = (data: Product[]) => {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+  };
 
+  const getFromLocal = (): Product[] => {
+    const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  };
+
+  // =========================
+  // SYNC
+  // =========================
+  const syncProducts = async () => {
+    try {
+      const { products: apiProducts } = await apiService.getProducts();
+
+      await localDBService.saveProducts(apiProducts);
+      saveToLocal(apiProducts);
+
+      dispatch(
+        fetchProductsSuccess({
+          products: apiProducts,
+          totalCount: apiProducts.length
+        })
+      );
+
+      console.log('✅ Inventario actualizado');
+    } catch {
+      console.log('⚠️ Sync falló');
+    }
+  };
+
+  // =========================
+  // LOAD
+  // =========================
   const loadProducts = async () => {
     dispatch(fetchProductsStart());
 
-    try {
-      const pendingEvents = await localDBService.getPendingEvents();
-      const shouldPreferLocal = !isOnline || pendingEvents.length > 0;
+    const local = getFromLocal();
 
-      if (shouldPreferLocal) {
-        const localProducts = await localDBService.getProducts();
-        dispatch(fetchProductsSuccess({ products: localProducts, totalCount: localProducts.length }));
-        return;
-      }
+    if (local.length) {
+      dispatch(
+        fetchProductsSuccess({
+          products: local,
+          totalCount: local.length
+        })
+      );
+    }
 
-      const { products: apiProducts } = await apiService.getProducts();
-      await localDBService.saveProducts(apiProducts);
-      dispatch(fetchProductsSuccess({ products: apiProducts, totalCount: apiProducts.length }));
-    } catch (error: any) {
-      dispatch(fetchProductsFailure(error.message));
-
-      try {
-        const localProducts = await localDBService.getProducts();
-        dispatch(fetchProductsSuccess({ products: localProducts, totalCount: localProducts.length }));
-      } catch {
-        dispatch(fetchProductsFailure('Error al cargar productos'));
-      }
+    if (isOnline) {
+      await syncProducts();
     }
   };
 
@@ -62,296 +91,171 @@ const ProductsPage: React.FC = () => {
     void loadProducts();
   }, [isOnline]);
 
+  // =========================
+  // AUTO SYNC
+  // =========================
+  useEffect(() => {
+    const interval = setInterval(
+      () => {
+        const hour = new Date().getHours();
+
+        if (hour === 8 || hour === 14) {
+          void syncProducts();
+        }
+      },
+      1000 * 60 * 30
+    );
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // =========================
+  // SCANNER
+  // =========================
+  useEffect(() => {
+    if (!showScanner) return;
+
+    const scanner = new Html5Qrcode('reader');
+
+    scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: 250 }, decodedText => {
+      setFilters({ search: decodedText });
+      setShowScanner(false);
+      scanner.stop();
+    });
+
+    return () => {
+      scanner.stop().catch(() => {});
+    };
+  }, [showScanner]);
+
+  // =========================
+  // FILTER
+  // =========================
+  const filteredProducts = products.filter(p => {
+    const s = filters.search.toLowerCase();
+
+    return s === '' || p.name.toLowerCase().includes(s) || p.partnumber.toLowerCase().includes(s);
+  });
+
+  // =========================
+  // CRUD
+  // =========================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const productData = {
+    const data: any = {
       name: formData.name,
-      description: formData.description || undefined,
       price: parseFloat(formData.price),
       stock: parseInt(formData.stock),
-      sku: formData.sku,
-      category: formData.category || undefined
+      sku: formData.sku
     };
 
-    const timestamp = new Date();
-    const timestampIso = timestamp.toISOString();
-
-    try {
-      if (editingProduct) {
-        if (isOnline) {
-          const updatedProduct = await apiService.updateProduct(editingProduct.id, productData);
-          await localDBService.saveProduct(updatedProduct);
-          dispatch(updateProductSuccess(updatedProduct));
-        } else {
-          throw new Error('OFFLINE_FALLBACK');
-        }
-      } else {
-        if (isOnline) {
-          const newProduct = await apiService.createProduct(productData);
-          await localDBService.saveProduct(newProduct);
-          dispatch(createProductSuccess(newProduct));
-        } else {
-          throw new Error('OFFLINE_FALLBACK');
-        }
-      }
-
-      setShowModal(false);
-      resetForm();
-    } catch (error: any) {
-      if (!isOnline || error.message === 'OFFLINE_FALLBACK' || shouldFallbackToOffline(error)) {
-        if (editingProduct) {
-          await localDBService.addPendingEvent({
-            id: `actualizar_producto_${editingProduct.id}_${timestamp.getTime()}`,
-            type: 'actualizar_producto',
-            data: { id: editingProduct.id, ...productData },
-            timestamp: timestampIso,
-            synced: false
-          });
-
-          const updatedProduct = { ...editingProduct, ...productData, updatedAt: timestampIso } as Product;
-          await localDBService.saveProduct(updatedProduct);
-          dispatch(updateProductSuccess(updatedProduct));
-        } else {
-          const localId = timestamp.getTime();
-          const tempProduct: Product = {
-            ...productData,
-            id: localId,
-            isActive: true,
-            createdAt: timestampIso,
-            updatedAt: timestampIso
-          } as Product;
-
-          await localDBService.addPendingEvent({
-            id: `crear_producto_${localId}`,
-            type: 'crear_producto',
-            data: { ...productData, localId },
-            timestamp: timestampIso,
-            synced: false
-          });
-
-          await localDBService.saveProduct(tempProduct);
-          dispatch(createProductSuccess(tempProduct));
-        }
-
-        setShowModal(false);
-        resetForm();
-        alert('El servidor no está disponible. El cambio quedó guardado localmente y se sincronizará al reconectar.');
-        return;
-      }
-
-      alert(error.message);
+    if (editingProduct) {
+      const updated = await apiService.updateProduct(editingProduct.id, data);
+      dispatch(updateProductSuccess(updated));
+    } else {
+      const created = await apiService.createProduct(data);
+      dispatch(createProductSuccess(created));
     }
-  };
 
-  const handleEdit = (product: Product) => {
-    setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      description: product.description || '',
-      price: product.price.toString(),
-      stock: product.stock.toString(),
-      sku: product.sku,
-      category: product.category || ''
-    });
-    setShowModal(true);
+    setShowModal(false);
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('¿Está seguro de eliminar este producto?')) return;
-
-    const timestampIso = new Date().toISOString();
-
-    try {
-      if (isOnline) {
-        await apiService.deleteProduct(id);
-        await localDBService.deleteProduct(id);
-        dispatch(deleteProductSuccess(id));
-        return;
-      }
-
-      throw new Error('OFFLINE_FALLBACK');
-    } catch (error: any) {
-      if (!isOnline || error.message === 'OFFLINE_FALLBACK' || shouldFallbackToOffline(error)) {
-        await localDBService.addPendingEvent({
-          id: `eliminar_producto_${id}_${Date.now()}`,
-          type: 'eliminar_producto',
-          data: { id },
-          timestamp: timestampIso,
-          synced: false
-        });
-        await localDBService.deleteProduct(id);
-        dispatch(deleteProductSuccess(id));
-        alert('Producto eliminado localmente. Se sincronizará cuando el servidor vuelva.');
-        return;
-      }
-
-      alert(error.message);
-    }
+    await apiService.deleteProduct(id);
+    dispatch(deleteProductSuccess(id));
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      price: '',
-      stock: '',
-      sku: '',
-      category: ''
-    });
-    setEditingProduct(null);
-  };
+  const canManage = user?.permissions?.some(p => ['crear_producto', 'actualizar_producto', 'eliminar_producto'].includes(p.name));
 
-  const canManageProducts = user?.permissions?.some(p => ['crear_producto', 'actualizar_producto', 'eliminar_producto'].includes(p.name));
-  const activeProducts = products.filter(product => product.isActive).length;
-  const lowStockProducts = products.filter(product => product.stock <= 10).length;
-  const totalUnits = products.reduce((sum, product) => sum + product.stock, 0);
-
+  // =========================
+  // UI
+  // =========================
   return (
-    <div className='page-shell container-fluid p-4'>
-      <div className='page-header'>
-        <div>
-          <span className='eyebrow mb-2'>Inventario</span>
-          <h2 className='mb-1'>Gestión de Productos</h2>
-          <p className='mb-0'>Consulta, crea y edita productos con una vista limpia y adaptable.</p>
-        </div>
-        <div className='page-actions'>
-          <button className='btn btn-outline-dark' onClick={() => navigate(-1)}>
-            ← Volver
+    <div className='container p-4'>
+      <div className='mb-4 text-center'>
+        {/* TÍTULO */}
+        <h2 className='fw-bold mb-3'>Productos</h2>
+
+        {/* BOTONES */}
+        <div className='d-flex justify-content-center align-items-center gap-2 '>
+          <button className='btn btn-light border d-flex align-items-center gap-2 px-3 shadow-sm' onClick={syncProducts}>
+            <span>🔄</span>
+            <span className='d-none d-md-inline'>Actualizar</span>
           </button>
-          <button className='btn btn-outline-secondary' onClick={() => void loadProducts()}>
-            Actualizar
+
+          <button className='btn btn-light border d-flex align-items-center gap-2 px-3 shadow-sm' onClick={() => setShowScanner(true)}>
+            <span>📷</span>
+            <span className='d-none d-md-inline'>Escanear</span>
           </button>
-          {canManageProducts && (
-            <button
-              className='btn btn-primary'
-              onClick={() => {
-                resetForm();
-                setShowModal(true);
-              }}
-            >
-              ➕ Nuevo Producto
+
+          <button className='btn btn-light border d-flex align-items-center gap-2 px-3 shadow-sm' onClick={() => navigate('/products/importer')}>
+            <span>📥</span>
+            <span className='d-none d-md-inline'>Importar</span>
+          </button>
+
+          {canManage && (
+            <button className='btn btn-primary d-flex align-items-center gap-2 px-3 shadow-sm' onClick={() => setShowModal(true)}>
+              <span>➕</span>
+              <span>Nuevo</span>
             </button>
           )}
         </div>
       </div>
 
-      <div className='row g-3 mb-4'>
-        <div className='col-12 col-md-4'>
-          <div className='stat-card'>
-            <div className='metric-label'>Productos activos</div>
-            <div className='metric-value'>{activeProducts}</div>
-          </div>
-        </div>
-        <div className='col-12 col-md-4'>
-          <div className='stat-card'>
-            <div className='metric-label'>Stock total</div>
-            <div className='metric-value'>{totalUnits}</div>
-          </div>
-        </div>
-        <div className='col-12 col-md-4'>
-          <div className='stat-card'>
-            <div className='metric-label'>Bajo inventario</div>
-            <div className='metric-value'>{lowStockProducts}</div>
-          </div>
-        </div>
-      </div>
+      {/* BUSCADOR */}
+      <input className='form-control mb-3' placeholder='Buscar por nombre o código de barras...' onChange={e => setFilters({ search: e.target.value })} />
 
-      {!isOnline && <div className='alert offline-banner'>⚠️ Modo offline: los cambios se sincronizarán cuando vuelva la conexión.</div>}
-      {error && <div className='alert alert-danger'>{error}</div>}
+      {/* LISTA */}
+      <div className='row'>
+        {filteredProducts.map(p => (
+          <div key={p.id} className='col-md-4 mb-3'>
+            <div className='card shadow-sm'>
+              <div className='card-body'>
+                <h5>{p.name}</h5>
+                <p>SKU: {p.partnumber}</p>
+                <p>💲 {p.price}</p>
+                <p>Stock: {p.stock}</p>
 
-      <div className='section-card'>
-        {loading ? (
-          <div className='text-center py-4'>Cargando productos...</div>
-        ) : (
-          <div className='table-responsive'>
-            <table className='table table-hover table-modern mb-0'>
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>SKU</th>
-                  <th>Categoría</th>
-                  <th>Precio</th>
-                  <th>Stock</th>
-                  <th>Estado</th>
-                  {canManageProducts && <th>Acciones</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {products.map(product => (
-                  <tr key={product.id}>
-                    <td className='fw-semibold'>{product.name}</td>
-                    <td>{product.sku}</td>
-                    <td>{product.category || '-'}</td>
-                    <td>${product.price}</td>
-                    <td>{product.stock}</td>
-                    <td>
-                      <span className={`badge ${product.isActive ? 'bg-success' : 'bg-danger'}`}>{product.isActive ? 'Activo' : 'Inactivo'}</span>
-                    </td>
-                    {canManageProducts && (
-                      <td>
-                        <div className='d-flex flex-wrap gap-2'>
-                          <button className='btn btn-sm btn-outline-primary' onClick={() => handleEdit(product)}>
-                            ✏️ Editar
-                          </button>
-                          <button className='btn btn-sm btn-outline-danger' onClick={() => handleDelete(product.id)}>
-                            🗑️ Eliminar
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {showModal && (
-        <div className='modal show d-block' tabIndex={-1}>
-          <div className='modal-dialog modal-dialog-centered'>
-            <div className='modal-content'>
-              <div className='modal-header'>
-                <h5 className='modal-title'>{editingProduct ? 'Editar Producto' : 'Nuevo Producto'}</h5>
-                <button type='button' className='btn-close' onClick={() => setShowModal(false)}></button>
+                <div className='d-flex justify-content-end'>
+                  <button className='btn btn-warning btn-sm me-2' onClick={() => setEditingProduct(p)}>
+                    Editar
+                  </button>
+                  <button className='btn btn-danger btn-sm' onClick={() => handleDelete(p.id)}>
+                    Eliminar
+                  </button>
+                </div>
               </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* SCANNER */}
+      {showScanner && (
+        <div className='modal d-block bg-dark bg-opacity-75'>
+          <div id='reader' style={{ width: '100%' }} />
+          <button className='btn btn-danger w-100' onClick={() => setShowScanner(false)}>
+            Cerrar
+          </button>
+        </div>
+      )}
+
+      {/* MODAL */}
+      {showModal && (
+        <div className='modal d-block'>
+          <div className='modal-dialog'>
+            <div className='modal-content'>
               <form onSubmit={handleSubmit}>
                 <div className='modal-body'>
-                  <div className='mb-3'>
-                    <label className='form-label'>Nombre *</label>
-                    <input type='text' className='form-control' value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
-                  </div>
-                  <div className='mb-3'>
-                    <label className='form-label'>SKU</label>
-                    <input type='text' className='form-control' disabled={Boolean(editingProduct)} value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value })} required />
-                  </div>
-                  <div className='mb-3'>
-                    <label className='form-label'>Descripción</label>
-                    <textarea className='form-control' value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
-                  </div>
-                  <div className='row'>
-                    <div className='col-12 col-md-6 mb-3'>
-                      <label className='form-label'>Precio *</label>
-                      <input type='number' step='0.01' className='form-control' value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} required />
-                    </div>
-                    <div className='col-12 col-md-6 mb-3'>
-                      <label className='form-label'>Stock</label>
-                      <input type='number' className='form-control' disabled={Boolean(editingProduct)} value={formData.stock} onChange={e => setFormData({ ...formData, stock: e.target.value })} required />
-                    </div>
-                  </div>
-                  <div className='mb-3'>
-                    <label className='form-label'>Categoría</label>
-                    <input type='text' className='form-control' value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} />
-                  </div>
+                  <input className='form-control mb-2' placeholder='Nombre' onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                  <input className='form-control mb-2' placeholder='SKU' onChange={e => setFormData({ ...formData, sku: e.target.value })} />
+                  <input className='form-control mb-2' type='number' placeholder='Precio' onChange={e => setFormData({ ...formData, price: e.target.value })} />
+                  <input className='form-control mb-2' type='number' placeholder='Stock' onChange={e => setFormData({ ...formData, stock: e.target.value })} />
                 </div>
+
                 <div className='modal-footer'>
-                  <button type='button' className='btn btn-secondary' onClick={() => setShowModal(false)}>
-                    Cancelar
-                  </button>
-                  <button type='submit' className='btn btn-primary'>
-                    {editingProduct ? 'Actualizar' : 'Crear'}
-                  </button>
+                  <button className='btn btn-primary'>Guardar</button>
                 </div>
               </form>
             </div>

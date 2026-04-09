@@ -23,6 +23,23 @@ class ProductController {
   }
 
   /**
+   * Crea productos masivo
+   * POST /products
+   */
+  async createProducts(req, res) {
+    try {
+      const { products } = req.body;
+      const product = await ProductService.createProducts(products);
+      res.status(201).json({
+        message: 'Product created successfully',
+        product,
+      });
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
+  }
+
+  /**
    * Obtiene un producto por ID
    * GET /products/:id
    */
@@ -42,7 +59,7 @@ class ProductController {
    */
   async getProducts(req, res) {
     try {
-      const { category, isActive, limit = 10, offset = 0 } = req.query;
+      const { category, isActive, limit = 100, offset = 0 } = req.query;
       const filters = {};
       if (category) filters.category = category;
       if (isActive !== undefined) filters.isActive = isActive === 'true';

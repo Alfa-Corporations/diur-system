@@ -130,6 +130,16 @@ class ApiService {
     return response.data.product;
   }
 
+  /**
+   * Crear múltiples productos (importación masiva)
+   */
+  async createProductsBulk(products: CreateProductRequest[]): Promise<Product[]> {
+    const response = await this.api.post<{ products: Product[] }>('/products/bulk', {
+      products
+    });
+    return response.data.products;
+  }
+
   async updateProduct(id: number, productData: Partial<Product>): Promise<Product> {
     const response = await this.api.put<{ product: Product }>(`/products/${id}`, productData);
     return response.data.product;

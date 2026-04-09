@@ -27,6 +27,7 @@ router.delete('/users/:id', authorize('crud_users'), AuthController.deleteUser);
 
 // Rutas de productos
 router.post('/products', authorize('crud_products'), validateProductData, ProductController.createProduct);
+router.post('/products/bulk', authorize('crud_products'), ProductController.createProducts);
 router.get('/products', ProductController.getProducts);
 router.get('/products/:id', ProductController.getProduct);
 router.put('/products/:id', authorize('crud_products'), ProductController.updateProduct);

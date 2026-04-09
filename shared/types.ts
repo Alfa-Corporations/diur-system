@@ -23,7 +23,7 @@ export interface Product {
   price: number;
   stock: number;
   category?: string;
-  sku: string;
+  partnumber: string;
   barcode?: string;
   isActive: boolean;
   createdAt: string;

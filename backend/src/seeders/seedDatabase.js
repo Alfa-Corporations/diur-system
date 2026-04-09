@@ -4,7 +4,7 @@ const db = require('../utils/database');
 const initModels = require('../models/initModels');
 const { User, Product, Permission, UserPermission } = require('../models');
 
-initModels(); // Inicializa relaciones entre modelos
+//initModels(); // Inicializa relaciones entre modelos
 
 const seedDatabase = async () => {
   try {
@@ -79,7 +79,7 @@ const seedDatabase = async () => {
     }
 
     // --- PRODUCTOS ---
-    const productsData = [
+    /* const productsData = [
       { name: 'Martillo de carpintero', description: 'Martillo profesional de 16 oz', price: 25.5, stock: 50, sku: 'HAM-001', category: 'Herramientas manuales' },
       { name: 'Destornillador Phillips', description: 'Set de destornilladores Phillips #2', price: 12.75, stock: 30, sku: 'SCR-001', category: 'Herramientas manuales' },
       { name: 'Cinta métrica 5m', description: 'Cinta métrica retráctil de 5 metros', price: 8.9, stock: 40, sku: 'MEA-001', category: 'Medición' },
@@ -90,7 +90,7 @@ const seedDatabase = async () => {
     for (const productData of productsData) {
       await Product.findOrCreate({ where: { sku: productData.sku }, defaults: productData });
       console.log(`✅ Producto procesado: ${productData.name}`);
-    }
+    } */
 
     console.log('🎉 Seeding completado exitosamente!');
   } catch (error) {

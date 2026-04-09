@@ -27,6 +27,42 @@ class ProductService {
   }
 
   /**
+ * Crear productos masivamente
+ * @param {Array} productsData
+ * @returns {Promise<Array>}
+  */
+ async createProducts(productsData) {
+   if (!Array.isArray(productsData) || productsData.length === 0) {
+     throw new Error('Debe enviar un array de productos');
+    }
+    
+    // ✅ Validar productos
+    const invalidProducts = productsData.filter(
+      p => !p.name || !p.price || !p.partnumber
+    );
+    
+    if (invalidProducts.length > 0) {
+      throw new Error(`Hay ${invalidProducts.length} productos inválidos (name, price, partnumber requeridos)`);
+    }
+    
+    // ✅ Obtener SKUs
+   const skus = productsData.map(p => p.partnumber);
+    
+    // ✅ Buscar duplicados en BD
+    const existingProducts = await ProductRepository.findBySkus(skus);
+    
+    if (existingProducts.length > 0) {
+      const existingSkus = existingProducts.map(p => p.partnumber);
+      throw new Error(`SKUs ya existentes: ${existingSkus.join(', ')}`);
+    }
+    
+    // ✅ Crear productos masivamente
+    const createdProducts = await ProductRepository.bulkCreate(productsData);
+
+    return createdProducts;
+  }
+
+  /**
    * Obtiene un producto por ID
    * @param {number} id - ID del producto
    * @returns {Promise<Object>} Producto encontrado

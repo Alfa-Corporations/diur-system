@@ -2,9 +2,7 @@ const { DataTypes } = require('sequelize');
 const db = require('../utils/database');
 
 /**
- * Modelo de Producto
- * Define la estructura de la tabla 'products' en la base de datos.
- * Incluye campos para información del producto, stock y precios.
+ * Modelo de Producto (estructura completa tipo ERP)
  */
 const Product = db.define('Product', {
   id: {
@@ -13,44 +11,173 @@ const Product = db.define('Product', {
     autoIncrement: true,
     allowNull: false,
   },
+
+  interno: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  partnumber: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
   name: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  description: {
-    type: DataTypes.TEXT,
+
+  brand: {
+    type: DataTypes.STRING,
     allowNull: true,
   },
+
+  categoria: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
   price: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
+    allowNull: true,
+    defaultValue: 0,
   },
+
+  pricecaja: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  priceb: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  costiva: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  util: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
   stock: {
     type: DataTypes.INTEGER,
     allowNull: false,
     defaultValue: 0,
   },
-  category: {
-    type: DataTypes.STRING,
+
+  piezas: {
+    type: DataTypes.INTEGER,
     allowNull: true,
   },
-  sku: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    unique: true,
-  },
-  barcode: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    unique: true,
-  },
-  isActive: {
+
+  importacion: {
     type: DataTypes.BOOLEAN,
+    allowNull: true,
+    defaultValue: false,
+  },
+
+  grupo: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  supplier: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  costlast: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  costavg: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  iva: {
+    type: DataTypes.BOOLEAN,
+    allowNull: true,
     defaultValue: true,
   },
+
+  isservice: {
+    type: DataTypes.BOOLEAN,
+    allowNull: true,
+    defaultValue: false,
+  },
+
+  esnota: {
+    type: DataTypes.BOOLEAN,
+    allowNull: true,
+    defaultValue: false,
+  },
+
+  gasto: {
+    type: DataTypes.BOOLEAN,
+    allowNull: true,
+    defaultValue: false,
+  },
+
+  baja: {
+    type: DataTypes.BOOLEAN,
+    allowNull: true,
+    defaultValue: false,
+  },
+
+  idsupplier: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+
+  idbrand: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+
+  ubicacion: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  foto: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  codigo2: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  codigo3: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  codigo4: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  modelo: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  porcentaje: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: true,
+  },
+
 }, {
-  timestamps: true,
   tableName: 'products',
+  timestamps: true,
 });
 
 module.exports = Product;
