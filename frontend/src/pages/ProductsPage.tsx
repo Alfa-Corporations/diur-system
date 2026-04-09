@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
-import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure, createProductSuccess, updateProductSuccess, deleteProductSuccess } from '../redux/slices/productSlice';
+import { fetchProductsStart, fetchProductsSuccess, createProductSuccess, updateProductSuccess, deleteProductSuccess } from '../redux/slices/productSlice';
 import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
 import type { Product } from '../../../shared/types';
@@ -117,11 +117,34 @@ const ProductsPage: React.FC = () => {
 
     const scanner = new Html5Qrcode('reader');
 
-    scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: 250 }, decodedText => {
-      setFilters({ search: decodedText });
-      setShowScanner(false);
-      scanner.stop();
-    });
+    let lastScan = '';
+
+    scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: 250 },
+      async decodedText => {
+        // 🚫 Evitar lecturas duplicadas
+        if (decodedText === lastScan) return;
+        lastScan = decodedText;
+
+        try {
+          setFilters({ search: decodedText });
+
+          // 🔊 (opcional) sonido de éxito
+          const audio = new Audio('/scan.mp3');
+          audio.play().catch(() => {});
+
+          // ⏹ detener scanner correctamente
+          await scanner.stop();
+          setShowScanner(false);
+        } catch (error) {
+          console.error('Error al procesar escaneo:', error);
+        }
+      },
+      () => {
+        // 👇 ignoramos errores frecuentes del escáner
+      }
+    );
 
     return () => {
       scanner.stop().catch(() => {});

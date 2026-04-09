@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { parseString } from 'xml2js';
-import axios from 'axios';
 import apiService from '../services/apiService';
 
 const FileImporter = () => {
@@ -77,11 +76,11 @@ const FileImporter = () => {
       const rows = text.split('\n');
       const headers = rows[0].split(',');
 
-      const json = rows.slice(1).map(row => {
+      const json = rows.slice(1).map((row: any) => {
         const values = row.split(',');
         const obj: any = {};
 
-        headers.forEach((h, i) => {
+        headers.forEach((h: string, i: number) => {
           obj[h.trim()] = values[i]?.trim();
         });
 
