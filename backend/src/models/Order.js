@@ -22,7 +22,7 @@ const Order = db.define('Order', {
     },
   },
   type: {
-    type: DataTypes.ENUM('purchase', 'sale'),
+    type: DataTypes.ENUM('compra', 'venta'),
     allowNull: false,
     defaultValue: 'sale',
   },

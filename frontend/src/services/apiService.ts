@@ -224,7 +224,7 @@ class ApiService {
     return response.data.order;
   }
 
-  async createOrder(orderData: { type: 'purchase' | 'sale'; items: Array<{ productId: number; quantityRequested: number }>; customerName?: string; customerAddress?: string }): Promise<Order> {
+  async createOrder(orderData: { type: 'compra' | 'sale'; items: Array<{ productId: number; quantityRequested: number }>; customerName?: string; customerAddress?: string }): Promise<Order> {
     const response = await this.api.post<{ order: Order }>('/orders', orderData);
     return response.data.order;
   }

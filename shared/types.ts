@@ -92,7 +92,7 @@ export interface Invoice {
 export interface Order {
   id: number;
   userId: number;
-  type: 'purchase' | 'sale';
+  type: 'compra' | 'sale';
   status: 'pending' | 'partial' | 'completed' | 'cancelled';
   total: number;
   customerName?: string;

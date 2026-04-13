@@ -31,9 +31,9 @@ const Dashboard: React.FC = () => {
 
   const menuItems = [
     { label: 'Productos', path: '/products', icon: '📦', helper: 'Inventario y stock', permission: 'gestionar_productos' },
-    { label: 'Pedidos de Compra', path: '/orders/purchase', icon: '📥', helper: 'Gestión de compras', permission: 'crear_orden' },
-    { label: 'Pedidos de Venta', path: '/orders/sale', icon: '📤', helper: 'Gestión de ventas', permission: 'crear_orden' },
-    { label: 'Punto de Venta', path: '/pos', icon: '🛒', helper: 'Venta en local', permission: 'crear_orden' },
+    { label: 'Compras', path: '/orders/purchase', icon: '📥', helper: 'Gestión de compras', permission: 'crear_orden' },
+    { label: 'Venta al Mayor', path: '/orders/sale', icon: '📤', helper: 'Gestión de ventas', permission: 'crear_orden' },
+    { label: 'Venta en el Local', path: '/pos', icon: '🛒', helper: 'Venta en local', permission: 'crear_orden' },
     { label: 'Dashboard Pedidos', path: '/orders/dashboard', icon: '📊', helper: 'Vista global de pedidos', permission: 'crear_orden' },
     { label: 'Facturas', path: '/invoices', icon: '🧾', helper: 'Ventas y cobros', permission: 'invoice_order' },
     { label: 'Usuarios', path: '/users', icon: '👥', helper: 'Administración de accesos', permission: 'crud_users' }

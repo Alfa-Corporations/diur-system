@@ -13,7 +13,7 @@ import socketService from '../services/socketService';
  * Página de Pedidos de Compra
  * Gestiona pedidos de compra a proveedores con estados individuales por producto
  */
-const PurchaseOrdersPage: React.FC = () => {
+const compraOrdersPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const { orders, loading, error } = useAppSelector((state: RootState) => state.orders);
   const { products } = useAppSelector((state: RootState) => state.products);
@@ -47,7 +47,7 @@ const PurchaseOrdersPage: React.FC = () => {
   }, []);
 
   const handleOrderUpdate = (data: any) => {
-    if (data.type === 'purchase') {
+    if (data.type === 'compra') {
       loadOrders();
     }
   };
@@ -57,11 +57,11 @@ const PurchaseOrdersPage: React.FC = () => {
     try {
       let ordersData;
       if (isOnline) {
-        const response = await apiService.getOrders({ type: 'purchase' });
+        const response = await apiService.getOrders({ type: 'compra' });
         ordersData = response.orders;
         await localDBService.saveOrders(ordersData);
       } else {
-        ordersData = (await localDBService.getOrders()).filter(o => o.type === 'purchase');
+        ordersData = (await localDBService.getOrders()).filter(o => o.type === 'compra');
       }
       dispatch(fetchOrdersSuccess({ orders: ordersData, totalCount: ordersData.length }));
     } catch (error) {
@@ -93,7 +93,7 @@ const PurchaseOrdersPage: React.FC = () => {
     try {
       const orderData = {
         userId: 1, // TODO: obtener del auth
-        type: 'purchase' as const,
+        type: 'compra' as const,
         items: orderItems.map(item => ({
           productId: item.productId,
           quantityRequested: item.quantity,
@@ -395,4 +395,4 @@ const PurchaseOrdersPage: React.FC = () => {
   );
 };
 
-export default PurchaseOrdersPage;
+export default compraOrdersPage;

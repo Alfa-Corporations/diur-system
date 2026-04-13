@@ -17,7 +17,7 @@ const OrdersDashboardPage: React.FC = () => {
   const { orders, loading, error } = useAppSelector((state: RootState) => state.orders);
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [filterType, setFilterType] = useState<'all' | 'purchase' | 'sale'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'compra' | 'sale'>('all');
 
   useEffect(() => {
     loadOrders();
@@ -83,7 +83,7 @@ const OrdersDashboardPage: React.FC = () => {
   };
 
   const getTypeBadge = (type: Order['type']) => {
-    return <Badge bg={type === 'purchase' ? 'info' : 'success'}>{type === 'purchase' ? 'Compra' : 'Venta'}</Badge>;
+    return <Badge bg={type === 'compra' ? 'info' : 'success'}>{type === 'compra' ? 'Compra' : 'Venta'}</Badge>;
   };
 
   // Estadísticas
@@ -92,7 +92,7 @@ const OrdersDashboardPage: React.FC = () => {
     pending: orders.filter(o => o.status === 'pending').length,
     partial: orders.filter(o => o.status === 'partial').length,
     completed: orders.filter(o => o.status === 'completed').length,
-    purchase: orders.filter(o => o.type === 'purchase').length,
+    compra: orders.filter(o => o.type === 'compra').length,
     sale: orders.filter(o => o.type === 'sale').length
   };
 
@@ -148,7 +148,7 @@ const OrdersDashboardPage: React.FC = () => {
         <Col md={2}>
           <Card className='text-center'>
             <Card.Body>
-              <Card.Title className='h3 text-info'>{stats.purchase}</Card.Title>
+              <Card.Title className='h3 text-info'>{stats.compra}</Card.Title>
               <Card.Text>Compras</Card.Text>
             </Card.Body>
           </Card>
@@ -168,7 +168,7 @@ const OrdersDashboardPage: React.FC = () => {
         <Button variant={filterType === 'all' ? 'primary' : 'outline-primary'} className='me-2' onClick={() => setFilterType('all')}>
           Todos
         </Button>
-        <Button variant={filterType === 'purchase' ? 'primary' : 'outline-primary'} className='me-2' onClick={() => setFilterType('purchase')}>
+        <Button variant={filterType === 'compra' ? 'primary' : 'outline-primary'} className='me-2' onClick={() => setFilterType('compra')}>
           Compras
         </Button>
         <Button variant={filterType === 'sale' ? 'primary' : 'outline-primary'} onClick={() => setFilterType('sale')}>

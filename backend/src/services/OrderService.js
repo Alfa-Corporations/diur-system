@@ -80,7 +80,7 @@ class OrderService {
     }
 
     // Lógica específica por tipo de pedido
-    if (order.type === 'purchase' && updateData.status === 'in_warehouse') {
+    if (order.type === 'compra' && updateData.status === 'in_warehouse') {
       // Para pedidos de compra, cuando llega a bodega, sumar al stock
       const product = await ProductRepository.findById(productId);
       const item = order.items.find(i => i.productId === productId);
@@ -109,7 +109,7 @@ class OrderService {
 
     const items = order.items;
     const allCompleted = items.every(item => {
-      if (order.type === 'purchase') {
+      if (order.type === 'compra') {
         return item.status === 'in_warehouse';
       } else {
         return item.status === 'invoiced' || item.status === 'delivered';
@@ -117,7 +117,7 @@ class OrderService {
     });
 
     const someCompleted = items.some(item => {
-      if (order.type === 'purchase') {
+      if (order.type === 'compra') {
         return item.status === 'in_warehouse';
       } else {
         return item.status === 'invoiced' || item.status === 'delivered';
