@@ -79,20 +79,56 @@ class OrderService {
       throw new Error('Order not found');
     }
 
-    // Lógica específica por tipo de pedido
-    if (order.type === 'compra' && updateData.status === 'in_warehouse') {
-      // Para pedidos de compra, cuando llega a bodega, sumar al stock
-      const product = await ProductRepository.findById(productId);
-      const item = order.items.find(i => i.productId === productId);
-      if (item) {
-        const newStock = product.stock + item.quantityRequested;
-        await ProductRepository.update(productId, { stock: newStock });
-      }
+    const item = order.items.find(i => i.productId === productId);
+    if (!item) {
+      throw new Error('Item no encontrado');
     }
 
-    const updatedItem = await OrderRepository.updateOrderItem(orderId, productId, updateData);
+    // 🔢 Cantidad actual procesada
+    const currentProcessed = item.quantityProcessed || 0;
 
-    // Verificar si el pedido está completo
+    // 🔥 SOLO lo que llega AHORA
+    const incoming = updateData.quantityProcessed || 0;
+
+    // 🔢 Nuevo acumulado
+    const newProcessed = currentProcessed + incoming;
+
+    // 🚨 Validación
+    if (newProcessed > item.quantityRequested) {
+      throw new Error('La cantidad excede lo solicitado');
+    }
+
+    // 🎯 Estado automático
+    let newStatus = 'pendiente';
+
+    if (newProcessed === 0) {
+      newStatus = 'pendiente';
+    } else if (newProcessed < item.quantityRequested) {
+      newStatus = 'en_transito';
+    } else if (newProcessed === item.quantityRequested) {
+      newStatus = 'en_bodega';
+    }
+
+    // 📦 ACTUALIZAR STOCK SOLO LO QUE LLEGÓ
+    if (order.type === 'compra' && incoming > 0) {
+      const product = await ProductRepository.findById(productId);
+
+      await ProductRepository.update(productId, {
+        stock: product.stock + incoming
+      });
+    }
+
+    console.log(orderId, productId, {
+      quantityProcessed: newProcessed,
+      status: newStatus
+    });
+    // 💾 Guardar
+    const updatedItem = await OrderRepository.updateOrderItem(orderId, productId, {
+      quantityProcessed: newProcessed,
+      status: newStatus
+    });
+
+    // 🔄 Estado general del pedido
     await this.checkOrderCompletion(orderId);
 
     return updatedItem;
@@ -108,31 +144,23 @@ class OrderService {
     if (!order) return;
 
     const items = order.items;
-    const allCompleted = items.every(item => {
-      if (order.type === 'compra') {
-        return item.status === 'in_warehouse';
-      } else {
-        return item.status === 'invoiced' || item.status === 'delivered';
-      }
-    });
 
-    const someCompleted = items.some(item => {
-      if (order.type === 'compra') {
-        return item.status === 'in_warehouse';
-      } else {
-        return item.status === 'invoiced' || item.status === 'delivered';
-      }
-    });
+    const allCompleted = items.every(item => item.status === 'en_bodega');
 
-    let newStatus = 'pending';
+    const someCompleted = items.some(item => item.status === 'en_bodega');
+
+    let newStatus = 'pendiente';
+
     if (allCompleted) {
-      newStatus = 'completed';
+      newStatus = 'completado';
     } else if (someCompleted) {
-      newStatus = 'partial';
+      newStatus = 'parcial';
     }
 
     if (order.status !== newStatus) {
-      await OrderRepository.update(orderId, { status: newStatus });
+      await OrderRepository.update(orderId, {
+        status: newStatus
+      });
     }
   }
 

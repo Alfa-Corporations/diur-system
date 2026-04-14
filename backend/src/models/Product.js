@@ -85,9 +85,13 @@ const Product = db.define('Product', {
     allowNull: true,
   },
 
-  supplier: {
-    type: DataTypes.STRING,
+  supplierId: {
+    type: DataTypes.INTEGER,
     allowNull: true,
+    references: {
+      model: 'suppliers',
+      key: 'id'
+    }
   },
 
   costlast: {
@@ -128,11 +132,6 @@ const Product = db.define('Product', {
     type: DataTypes.BOOLEAN,
     allowNull: true,
     defaultValue: false,
-  },
-
-  idsupplier: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
   },
 
   idbrand: {

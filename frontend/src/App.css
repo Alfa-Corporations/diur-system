@@ -69,6 +69,15 @@
   border-top: none;
 }
 
+.btn-goback{
+  display: flex;
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  border: transparent;
+  z-index: 50;
+}
+
 .feature-icon,
 .metric-icon {
   width: 2.5rem;

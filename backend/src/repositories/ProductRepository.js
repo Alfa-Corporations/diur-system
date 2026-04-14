@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Product } = require('../models');
+const { Product, Suppliers } = require('../models');
 
 /**
  * Repositorio para operaciones de Producto
@@ -98,11 +98,18 @@ class ProductRepository {
    * @param {number} offset - Desplazamiento
    * @returns {Promise<Array<Product>>} Lista de productos
    */
-  async findAll(filters = {}, limit = 10, offset = 0) {
-    const where = {};
+  async findAll() {
+    /* const where = {};
     if (filters.category) where.category = filters.category;
-    if (filters.isActive !== undefined) where.isActive = filters.isActive;
-    return await Product.findAll({ where, limit, offset });
+    if (filters.isActive !== undefined) where.isActive = filters.isActive; */
+    return await Product.findAll({
+      include: [
+        {
+          model: Suppliers,
+          as: 'supplier',
+          attributes: ['id', 'name'] // 👈 evita traer todo
+        }
+      ] });
   }
 }
 

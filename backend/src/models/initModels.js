@@ -8,8 +8,21 @@ const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const Permission = require('./Permission');
 const UserPermission = require('./UserPermission');
+const Supplier = require('./Suppliers')
 
 const initModels = () => {
+
+  // 🔵 Asociaciones de Proveedor
+  Supplier.hasMany(Product, {
+    foreignKey: 'supplierId',
+    as: 'products'
+  });
+
+  Product.belongsTo(Supplier, {
+    foreignKey: 'supplierId',
+    as: 'supplier'
+  });
+
   // Asociaciones de Usuario
   //User.hasMany(Invoice, { foreignKey: 'userId', as: 'userInvoices' });
   User.hasMany(Order, { foreignKey: 'userId', as: 'orders' });

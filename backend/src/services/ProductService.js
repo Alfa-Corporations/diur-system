@@ -114,8 +114,8 @@ class ProductService {
    * @returns {Promise<Array>} Lista de productos
    */
 
-  async getProducts(filters = {}, limit = 10, offset = 0) {
-    return await ProductRepository.findAll(filters, limit, offset);
+  async getProducts() {
+    return await ProductRepository.findAll();
   }
 
   /**

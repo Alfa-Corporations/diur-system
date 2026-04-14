@@ -8,6 +8,7 @@ const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const Permission = require('./Permission');
 const UserPermission = require('./UserPermission');
+const Suppliers = require('./Suppliers')
 
 module.exports = {
   User,
@@ -19,4 +20,5 @@ module.exports = {
   OrderItem,
   Permission,
   UserPermission,
+  Suppliers
 };

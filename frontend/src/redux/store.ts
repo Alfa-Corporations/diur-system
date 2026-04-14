@@ -4,6 +4,7 @@ import productReducer from './slices/productSlice';
 import invoiceReducer from './slices/invoiceSlice';
 import orderReducer from './slices/orderSlice';
 import syncReducer from './slices/syncSlice';
+import suppliersReducer from './slices/suppliersSlice';
 
 /**
  * Store de Redux
@@ -15,7 +16,8 @@ export const store = configureStore({
     products: productReducer,
     invoices: invoiceReducer,
     orders: orderReducer,
-    sync: syncReducer
+    sync: syncReducer,
+    suppliers: suppliersReducer
   },
   middleware: getDefaultMiddleware =>
     getDefaultMiddleware({

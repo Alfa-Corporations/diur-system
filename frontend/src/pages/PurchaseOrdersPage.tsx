@@ -22,6 +22,22 @@ const compraOrdersPage: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<Array<{ productId: number; quantity: number }>>([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [tempQuantity, setTempQuantity] = useState<{ [key: number]: number }>({});
+
+  // Esto debes traerlo desde backend o redux luego
+  const suppliers = React.useMemo(() => {
+    const map = new Map();
+
+    products.forEach(product => {
+      if (product.supplier) {
+        map.set(product.supplier.id, product.supplier);
+      }
+    });
+
+    return Array.from(map.values());
+  }, [products]);
 
   useEffect(() => {
     loadOrders();
@@ -47,9 +63,14 @@ const compraOrdersPage: React.FC = () => {
   }, []);
 
   const handleOrderUpdate = (data: any) => {
-    if (data.type === 'compra') {
-      loadOrders();
-    }
+    if (data.type !== 'compra') return;
+
+    dispatch(
+      updateOrderItemStatusSuccess({
+        orderId: data.orderId,
+        item: data.item
+      })
+    );
   };
 
   const loadOrders = async () => {
@@ -90,15 +111,17 @@ const compraOrdersPage: React.FC = () => {
     if (orderItems.length === 0) return;
 
     dispatch(createOrderStart());
+
     try {
       const orderData = {
-        userId: 1, // TODO: obtener del auth
-        type: 'compra' as const,
+        userId: 1,
+        supplierId: selectedSupplierId, // 🔥 IMPORTANTE
+        type: 'compra',
         items: orderItems.map(item => ({
           productId: item.productId,
           quantityRequested: item.quantity,
           quantityProcessed: 0,
-          status: 'pending' as const
+          status: 'pendiente'
         }))
       };
 
@@ -106,87 +129,97 @@ const compraOrdersPage: React.FC = () => {
         const createdOrder = await apiService.createOrder(orderData);
         dispatch(createOrderSuccess(createdOrder));
       } else {
-        // Guardar como evento pendiente
         await localDBService.addPendingEvent({
           id: `sync_${Date.now()}`,
           type: 'crear_orden',
-          data: { orderData, items: orderData.items },
+          data: orderData,
           timestamp: new Date().toISOString(),
           synced: false
         });
-        // Crear orden local temporal
-        const tempOrder: Order = {
-          id: Date.now(), // ID temporal
-          ...orderData,
-          status: 'pending',
-          total: 0, // Calcular después
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          items: orderData.items.map((item, index) => ({
-            id: Date.now() + index,
-            orderId: Date.now(),
-            ...item,
-            unitPrice: products.find(p => p.id === item.productId)?.price || 0,
+
+        dispatch(
+          createOrderSuccess({
+            id: Date.now(),
+            ...orderData,
+            status: 'pendiente',
+            total: 0,
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }))
-        };
-        dispatch(createOrderSuccess(tempOrder));
+            updatedAt: new Date().toISOString(),
+            items: orderData.items
+          })
+        );
       }
 
       setShowCreateModal(false);
       setOrderItems([]);
+      setSelectedSupplierId(null);
     } catch (error) {
       dispatch(createOrderFailure('Error al crear pedido'));
     }
   };
 
-  const handleUpdateItemStatus = async (orderId: number, productId: number, newStatus: OrderItem['status']) => {
-    try {
-      if (isOnline) {
-        await apiService.updateOrderItemStatus(orderId, productId, newStatus);
-      } else {
-        await localDBService.addPendingEvent({
-          id: `sync_${Date.now()}`,
-          type: 'actualizar_orden',
-          data: { orderId, productId, status: newStatus },
-          timestamp: new Date().toISOString(),
-          synced: false
-        });
-      }
+ const handleUpdateItemStatus = async (orderId: number, productId: number, quantityToAdd: number) => {
+   try {
+     const order = orders.find(o => o.id === orderId);
+     const item = order?.items?.find(i => i.productId === productId);
 
-      // Actualizar localmente
-      const order = orders.find(o => o.id === orderId);
-      const item = order?.items?.find(i => i.productId === productId);
-      if (item) {
-        dispatch(
-          updateOrderItemStatusSuccess({
-            orderId,
-            item: { ...item, status: newStatus, quantityProcessed: newStatus === 'in_warehouse' ? item.quantityRequested : item.quantityProcessed }
-          })
-        );
-      }
-    } catch (error) {
-      console.error('Error updating item status:', error);
-    }
-  };
+     if (!item) return;
+
+     const newProcessed = item.quantityProcessed + quantityToAdd;
+
+     if (newProcessed > item.quantityRequested) {
+       alert('No puedes procesar más de lo solicitado');
+       return;
+     }
+
+     const payload = {
+       quantityProcessed: quantityToAdd
+     };
+
+     if (isOnline) {
+       await apiService.updateOrderItemStatus(orderId, productId, payload);
+     } else {
+       await localDBService.addPendingEvent({
+         id: `sync_${Date.now()}`,
+         type: 'actualizar_orden',
+         data: { orderId, productId, ...payload },
+         timestamp: new Date().toISOString(),
+         synced: false
+       });
+     }
+
+     // 🔥 optimista UI
+     dispatch(
+       updateOrderItemStatusSuccess({
+         orderId,
+         item: {
+           ...item,
+           quantityProcessed: newProcessed
+         }
+       })
+     );
+     setSelectedOrder(null)
+   } catch (error) {
+     console.error(error);
+   }
+ };
 
   const handleCancelOrder = async (orderId: number) => {
     try {
       if (isOnline) {
-        const updatedOrder = await apiService.updateOrderStatus(orderId, 'cancelled');
+        const updatedOrder = await apiService.updateOrderStatus(orderId, 'cancelado');
         dispatch(cancelOrderSuccess(updatedOrder));
       } else {
         await localDBService.addPendingEvent({
           id: `sync_${Date.now()}`,
           type: 'actualizar_orden',
-          data: { orderId, status: 'cancelled' },
+          data: { orderId, status: 'cancelado' },
           timestamp: new Date().toISOString(),
           synced: false
         });
         const order = orders.find(o => o.id === orderId);
         if (order) {
-          dispatch(cancelOrderSuccess({ ...order, status: 'cancelled' }));
+          dispatch(cancelOrderSuccess({ ...order, status: 'cancelado' }));
         }
       }
     } catch (error) {
@@ -196,21 +229,22 @@ const compraOrdersPage: React.FC = () => {
 
   const getStatusBadge = (status: Order['status']) => {
     const variants: Record<Order['status'], string> = {
-      pending: 'warning',
-      partial: 'info',
-      completed: 'success',
-      cancelled: 'danger'
+      pendiente: 'warning',
+      en_transito: 'info',
+      facturado: 'success',
+      cancelado: 'danger'
     };
+
     return <Badge bg={variants[status]}>{status}</Badge>;
   };
 
   const getItemStatusBadge = (status: OrderItem['status']) => {
     const variants: Record<OrderItem['status'], string> = {
-      pending: 'secondary',
-      in_transit: 'info',
-      in_warehouse: 'success',
-      delivered: 'success',
-      invoiced: 'primary'
+      pendiente: 'secondary',
+      en_transito: 'info',
+      en_bodega: 'success',
+      repartidor: 'success',
+      facturado: 'primary'
     };
     return <Badge bg={variants[status]}>{status.replace('_', ' ')}</Badge>;
   };
@@ -267,7 +301,7 @@ const compraOrdersPage: React.FC = () => {
                   <Button variant='outline-info' size='sm' className='me-1' onClick={() => setSelectedOrder(order)}>
                     Ver
                   </Button>
-                  {order.status !== 'cancelled' && (
+                  {order.status !== 'cancelado' && (
                     <Button variant='outline-danger' size='sm' onClick={() => handleCancelOrder(order.id)}>
                       Cancelar
                     </Button>
@@ -279,114 +313,243 @@ const compraOrdersPage: React.FC = () => {
         </Table>
       )}
 
-      {/* Modal de creación de pedido */}
-      <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} size='lg'>
+      <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} size='lg' centered>
         <Modal.Header closeButton>
           <Modal.Title>Nuevo Pedido de Compra</Modal.Title>
         </Modal.Header>
+
         <Modal.Body>
           <Form>
-            {orderItems.map((item, index) => (
-              <div key={index} className='d-flex mb-2 align-items-center'>
-                <Form.Select
-                  className='me-2'
-                  value={item.productId}
-                  onChange={e => {
-                    const newItems = [...orderItems];
-                    newItems[index].productId = parseInt(e.target.value);
-                    setOrderItems(newItems);
-                  }}
-                >
-                  <option value=''>Seleccionar producto</option>
-                  {products.map(product => (
-                    <option key={product.id} value={product.id}>
-                      {product.name} - {product.partnumber}
-                    </option>
-                  ))}
-                </Form.Select>
-                <Form.Control
-                  type='number'
-                  placeholder='Cantidad'
-                  value={item.quantity}
-                  onChange={e => {
-                    const newItems = [...orderItems];
-                    newItems[index].quantity = parseInt(e.target.value);
-                    setOrderItems(newItems);
-                  }}
-                  style={{ width: '100px' }}
-                />
-                <Button variant='outline-danger' size='sm' className='ms-2' onClick={() => setOrderItems(orderItems.filter((_, i) => i !== index))}>
-                  ×
-                </Button>
-              </div>
-            ))}
-            <Button variant='outline-primary' onClick={() => setOrderItems([...orderItems, { productId: 0, quantity: 1 }])}>
-              Agregar Producto
-            </Button>
+            {/* 🔵 PROVEEDOR */}
+            <Form.Group className='mb-3'>
+              <Form.Label>Proveedor</Form.Label>
+              <Form.Select
+                value={selectedSupplierId || ''}
+                onChange={e => {
+                  const supplierId = parseInt(e.target.value);
+                  setSelectedSupplierId(supplierId);
+                  setOrderItems([]);
+                }}
+              >
+                <option value=''>Seleccionar proveedor</option>
+                {suppliers.map(supplier => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+
+            {/* 🔍 BUSCADOR */}
+            {selectedSupplierId && (
+              <>
+                <Form.Control type='text' placeholder='Buscar producto...' className='mb-3' onChange={e => setSearchTerm(e.target.value)} />
+
+                {/* 🔵 LISTA PRODUCTOS */}
+                <div style={{ maxHeight: '200px', overflowY: 'auto' }} className='mb-3 border rounded p-2'>
+                  {products
+                    .filter(p => p.supplier?.id === selectedSupplierId && p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                    .slice(0, 10)
+                    .map(product => (
+                      <div key={product.id} className='d-flex justify-content-between align-items-center border-bottom py-2'>
+                        <div>
+                          <div style={{ fontWeight: 500 }}>{product.name}</div>
+                          <small className='text-muted'>{product.partnumber}</small>
+                        </div>
+
+                        <Button
+                          size='sm'
+                          variant='outline-primary'
+                          onClick={() => {
+                            const exists = orderItems.find(i => i.productId === product.id);
+
+                            if (exists) {
+                              setOrderItems(orderItems.map(i => (i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i)));
+                            } else {
+                              setOrderItems([...orderItems, { productId: product.id, quantity: 1 }]);
+                            }
+                          }}
+                        >
+                          +
+                        </Button>
+                      </div>
+                    ))}
+                </div>
+
+                {/* 🛒 CARRITO */}
+                <div>
+                  <h6 className='mb-2'>🛒 Productos agregados</h6>
+
+                  {orderItems.length === 0 && <small className='text-muted'>No hay productos</small>}
+
+                  {orderItems.map((item, index) => {
+                    const product = products.find(p => p.id === item.productId);
+
+                    return (
+                      <div key={index} className='border rounded p-2 mb-2 d-flex flex-column'>
+                        <strong>{product?.name}</strong>
+                        <small className='text-muted'>{product?.partnumber}</small>
+
+                        <div className='d-flex justify-content-between align-items-center mt-2'>
+                          {/* 🔢 CONTROLES CANTIDAD */}
+                          <div className='d-flex align-items-center gap-2'>
+                            <Button
+                              size='sm'
+                              variant='outline-secondary'
+                              onClick={() => {
+                                const newItems = [...orderItems];
+                                if (newItems[index].quantity > 1) {
+                                  newItems[index].quantity--;
+                                }
+                                setOrderItems(newItems);
+                              }}
+                            >
+                              -
+                            </Button>
+
+                            <span>{item.quantity}</span>
+
+                            <Button
+                              size='sm'
+                              variant='outline-secondary'
+                              onClick={() => {
+                                const newItems = [...orderItems];
+                                newItems[index].quantity++;
+                                setOrderItems(newItems);
+                              }}
+                            >
+                              +
+                            </Button>
+                          </div>
+
+                          {/* ❌ ELIMINAR */}
+                          <Button size='sm' variant='outline-danger' onClick={() => setOrderItems(orderItems.filter((_, i) => i !== index))}>
+                            Eliminar
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </Form>
         </Modal.Body>
+
         <Modal.Footer>
           <Button variant='secondary' onClick={() => setShowCreateModal(false)}>
             Cancelar
           </Button>
-          <Button variant='primary' onClick={handleCreateOrder} disabled={orderItems.length === 0}>
+
+          <Button variant='primary' onClick={handleCreateOrder} disabled={orderItems.length === 0 || !selectedSupplierId}>
             Crear Pedido
           </Button>
         </Modal.Footer>
       </Modal>
 
       {/* Modal de detalle de pedido */}
-      <Modal show={!!selectedOrder} onHide={() => setSelectedOrder(null)} size='lg'>
+      <Modal show={!!selectedOrder} onHide={() => setSelectedOrder(null)} size='lg' centered>
         <Modal.Header closeButton>
-          <Modal.Title>Detalle del Pedido #{selectedOrder?.id}</Modal.Title>
+          <Modal.Title>Pedido #{selectedOrder?.id}</Modal.Title>
         </Modal.Header>
+
         <Modal.Body>
           {selectedOrder && (
             <div>
-              <p>
-                <strong>Estado:</strong> {getStatusBadge(selectedOrder.status)}
-              </p>
-              <p>
-                <strong>Total:</strong> ${selectedOrder.total}
-              </p>
-              <p>
-                <strong>Fecha:</strong> {new Date(selectedOrder.createdAt).toLocaleString()}
-              </p>
+              {/* 🔵 INFO GENERAL */}
+              <div className='mb-3 p-3 border rounded'>
+                <div className='d-flex justify-content-between align-items-center mb-2'>
+                  <strong>Estado</strong>
+                  {getStatusBadge(selectedOrder.status)}
+                </div>
 
-              <h5>Productos:</h5>
-              <Table striped bordered>
-                <thead>
-                  <tr>
-                    <th>Producto</th>
-                    <th>Cantidad Solicitada</th>
-                    <th>Cantidad Procesada</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedOrder.items?.map(item => (
-                    <tr key={item.id}>
-                      <td>{item.product?.name}</td>
-                      <td>{item.quantityRequested}</td>
-                      <td>{item.quantityProcessed}</td>
-                      <td>{getItemStatusBadge(item.status)}</td>
-                      <td>
-                        {item.status === 'pending' && (
-                          <Button variant='outline-primary' size='sm' onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, 'in_transit')}>
-                            En Tránsito
-                          </Button>
-                        )}
-                        {item.status === 'in_transit' && (
-                          <Button variant='outline-success' size='sm' onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, 'in_warehouse')}>
-                            En Bodega
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
+                <div className='d-flex justify-content-between'>
+                  <span>Total</span>
+                  <strong>${selectedOrder.total}</strong>
+                </div>
+
+                <div className='mt-2 text-muted' style={{ fontSize: '0.85rem' }}>
+                  {new Date(selectedOrder.createdAt).toLocaleString()}
+                </div>
+              </div>
+
+              {/* 🛒 PRODUCTOS */}
+              <h6 className='mb-3'>Productos</h6>
+
+              {selectedOrder.items?.map(item => {
+                const progress = (item.quantityProcessed / item.quantityRequested) * 100;
+
+                return (
+                  <div key={item.id} className='border rounded p-3 mb-3 shadow-sm'>
+                    {/* 🔹 NOMBRE */}
+                    <div className='mb-2'>
+                      <strong style={{ fontSize: '1rem' }}>{item.product?.name}</strong>
+                    </div>
+
+                    {/* 🔹 PROGRESO */}
+                    <div className='mb-2'>
+                      <div className='d-flex justify-content-between'>
+                        <small className='text-muted'>Progreso</small>
+                        <small>
+                          {item.quantityProcessed} / {item.quantityRequested}
+                        </small>
+                      </div>
+
+                      <div className='progress' style={{ height: '8px' }}>
+                        <div className='progress-bar' role='progressbar' style={{ width: `${progress}%` }} />
+                      </div>
+                    </div>
+
+                    {/* 🔹 INFO */}
+                    <div className='d-flex justify-content-between mb-2'>
+                      <div>
+                        <small className='text-muted'>Solicitado</small>
+                        <div>{item.quantityRequested}</div>
+                      </div>
+
+                      <div>
+                        <small className='text-muted'>Procesado</small>
+                        <div>{item.quantityProcessed}</div>
+                      </div>
+
+                      <div className='text-end'>
+                        <small className='text-muted'>Estado</small>
+                        <div>{getItemStatusBadge(item.status)}</div>
+                      </div>
+                    </div>
+
+                    {/* 🔹 INPUT CANTIDAD */}
+                    <div className='d-flex gap-2 mt-3 align-items-center'>
+                      <Form.Control
+                        type='number'
+                        min={1}
+                        placeholder='Cantidad'
+                        value={tempQuantity[item.productId] || ''}
+                        onChange={e =>
+                          setTempQuantity({
+                            ...tempQuantity,
+                            [item.productId]: parseInt(e.target.value)
+                          })
+                        }
+                        style={{ maxWidth: '90px' }}
+                      />
+
+                      <Button variant='outline-success' size='sm' className='w-100' onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, tempQuantity[item.productId] || 1)}>
+                        📦 Ingresar
+                      </Button>
+                    </div>
+
+                    {/* 🔹 BOTÓN RÁPIDO COMPLETAR */}
+                    {item.quantityProcessed < item.quantityRequested && (
+                      <Button variant='outline-primary' size='sm' className='w-100 mt-2' onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, item.quantityRequested - item.quantityProcessed)}>
+                        ⚡ Completar todo
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+
+              {selectedOrder.items?.length === 0 && <div className='text-center text-muted'>No hay productos en este pedido</div>}
             </div>
           )}
         </Modal.Body>

@@ -239,8 +239,8 @@ class ApiService {
     return response.data.order;
   }
 
-  async updateOrderItemStatus(orderId: number, productId: number, status: OrderItem['status']): Promise<Order> {
-    const response = await this.api.patch<{ order: Order }>(`/orders/${orderId}/items/${productId}/status`, { status });
+  async updateOrderItemStatus(orderId: number, productId: number, data: { status: OrderItem['status']; quantityProcessed: number }): Promise<Order> {
+    const response = await this.api.patch<{ order: Order }>(`/orders/${orderId}/items/${productId}/status`, data);
     return response.data.order;
   }
 

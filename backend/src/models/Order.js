@@ -24,12 +24,12 @@ const Order = db.define('Order', {
   type: {
     type: DataTypes.ENUM('compra', 'venta'),
     allowNull: false,
-    defaultValue: 'sale',
+    defaultValue: 'venta',
   },
   status: {
-    type: DataTypes.ENUM('pending', 'partial', 'completed', 'cancelled'),
+    type: DataTypes.ENUM('pendiente', 'parcial', 'completado', 'cancelado'),
     allowNull: false,
-    defaultValue: 'pending',
+    defaultValue: 'pendiente',
   },
   total: {
     type: DataTypes.DECIMAL(10, 2),
@@ -38,6 +38,14 @@ const Order = db.define('Order', {
   customerName: {
     type: DataTypes.STRING,
     allowNull: true,
+  },
+  supplierId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'suppliers',
+      key: 'id'
+    }
   },
   customerAddress: {
     type: DataTypes.TEXT,

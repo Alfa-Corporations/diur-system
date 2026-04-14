@@ -20,7 +20,7 @@ db.authenticate()
     .then(() => console.log('Database authentication successful'))
     .catch(error => console.log('Database authentication failed:', error));
 
-db.sync({ force: true, alter: process.env.NODE_ENV !== 'production' })
+db.sync({ force: false, alter: process.env.NODE_ENV !== 'production' })
     .then(() => {
         console.log('Database synchronized');
         initModels(); // Inicializar asociaciones después de sincronizar

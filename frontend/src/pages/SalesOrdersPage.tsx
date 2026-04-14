@@ -1,51 +1,50 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
-import { Button, Table, Badge, Modal, Form, Alert, Spinner } from 'react-bootstrap';
+import { Button, Table, Badge, Modal, Form, Alert, Spinner, InputGroup } from 'react-bootstrap';
+
 import type { RootState } from '../redux/store';
-import { fetchOrdersStart, fetchOrdersSuccess, fetchOrdersFailure, createOrderStart, createOrderSuccess, createOrderFailure, updateOrderItemStatusSuccess, cancelOrderSuccess } from '../redux/slices/orderSlice';
-import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure } from '../redux/slices/productSlice';
+import { fetchOrdersStart, fetchOrdersSuccess, fetchOrdersFailure, createOrderSuccess, updateOrderItemStatusSuccess } from '../redux/slices/orderSlice';
+
 import type { Order, OrderItem } from '../../../shared/types';
 import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
 import socketService from '../services/socketService';
 
-/**
- * Página de Pedidos de Venta
- * Gestiona pedidos de venta a clientes con facturación parcial
- */
-const SalesOrdersPage: React.FC = () => {
+const WholesaleSalesPage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { orders, loading, error } = useAppSelector((state: RootState) => state.orders);
-  const { products } = useAppSelector((state: RootState) => state.products);
+  const { orders, loading, error } = useAppSelector((s: RootState) => s.orders);
+  const { products } = useAppSelector((s: RootState) => s.products);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<Array<{ productId: number; quantity: number }>>([]);
+
+  const [search, setSearch] = useState('');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
+  /* =========================
+     LOAD DATA
+  ========================== */
   useEffect(() => {
     loadOrders();
-    loadProducts();
 
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
 
-    socketService.on('pedido_creado', handleOrderUpdate);
-    socketService.on('pedido_actualizado', handleOrderUpdate);
+    socketService.on('pedido_actualizado', refreshOrder);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      socketService.off('pedido_creado', handleOrderUpdate);
-      socketService.off('pedido_actualizado', handleOrderUpdate);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+      socketService.off('pedido_actualizado', refreshOrder);
     };
   }, []);
 
-  const handleOrderUpdate = (data: any) => {
-    if (data.type === 'sale') {
+  const refreshOrder = (data: any) => {
+    if (data.type === 'wholesale') {
       loadOrders();
     }
   };
@@ -53,389 +52,264 @@ const SalesOrdersPage: React.FC = () => {
   const loadOrders = async () => {
     dispatch(fetchOrdersStart());
     try {
-      let ordersData;
+      let data;
       if (isOnline) {
-        const response = await apiService.getOrders({ type: 'sale' });
-        ordersData = response.orders;
-        await localDBService.saveOrders(ordersData);
+        const res = await apiService.getOrders({ type: 'wholesale' });
+        data = res.orders;
+        await localDBService.saveOrders(data);
       } else {
-        ordersData = (await localDBService.getOrders()).filter(o => o.type === 'sale');
+        data = (await localDBService.getOrders()).filter((o: Order) => o.type === 'wholesale');
       }
-      dispatch(fetchOrdersSuccess({ orders: ordersData, totalCount: ordersData.length }));
-    } catch (error) {
-      dispatch(fetchOrdersFailure('Error al cargar pedidos'));
+
+      dispatch(
+        fetchOrdersSuccess({
+          orders: data,
+          totalCount: data.length
+        })
+      );
+    } catch {
+      dispatch(fetchOrdersFailure('Error cargando órdenes'));
     }
   };
 
-  const loadProducts = async () => {
-    dispatch(fetchProductsStart());
-    try {
-      let productsData;
-      if (isOnline) {
-        const response = await apiService.getProducts();
-        productsData = response.products;
-        await localDBService.saveProducts(productsData);
-      } else {
-        productsData = await localDBService.getProducts();
-      }
-      dispatch(fetchProductsSuccess({ products: productsData, totalCount: productsData.length }));
-    } catch (error) {
-      dispatch(fetchProductsFailure('Error al cargar productos'));
-    }
-  };
-
+  /* =========================
+     CREATE ORDER
+  ========================== */
   const handleCreateOrder = async () => {
-    if (orderItems.length === 0) return;
+    if (!orderItems.length) return;
 
-    dispatch(createOrderStart());
+    const payload = {
+      userId: 1,
+      type: 'wholesale',
+      customerName: 'Cliente Mayorista',
+      items: orderItems.map(i => ({
+        productId: i.productId,
+        quantityRequested: i.quantity,
+        quantityProcessed: 0,
+        status: 'pending'
+      }))
+    };
+
     try {
-      const orderData = {
-        userId: 1, // TODO: obtener del auth
-        type: 'sale' as const,
-        customerName: 'Cliente Minorista', // Para POS
-        items: orderItems.map(item => ({
-          productId: item.productId,
-          quantityRequested: item.quantity,
-          quantityProcessed: 0,
-          status: 'pending' as const
-        }))
-      };
-
       if (isOnline) {
-        const createdOrder = await apiService.createOrder(orderData);
-        dispatch(createOrderSuccess(createdOrder));
+        const res = await apiService.createOrder(payload);
+        dispatch(createOrderSuccess(res));
       } else {
         await localDBService.addPendingEvent({
           id: `sync_${Date.now()}`,
           type: 'crear_orden',
-          data: { orderData, items: orderData.items },
+          data: payload,
           timestamp: new Date().toISOString(),
           synced: false
         });
-        const tempOrder: Order = {
-          id: Date.now(),
-          ...orderData,
-          status: 'pending',
-          total: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          items: orderData.items.map((item, index) => ({
-            id: Date.now() + index,
-            orderId: Date.now(),
-            ...item,
-            unitPrice: products.find(p => p.id === item.productId)?.price || 0,
+
+        dispatch(
+          createOrderSuccess({
+            id: Date.now(),
+            ...payload,
+            total: 0,
+            status: 'pending',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
-          }))
-        };
-        dispatch(createOrderSuccess(tempOrder));
-      }
-
-      setShowCreateModal(false);
-      setOrderItems([]);
-    } catch (error) {
-      dispatch(createOrderFailure('Error al crear pedido'));
-    }
-  };
-
-  const handleUpdateItemStatus = async (orderId: number, productId: number, newStatus: OrderItem['status']) => {
-    try {
-      if (isOnline) {
-        await apiService.updateOrderItemStatus(orderId, productId, newStatus);
-      } else {
-        await localDBService.addPendingEvent({
-          id: `sync_${Date.now()}`,
-          type: 'actualizar_orden',
-          data: { orderId, productId, status: newStatus },
-          timestamp: new Date().toISOString(),
-          synced: false
-        });
-      }
-
-      const order = orders.find(o => o.id === orderId);
-      const item = order?.items?.find(i => i.productId === productId);
-      if (item) {
-        dispatch(
-          updateOrderItemStatusSuccess({
-            orderId,
-            item: { ...item, status: newStatus }
-          })
+          } as any)
         );
       }
-    } catch (error) {
-      console.error('Error updating item status:', error);
+
+      setOrderItems([]);
+      setShowCreateModal(false);
+    } catch {
+      alert('Error creando orden');
     }
   };
 
-  const handleCancelOrder = async (orderId: number) => {
-    try {
-      if (isOnline) {
-        const updatedOrder = await apiService.updateOrderStatus(orderId, 'cancelled');
-        dispatch(cancelOrderSuccess(updatedOrder));
-      } else {
-        await localDBService.addPendingEvent({
-          id: `sync_${Date.now()}`,
-          type: 'actualizar_orden',
-          data: { orderId, status: 'cancelled' },
-          timestamp: new Date().toISOString(),
-          synced: false
-        });
-        const order = orders.find(o => o.id === orderId);
-        if (order) {
-          dispatch(cancelOrderSuccess({ ...order, status: 'cancelled' }));
-        }
-      }
-    } catch (error) {
-      console.error('Error cancelling order:', error);
-    }
-  };
+  /* =========================
+     UPDATE DELIVERY
+  ========================== */
+  const handleDeliver = async (orderId: number, productId: number, qty: number) => {
+    const order = orders.find(o => o.id === orderId);
+    const item = order?.items?.find(i => i.productId === productId);
+    if (!item) return;
 
-  const handleInvoiceSelection = async (orderId: number, selectedItems: OrderItem[]) => {
-    // TODO: Implementar facturación parcial
-    // La función se usa en los botones de UI para evitar warning de variable no usada
-    console.log('Facturar pedido', orderId, 'items:', selectedItems);
+    const newQty = item.quantityProcessed + qty;
 
-    if (!selectedItems.length) return;
+    if (newQty > item.quantityRequested) return;
 
-    // Actualizar localmente como ejemplo
-    selectedItems.forEach(item => {
-      dispatch(
-        updateOrderItemStatusSuccess({
-          orderId,
-          item: {
-            ...item,
-            status: 'invoiced'
-          }
-        })
-      );
-    });
-
-    // Cambiar estado de pedido si todos facturados
-    const orderToUpdate = orders.find(o => o.id === orderId);
-    if (orderToUpdate && orderToUpdate.items?.every(i => i.status === 'invoiced')) {
-      dispatch(cancelOrderSuccess({ ...orderToUpdate, status: 'completed' }));
-    }
-  };
-
-  const getStatusBadge = (status: Order['status']) => {
-    const variants: Record<Order['status'], string> = {
-      pending: 'warning',
-      partial: 'info',
-      completed: 'success',
-      cancelled: 'danger'
+    const updated = {
+      ...item,
+      quantityProcessed: newQty,
+      status: newQty === item.quantityRequested ? 'delivered' : 'in_transit'
     };
-    return <Badge bg={variants[status]}>{status}</Badge>;
+
+    dispatch(
+      updateOrderItemStatusSuccess({
+        orderId,
+        item: updated
+      })
+    );
   };
 
-  const getItemStatusBadge = (status: OrderItem['status']) => {
-    const variants: Record<OrderItem['status'], string> = {
-      pending: 'secondary',
-      in_transit: 'info',
-      in_warehouse: 'success',
-      delivered: 'success',
-      invoiced: 'primary'
-    };
-    return <Badge bg={variants[status]}>{status.replace('_', ' ')}</Badge>;
+  /* =========================
+     FACTURACIÓN
+  ========================== */
+  const handleInvoice = (order: Order) => {
+    const ready = order.items?.filter(i => i.quantityProcessed > 0);
+
+    if (!ready?.length) return;
+
+    alert(`Factura generada para ${ready.length} productos del pedido ${order.id}`);
   };
 
+  const filteredOrders = useMemo(() => {
+    return orders.filter(o => o.customerName?.toLowerCase().includes(search.toLowerCase()));
+  }, [orders, search]);
+
+  /* =========================
+     UI
+  ========================== */
   return (
     <div className='container mt-4'>
-      <div className='d-flex justify-content-between align-items-center mb-4'>
-        <h2>Pedidos de Venta</h2>
-        <div>
-          <Button variant='outline-secondary' className='me-2' onClick={() => window.history.back()}>
+      {/* HEADER */}
+      <div className='d-flex justify-content-between mb-3'>
+        <h3>Ventas Mayoristas</h3>
+
+        <div className='d-flex gap-2'>
+          <Button variant='outline-secondary' onClick={() => window.history.back()}>
             ← Volver
           </Button>
-          <Button variant='primary' onClick={() => setShowCreateModal(true)} disabled={!isOnline && loading}>
-            Nuevo Pedido
-          </Button>
+
+          <Button onClick={() => setShowCreateModal(true)}>Nueva Orden</Button>
         </div>
       </div>
 
-      {!isOnline && <Alert variant='warning'>Modo offline - Los cambios se sincronizarán cuando se restablezca la conexión</Alert>}
-
       {error && <Alert variant='danger'>{error}</Alert>}
 
+      {/* SEARCH */}
+      <InputGroup className='mb-3'>
+        <Form.Control placeholder='Buscar cliente...' value={search} onChange={e => setSearch(e.target.value)} />
+      </InputGroup>
+
+      {/* TABLE */}
       {loading ? (
-        <div className='text-center'>
-          <Spinner animation='border' />
-        </div>
+        <Spinner animation='border' />
       ) : (
-        <Table striped bordered hover responsive>
+        <Table bordered hover>
           <thead>
             <tr>
               <th>ID</th>
               <th>Cliente</th>
               <th>Estado</th>
-              <th>Total</th>
-              <th>Productos</th>
-              <th>Fecha</th>
+              <th>Progreso</th>
               <th>Acciones</th>
             </tr>
           </thead>
+
           <tbody>
-            {orders.map(order => (
-              <tr key={order.id}>
-                <td>{order.id}</td>
-                <td>{order.customerName || 'N/A'}</td>
-                <td>{getStatusBadge(order.status)}</td>
-                <td>${order.total}</td>
-                <td>
-                  {order.items?.map(item => (
-                    <div key={item.id} className='mb-1'>
-                      {item.product?.name} (x{item.quantityRequested}) - {getItemStatusBadge(item.status)}
-                    </div>
-                  ))}
-                </td>
-                <td>{new Date(order.createdAt).toLocaleDateString()}</td>
-                <td>
-                  <Button variant='outline-info' size='sm' className='me-1' onClick={() => setSelectedOrder(order)}>
-                    Ver
-                  </Button>
-                  {order.status !== 'cancelled' && (
-                    <Button variant='outline-danger' size='sm' onClick={() => handleCancelOrder(order.id)}>
-                      Cancelar
+            {filteredOrders.map(order => {
+              const total = order.items?.length || 0;
+              const done = order.items?.filter(i => i.quantityProcessed > 0).length || 0;
+
+              return (
+                <tr key={order.id}>
+                  <td>{order.id}</td>
+                  <td>{order.customerName}</td>
+                  <td>{order.status}</td>
+                  <td>
+                    {done}/{total}
+                  </td>
+
+                  <td>
+                    <Button size='sm' onClick={() => setSelectedOrder(order)}>
+                      Ver
                     </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
+
+                    <Button size='sm' variant='success' className='ms-2' onClick={() => handleInvoice(order)}>
+                      Facturar
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </Table>
       )}
 
-      {/* Modal de creación de pedido */}
-      <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} size='lg'>
+      {/* CREATE MODAL */}
+      <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>Nuevo Pedido de Venta</Modal.Title>
+          <Modal.Title>Nueva Orden Mayorista</Modal.Title>
         </Modal.Header>
+
         <Modal.Body>
-          <Form>
-            {orderItems.map((item, index) => (
-              <div key={index} className='d-flex mb-2 align-items-center'>
-                <Form.Select
-                  className='me-2'
-                  value={item.productId}
-                  onChange={e => {
-                    const newItems = [...orderItems];
-                    newItems[index].productId = parseInt(e.target.value);
-                    setOrderItems(newItems);
-                  }}
-                >
-                  <option value=''>Seleccionar producto</option>
-                  {products.map(product => (
-                    <option key={product.id} value={product.id}>
-                      {product.name} - {product.partnumber}
-                    </option>
-                  ))}
-                </Form.Select>
-                <Form.Control
-                  type='number'
-                  placeholder='Cantidad'
-                  value={item.quantity}
-                  onChange={e => {
-                    const newItems = [...orderItems];
-                    newItems[index].quantity = parseInt(e.target.value);
-                    setOrderItems(newItems);
-                  }}
-                  style={{ width: '100px' }}
-                />
-                <Button variant='outline-danger' size='sm' className='ms-2' onClick={() => setOrderItems(orderItems.filter((_, i) => i !== index))}>
-                  ×
-                </Button>
-              </div>
-            ))}
-            <Button variant='outline-primary' onClick={() => setOrderItems([...orderItems, { productId: 0, quantity: 1 }])}>
-              Agregar Producto
-            </Button>
-          </Form>
+          {orderItems.map((item, i) => (
+            <div key={i} className='d-flex gap-2 mb-2'>
+              <Form.Select
+                value={item.productId}
+                onChange={e => {
+                  const copy = [...orderItems];
+                  copy[i].productId = Number(e.target.value);
+                  setOrderItems(copy);
+                }}
+              >
+                <option>Producto</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Form.Select>
+
+              <Form.Control
+                type='number'
+                value={item.quantity}
+                onChange={e => {
+                  const copy = [...orderItems];
+                  copy[i].quantity = Number(e.target.value);
+                  setOrderItems(copy);
+                }}
+              />
+            </div>
+          ))}
+
+          <Button variant='outline-primary' onClick={() => setOrderItems([...orderItems, { productId: 0, quantity: 1 }])}>
+            + Agregar producto
+          </Button>
         </Modal.Body>
+
         <Modal.Footer>
-          <Button variant='secondary' onClick={() => setShowCreateModal(false)}>
-            Cancelar
-          </Button>
-          <Button variant='primary' onClick={handleCreateOrder} disabled={orderItems.length === 0}>
-            Crear Pedido
-          </Button>
+          <Button onClick={() => setShowCreateModal(false)}>Cancelar</Button>
+
+          <Button onClick={handleCreateOrder}>Crear</Button>
         </Modal.Footer>
       </Modal>
 
-      {/* Modal de detalle de pedido con facturación parcial */}
+      {/* DETAIL MODAL */}
       <Modal show={!!selectedOrder} onHide={() => setSelectedOrder(null)} size='lg'>
         <Modal.Header closeButton>
-          <Modal.Title>Detalle del Pedido #{selectedOrder?.id}</Modal.Title>
+          <Modal.Title>Detalle Orden</Modal.Title>
         </Modal.Header>
+
         <Modal.Body>
-          {selectedOrder && (
-            <div>
-              <p>
-                <strong>Cliente:</strong> {selectedOrder.customerName}
-              </p>
-              <p>
-                <strong>Estado:</strong> {getStatusBadge(selectedOrder.status)}
-              </p>
-              <p>
-                <strong>Total:</strong> ${selectedOrder.total}
-              </p>
-              <p>
-                <strong>Fecha:</strong> {new Date(selectedOrder.createdAt).toLocaleString()}
-              </p>
+          {selectedOrder?.items?.map(item => (
+            <div key={item.id} className='border p-2 mb-2'>
+              <b>{item.product?.name}</b>
 
-              <h5>Productos:</h5>
-              <Table striped bordered>
-                <thead>
-                  <tr>
-                    <th>Seleccionar</th>
-                    <th>Producto</th>
-                    <th>Cantidad Solicitada</th>
-                    <th>Estado</th>
-                    <th>Precio Unit.</th>
-                    <th>Subtotal</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedOrder.items?.map(item => (
-                    <tr key={item.id}>
-                      <td>
-                        <Form.Check type='checkbox' disabled={item.status === 'invoiced'} />
-                      </td>
-                      <td>{item.product?.name}</td>
-                      <td>{item.quantityRequested}</td>
-                      <td>{getItemStatusBadge(item.status)}</td>
-                      <td>${item.unitPrice}</td>
-                      <td>${item.quantityRequested * item.unitPrice}</td>
-                      <td>
-                        {item.status === 'pending' && (
-                          <Button variant='outline-info' size='sm' onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, 'in_transit')}>
-                            En tránsito
-                          </Button>
-                        )}
-                        {item.status === 'in_transit' && (
-                          <Button variant='outline-success' size='sm' onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, 'in_warehouse')}>
-                            En bodega
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-
-              <div className='mt-3'>
-                <Button variant='success' className='me-2' onClick={() => selectedOrder && handleInvoiceSelection(selectedOrder.id, selectedOrder.items?.filter(item => item.status !== 'invoiced') || [])}>
-                  Facturar Seleccionados
-                </Button>
-                <Button variant='outline-success' onClick={() => selectedOrder && handleInvoiceSelection(selectedOrder.id, selectedOrder.items || [])}>
-                  Facturar Todo
-                </Button>
+              <div>
+                {item.quantityProcessed}/{item.quantityRequested}
               </div>
+
+              <Button size='sm' onClick={() => handleDeliver(selectedOrder.id, item.productId, 1)}>
+                Entregar +1
+              </Button>
+
+              <Button size='sm' className='ms-2' onClick={() => handleDeliver(selectedOrder.id, item.productId, item.quantityRequested - item.quantityProcessed)}>
+                Completar
+              </Button>
             </div>
-          )}
+          ))}
         </Modal.Body>
       </Modal>
     </div>
   );
 };
 
-export default SalesOrdersPage;
+export default WholesaleSalesPage;

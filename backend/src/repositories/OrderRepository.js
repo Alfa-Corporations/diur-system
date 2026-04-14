@@ -78,9 +78,11 @@ class OrderRepository {
    * @returns {Promise<OrderItem>} Item actualizado
    */
   async updateOrderItem(orderId, productId, updateData) {
+    console.log(orderId, productId, updateData);
     const item = await OrderItem.findOne({
       where: { orderId, productId }
     });
+    console.log(item);
     if (!item) throw new Error('Order item not found');
     return await item.update(updateData);
   }

@@ -93,7 +93,7 @@ export interface Order {
   id: number;
   userId: number;
   type: 'compra' | 'sale';
-  status: 'pending' | 'partial' | 'completed' | 'cancelled';
+  status: 'pendiente' | 'en_transito' | 'facturado' | 'cancelado';
   total: number;
   customerName?: string;
   customerAddress?: string;
@@ -112,7 +112,7 @@ export interface OrderItem {
   productId: number;
   quantityRequested: number;
   quantityProcessed: number;
-  status: 'pending' | 'in_transit' | 'in_warehouse' | 'delivered' | 'invoiced';
+  status: 'pendiente' | 'en_transito' | 'en_bodega' | 'repartidor' | 'facturado';
   unitPrice: number;
   product?: Product;
   createdAt: string;

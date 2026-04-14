@@ -79,24 +79,37 @@ class OrderController {
   async updateOrderItemStatus(req, res) {
     try {
       const { orderId, productId } = req.params;
-      const { status, quantityProcessed } = req.body;
+      const { quantityProcessed } = req.body;
 
-      const updateData = {};
-      if (status) updateData.status = status;
-      if (quantityProcessed !== undefined) updateData.quantityProcessed = quantityProcessed;
+      // 🚨 Validación obligatoria
+      if (quantityProcessed === undefined) {
+        return res.status(400).json({
+          message: 'quantityProcessed es requerido'
+        });
+      }
+
+      if (quantityProcessed <= 0) {
+        return res.status(400).json({
+          message: 'quantityProcessed debe ser mayor a 0'
+        });
+      }
 
       const updatedItem = await OrderService.updateOrderItemStatus(
         parseInt(orderId),
         parseInt(productId),
-        updateData
+        { quantityProcessed } // 🔥 SOLO esto
       );
 
       res.json({
-        message: 'Order item updated successfully',
-        item: updatedItem,
+        message: 'Item actualizado correctamente',
+        item: updatedItem
       });
+
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      console.error(error); // 🔥 DEBUG
+      res.status(400).json({
+        message: error.message || 'Error al actualizar item'
+      });
     }
   }
 

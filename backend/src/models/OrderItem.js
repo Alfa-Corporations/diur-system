@@ -39,9 +39,9 @@ const OrderItem = db.define('OrderItem', {
     defaultValue: 0,
   },
   status: {
-    type: DataTypes.ENUM('pending', 'in_transit', 'in_warehouse', 'delivered', 'invoiced'),
+    type: DataTypes.ENUM('pendiente', 'en_transito', 'en_bodega', 'repartidor', 'facturado'),
     allowNull: false,
-    defaultValue: 'pending',
+    defaultValue: 'pendiente',
   },
   unitPrice: {
     type: DataTypes.DECIMAL(10, 2),

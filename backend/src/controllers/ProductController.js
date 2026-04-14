@@ -59,12 +59,12 @@ class ProductController {
    */
   async getProducts(req, res) {
     try {
-      const { category, isActive, limit = 100, offset = 0 } = req.query;
+      const { category, isActive} = req.query;
       const filters = {};
       if (category) filters.category = category;
       if (isActive !== undefined) filters.isActive = isActive === 'true';
 
-      const products = await ProductService.getProducts(filters, parseInt(limit), parseInt(offset));
+      const products = await ProductService.getProducts(filters);
       res.json({ products });
     } catch (error) {
       res.status(500).json({ message: 'Internal server error' });
