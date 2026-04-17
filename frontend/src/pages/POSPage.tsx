@@ -9,7 +9,8 @@ import localDBService from '../services/localDBService';
 
 const POSPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { products, loading } = useSelector((state: RootState) => state.products);
+  const { products } = useSelector((state: RootState) => state.products);
+  const { user } = useSelector((state: RootState) => state.auth);
 
   const [cart, setCart] = useState<Array<{ product: Product; quantity: number; price: number }>>([]);
   const [barcodeInput, setBarcodeInput] = useState('');
@@ -96,9 +97,9 @@ const POSPage: React.FC = () => {
     if (!cart.length) return;
 
     const order = {
-      userId: 1,
+      userId: user?.id || 1,
       type: 'venta',
-      customerName: 'Venta POS',
+      customerName: 'venta en el local',
       items: cart.map(i => ({
         productId: i.product.id,
         quantityRequested: i.quantity,

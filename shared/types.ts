@@ -15,6 +15,11 @@ export interface User {
   updatedAt: string;
 }
 
+export interface Supplier {
+  id: number;
+  name: string
+}
+
 // Producto
 export interface Product {
   id: number;
@@ -28,6 +33,7 @@ export interface Product {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  supplier: Array<Supplier>
 }
 
 // Item de factura
@@ -92,7 +98,7 @@ export interface Invoice {
 export interface Order {
   id: number;
   userId: number;
-  type: 'compra' | 'sale';
+  type: 'compra' | 'venta';
   status: 'pendiente' | 'en_transito' | 'facturado' | 'cancelado';
   total: number;
   customerName?: string;

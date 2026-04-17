@@ -17,6 +17,7 @@ const compraOrdersPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const { orders, loading, error } = useAppSelector((state: RootState) => state.orders);
   const { products } = useAppSelector((state: RootState) => state.products);
+  const { user } = useAppSelector((state: RootState) => state.auth);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -114,7 +115,7 @@ const compraOrdersPage: React.FC = () => {
 
     try {
       const orderData = {
-        userId: 1,
+        userId: user?.id,
         supplierId: selectedSupplierId, // 🔥 IMPORTANTE
         type: 'compra',
         items: orderItems.map(item => ({

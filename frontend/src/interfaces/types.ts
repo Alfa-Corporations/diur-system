@@ -13,6 +13,11 @@ export interface User {
   updatedAt: string;
 }
 
+export interface Supplier {
+  id: number;
+  name: string;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -24,6 +29,7 @@ export interface Product {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  supplier: Array<Supplier>;
 }
 
 export interface InvoiceItem {
@@ -85,7 +91,7 @@ export interface Invoice {
 export interface Order {
   id: number;
   userId: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pendiente' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   total: number;
   customerName?: string;
   customerAddress?: string;

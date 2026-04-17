@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
-import { Button, Table, Badge, Modal, Form, Alert, Spinner, InputGroup } from 'react-bootstrap';
+import { Button, Table, Modal, Form, Alert, Spinner, InputGroup } from 'react-bootstrap';
 
 import type { RootState } from '../redux/store';
 import { fetchOrdersStart, fetchOrdersSuccess, fetchOrdersFailure, createOrderSuccess, updateOrderItemStatusSuccess } from '../redux/slices/orderSlice';
 
-import type { Order, OrderItem } from '../../../shared/types';
+import type { Order } from '../../../shared/types';
 import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
 import socketService from '../services/socketService';
@@ -44,7 +44,7 @@ const WholesaleSalesPage: React.FC = () => {
   }, []);
 
   const refreshOrder = (data: any) => {
-    if (data.type === 'wholesale') {
+    if (data.type === 'bodega') {
       loadOrders();
     }
   };
@@ -54,11 +54,11 @@ const WholesaleSalesPage: React.FC = () => {
     try {
       let data;
       if (isOnline) {
-        const res = await apiService.getOrders({ type: 'wholesale' });
+        const res = await apiService.getOrders({ type: 'venta' });
         data = res.orders;
         await localDBService.saveOrders(data);
       } else {
-        data = (await localDBService.getOrders()).filter((o: Order) => o.type === 'wholesale');
+        data = (await localDBService.getOrders()).filter((o: Order) => o.type === 'venta');
       }
 
       dispatch(
@@ -80,13 +80,13 @@ const WholesaleSalesPage: React.FC = () => {
 
     const payload = {
       userId: 1,
-      type: 'wholesale',
+      type: 'bodega',
       customerName: 'Cliente Mayorista',
       items: orderItems.map(i => ({
         productId: i.productId,
         quantityRequested: i.quantity,
         quantityProcessed: 0,
-        status: 'pending'
+        status: 'pendiente'
       }))
     };
 
@@ -108,7 +108,7 @@ const WholesaleSalesPage: React.FC = () => {
             id: Date.now(),
             ...payload,
             total: 0,
-            status: 'pending',
+            status: 'pendiente',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           } as any)

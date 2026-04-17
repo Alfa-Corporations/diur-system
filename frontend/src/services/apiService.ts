@@ -245,7 +245,7 @@ class ApiService {
   }
 
   async cancelOrder(id: number): Promise<Order> {
-    return this.updateOrderStatus(id, 'cancelled');
+    return this.updateOrderStatus(id, 'cancelado');
   }
 
   async deleteOrder(id: number): Promise<void> {

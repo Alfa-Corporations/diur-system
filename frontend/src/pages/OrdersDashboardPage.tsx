@@ -63,21 +63,21 @@ const OrdersDashboardPage: React.FC = () => {
 
   const getStatusBadge = (status: Order['status']) => {
     const variants: Record<Order['status'], string> = {
-      pending: 'warning',
-      partial: 'info',
-      completed: 'success',
-      cancelled: 'danger'
+      pendiente: 'warning',
+      en_transito: 'info',
+      facturado: 'success',
+      cancelado: 'danger'
     };
     return <Badge bg={variants[status]}>{status}</Badge>;
   };
 
   const getItemStatusBadge = (status: OrderItem['status']) => {
     const variants: Record<OrderItem['status'], string> = {
-      pending: 'secondary',
-      in_transit: 'info',
-      in_warehouse: 'success',
-      delivered: 'success',
-      invoiced: 'primary'
+      pendiente: 'secondary',
+      en_transito: 'info',
+      en_bodega: 'success',
+      repartidor: 'success',
+      facturado: 'primary'
     };
     return <Badge bg={variants[status]}>{status.replace('_', ' ')}</Badge>;
   };
@@ -93,7 +93,7 @@ const OrdersDashboardPage: React.FC = () => {
     partial: orders.filter(o => o.status === 'en_transito').length,
     completed: orders.filter(o => o.status === 'cancelado').length,
     compra: orders.filter(o => o.type === 'compra').length,
-    sale: orders.filter(o => o.type === 'venta').length
+    venta: orders.filter(o => o.type === 'venta').length
   };
 
   return (
@@ -158,7 +158,7 @@ const OrdersDashboardPage: React.FC = () => {
         <Col md={2}>
           <Card className='text-center'>
             <Card.Body>
-              <Card.Title className='h3 text-success'>{stats.sale}</Card.Title>
+              <Card.Title className='h3 text-success'>{stats.venta}</Card.Title>
               <Card.Text>Ventas</Card.Text>
             </Card.Body>
           </Card>
