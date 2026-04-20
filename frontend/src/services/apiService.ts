@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import { store } from '../redux/store';
 import { logout } from '../redux/slices/authSlice';
-import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, CreateInvoiceRequest, User, Product, Invoice, Order, OrderItem, Permission } from '../../../shared/types';
+import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, CreateInvoiceRequest, User, Product, Invoice, Order, OrderItem, Permission, CreateOrderDTO } from '../../../shared/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://diursystem.alfauzcat.com/api/v1';
 const BACKEND_BASE_HINT = API_BASE_URL.replace(/\/api\/v1$/, '');
@@ -224,7 +225,7 @@ class ApiService {
     return response.data.order;
   }
 
-  async createOrder(orderData: { type: 'compra' | 'sale'; items: Array<{ productId: number; quantityRequested: number }>; customerName?: string; customerAddress?: string }): Promise<Order> {
+  async createOrder(orderData: CreateOrderDTO): Promise<Order> {
     const response = await this.api.post<{ order: Order }>('/orders', orderData);
     return response.data.order;
   }

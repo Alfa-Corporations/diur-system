@@ -34,6 +34,7 @@ const compraOrdersPage: React.FC = () => {
     products.forEach(product => {
       if (product.supplier) {
         map.set(product.supplier.id, product.supplier);
+        console.log(Array.from(map.values()));
       }
     });
 
@@ -115,14 +116,10 @@ const compraOrdersPage: React.FC = () => {
 
     try {
       const orderData = {
-        userId: user?.id,
-        supplierId: selectedSupplierId, // 🔥 IMPORTANTE
-        type: 'compra',
+        type: 'compra' as const,
         items: orderItems.map(item => ({
           productId: item.productId,
-          quantityRequested: item.quantity,
-          quantityProcessed: 0,
-          status: 'pendiente'
+          quantityRequested: item.quantity
         }))
       };
 
@@ -142,11 +139,22 @@ const compraOrdersPage: React.FC = () => {
           createOrderSuccess({
             id: Date.now(),
             ...orderData,
+            userId: user?.id || 0,
             status: 'pendiente',
             total: 0,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-            items: orderData.items
+            items: orderData.items.map(i => ({
+              id: Date.now(),
+              orderId: 0,
+              productId: i.productId,
+              quantityRequested: i.quantityRequested,
+              quantityProcessed: 0,
+              status: 'pendiente',
+              unitPrice: 0,
+              createdAt: '',
+              updatedAt: ''
+            }))
           })
         );
       }
@@ -173,9 +181,10 @@ const compraOrdersPage: React.FC = () => {
        return;
      }
 
-     const payload = {
-       quantityProcessed: quantityToAdd
-     };
+     const payload: { status: OrderItem['status']; quantityProcessed: number } = {
+      status: 'en_bodega',
+      quantityProcessed: newProcessed
+    }
 
      if (isOnline) {
        await apiService.updateOrderItemStatus(orderId, productId, payload);
@@ -334,8 +343,8 @@ const compraOrdersPage: React.FC = () => {
               >
                 <option value=''>Seleccionar proveedor</option>
                 {suppliers.map(supplier => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
+                  <option key={supplier?.id} value={supplier?.id}>
+                    {supplier?.name}
                   </option>
                 ))}
               </Form.Select>

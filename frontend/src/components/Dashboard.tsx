@@ -35,7 +35,7 @@ const Dashboard: React.FC = () => {
     { label: 'Venta al Mayor', path: '/orders/sale', icon: '📤', helper: 'Gestión de ventas', permission: 'crear_orden' },
     { label: 'Venta en el Local', path: '/pos', icon: '🛒', helper: 'Venta en local', permission: 'crear_orden' },
     { label: 'Dashboard Pedidos', path: '/orders/dashboard', icon: '📊', helper: 'Vista global de pedidos', permission: 'crear_orden' },
-    { label: 'Facturas', path: '/invoices', icon: '🧾', helper: 'Ventas y cobros', permission: 'invoice_order' },
+    { label: 'Facturas', path: '/invoices', icon: '🧾', helper: 'Ventas y cobros', permission: 'crear_factura' },
     { label: 'Usuarios', path: '/users', icon: '👥', helper: 'Administración de accesos', permission: 'crud_users' }
   ];
 

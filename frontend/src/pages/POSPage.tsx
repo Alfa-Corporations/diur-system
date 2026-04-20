@@ -3,14 +3,14 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Button, Card, Form, InputGroup, Alert, Badge, Table } from 'react-bootstrap';
 import type { RootState, AppDispatch } from '../redux/store';
 import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure } from '../redux/slices/productSlice';
-import type { Product } from '../../../shared/types';
+import type { Product, CreateOrderDTO } from '../../../shared/types';
 import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
 
 const POSPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { products } = useSelector((state: RootState) => state.products);
-  const { user } = useSelector((state: RootState) => state.auth);
+  //const { user } = useSelector((state: RootState) => state.auth);
 
   const [cart, setCart] = useState<Array<{ product: Product; quantity: number; price: number }>>([]);
   const [barcodeInput, setBarcodeInput] = useState('');
@@ -96,17 +96,13 @@ const POSPage: React.FC = () => {
   const createSale = async () => {
     if (!cart.length) return;
 
-    const order = {
-      userId: user?.id || 1,
-      type: 'venta',
-      customerName: 'venta en el local',
-      items: cart.map(i => ({
-        productId: i.product.id,
-        quantityRequested: i.quantity,
-        quantityProcessed: 0,
-        status: 'pendiente'
-      }))
-    };
+    const order: CreateOrderDTO = {
+  type: 'venta', // o 'compra'
+  items: cart.map(item => ({
+    productId: item.product.id,
+    quantityRequested: item.quantity
+  }))
+};
 
     if (isOnline) {
       await apiService.createOrder(order);

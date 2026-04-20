@@ -80,7 +80,7 @@ const WholesaleSalesPage: React.FC = () => {
 
     const payload = {
       userId: 1,
-      type: 'bodega',
+      type: 'venta' as const,
       customerName: 'Cliente Mayorista',
       items: orderItems.map(i => ({
         productId: i.productId,
@@ -143,7 +143,15 @@ const WholesaleSalesPage: React.FC = () => {
     dispatch(
       updateOrderItemStatusSuccess({
         orderId,
-        item: updated
+        item: {
+          ...updated,
+          status: updated.status as
+            | 'pendiente'
+            | 'en_transito'
+            | 'facturado'
+            | 'en_bodega'
+            | 'repartidor'
+        }
       })
     );
   };

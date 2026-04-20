@@ -33,7 +33,7 @@ export interface Product {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  supplier: Array<Supplier>
+  supplier: Supplier;
 }
 
 // Item de factura
@@ -124,6 +124,16 @@ export interface OrderItem {
   createdAt: string;
   updatedAt: string;
 }
+
+export type CreateOrderDTO = {
+  type: 'compra' | 'venta';
+  items: {
+    productId: number;
+    quantityRequested: number;
+  }[];
+  customerName?: string;
+  customerAddress?: string;
+};
 
 // Permiso
 export interface Permission {
