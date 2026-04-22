@@ -118,10 +118,6 @@ class OrderService {
       });
     }
 
-    console.log(orderId, productId, {
-      quantityProcessed: newProcessed,
-      status: newStatus
-    });
     // 💾 Guardar
     const updatedItem = await OrderRepository.updateOrderItem(orderId, productId, {
       quantityProcessed: newProcessed,
@@ -170,7 +166,7 @@ class OrderService {
    * @returns {Promise<Object>} Pedido cancelado
    */
   async cancelOrder(id) {
-    return await OrderRepository.update(id, { status: 'cancelled' });
+    return await OrderRepository.update(id, { status: 'cancelado' });
   }
 }
 

@@ -26,13 +26,13 @@ router.put('/users/:id', authorize('crud_users'), AuthController.updateUser);
 router.delete('/users/:id', authorize('crud_users'), AuthController.deleteUser);
 
 // Rutas de productos
-router.post('/products', authorize('crud_products'), validateProductData, ProductController.createProduct);
-router.post('/products/bulk', authorize('crud_products'), ProductController.createProducts);
-router.get('/products', ProductController.getProducts);
-router.get('/products/:id', ProductController.getProduct);
-router.put('/products/:id', authorize('crud_products'), ProductController.updateProduct);
-router.patch('/products/:id/stock', authorize('manage_inventory'), ProductController.updateStock);
-router.delete('/products/:id', authorize('crud_products'), ProductController.deleteProduct);
+router.post('/products', authorize('crear_producto'), validateProductData, ProductController.createProduct);
+router.post('/products/bulk', authorize('crear_producto'), ProductController.createProducts);
+router.get('/products', authorize('leer_producto'), ProductController.getProducts);
+router.get('/products/:id', authorize('leer_producto'), ProductController.getProduct);
+router.put('/products/:id', authorize('actualizar_producto'), ProductController.updateProduct);
+router.patch('/products/:id/stock', authorize('actualizar_producto'), ProductController.updateStock);
+router.delete('/products/:id', authorize('eliminar_producto'), ProductController.deleteProduct);
 
 // Rutas de facturas
 router.post('/invoices', authorize('invoice_order'), InvoiceController.createInvoice);
@@ -46,8 +46,8 @@ router.post('/invoices/:id/cancel', InvoiceController.cancelInvoice);
 // Rutas de pedidos
 router.post('/orders', authorize('crear_orden'), OrderController.createOrder);
 router.get('/orders', OrderController.getOrders);
-router.patch('/orders/:orderId/items/:productId/status', authorize('manage_inventory'), OrderController.updateOrderItemStatus);
-router.put('/orders/:id/cancel', authorize('cancelar_orden'), OrderController.cancelOrder);
+router.patch('/orders/:orderId/items/:productId/status', authorize('actualizar_orden'), OrderController.updateOrderItemStatus);
+router.put('/orders/:id/status', authorize('cancelar_orden'), OrderController.cancelOrder);
 router.get('/orders/:id', OrderController.getOrder);
 
 // Rutas de permisos

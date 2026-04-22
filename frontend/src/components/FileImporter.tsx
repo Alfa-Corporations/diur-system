@@ -101,7 +101,7 @@ const FileImporter = () => {
         name: item.name || item.nombre || `Producto ${i}`,
         price: Number(item.price || item.precio || 0),
         stock: Number(item.stock || 0),
-
+        supplierId: item.idsupplier,
         cost: Number(item.costavg || item.costlast || item.costo || 0),
 
         brand: item.brand || 'Genérico',
@@ -128,7 +128,7 @@ const FileImporter = () => {
 
       const transformed = transformData();
 
-      const chunkSize = 50; // 🔥 puedes ajustar (50 - 200 recomendado)
+      const chunkSize = 70; // 🔥 puedes ajustar (50 - 200 recomendado)
       const total = transformed.length;
 
       let successCount = 0;
@@ -175,16 +175,16 @@ const FileImporter = () => {
     <div style={{ padding: 20 }}>
       <h2>Importador de Productos</h2>
 
-      <input type='file' onChange={handleFile} />
+      <input type='file' onChange={handleFile} className='btn'/>
 
       <br />
       <br />
 
-      <button onClick={sendToAPI} disabled={loading}>
+      <button onClick={sendToAPI} disabled={loading} className='btn btn-success mb-3'>
         {loading ? 'Enviando...' : 'Enviar a Base de Datos'}
       </button>
 
-      <pre style={{ maxHeight: 300, overflow: 'auto', background: '#eee', padding: 10 }}>{JSON.stringify(data, null, 2)}</pre>
+      <pre style={{ maxHeight: '60vh', overflow: 'auto', background: '#eee', padding: 10 }}>{JSON.stringify(data, null, 2)}</pre>
     </div>
   );
 };

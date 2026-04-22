@@ -23,7 +23,14 @@ class UserRepository {
    */
   async findById(id) {
     return await User.findByPk(id, {
-      include: [{ model: Permission, as: 'permissions', through: { attributes: [] } }]
+      include: [{
+        model: Permission, as: 'permissions', through: { attributes: [] }, attributes: {
+          exclude: ['password', 'createdAt', 'updatedAt']
+        }
+      }],
+      attributes: {
+        exclude: ['createdAt', 'updatedAt']
+      }
     });
   }
 

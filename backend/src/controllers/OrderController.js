@@ -120,7 +120,7 @@ class OrderController {
   async cancelOrder(req, res) {
     try {
       const { id } = req.params;
-      const order = await OrderService.cancelOrder(id);
+      const order = await OrderService.cancelOrder(Number(id));
       res.json({
         message: 'Order cancelled successfully',
         order,

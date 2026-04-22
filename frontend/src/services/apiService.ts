@@ -236,7 +236,7 @@ class ApiService {
   }
 
   async updateOrderStatus(id: number, status: Order['status']): Promise<Order> {
-    const response = await this.api.patch<{ order: Order }>(`/orders/${id}/status`, { status });
+    const response = await this.api.put<{ order: Order }>(`/orders/${id}/status`, { status });
     return response.data.order;
   }
 

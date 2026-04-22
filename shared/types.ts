@@ -131,7 +131,8 @@ export type CreateOrderDTO = {
     productId: number;
     quantityRequested: number;
   }[];
-  customerName?: string;
+  customerName: string;
+  supplier: number;
   customerAddress?: string;
 };
 
