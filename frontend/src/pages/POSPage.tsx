@@ -97,12 +97,12 @@ const POSPage: React.FC = () => {
     if (!cart.length) return;
 
     const order: CreateOrderDTO = {
-  type: 'venta', // o 'compra'
-  items: cart.map(item => ({
-    productId: item.product.id,
-    quantityRequested: item.quantity
-  }))
-};
+      type: 'venta', // o 'compra'
+      items: cart.map(item => ({
+        productId: item.product.id,
+        quantityRequested: item.quantity
+      }))
+    };
 
     if (isOnline) {
       await apiService.createOrder(order);
