@@ -35,7 +35,7 @@ router.patch('/products/:id/stock', authorize('actualizar_producto'), ProductCon
 router.delete('/products/:id', authorize('eliminar_producto'), ProductController.deleteProduct);
 
 // Rutas de facturas
-router.post('/invoices', authorize('invoice_order'), InvoiceController.createInvoice);
+router.post('/invoices', authorize('crear_factura'), InvoiceController.createInvoice);
 router.get('/invoices', InvoiceController.getInvoices);
 router.get('/invoices/:id', InvoiceController.getInvoice);
 router.patch('/invoices/:id/status', InvoiceController.updateInvoiceStatus);

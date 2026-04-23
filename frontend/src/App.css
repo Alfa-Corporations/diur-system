@@ -1,17 +1,28 @@
 * {
-    padding: 0;
-    margin: 0;
-    box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
 }
 
 :root {
-    --white: #ffffff;
-    --black: #000000;
+  --white: #ffffff;
+  --black: #000000;
 }
 
 .App {
   min-height: 100vh;
   padding: 1rem;
+}
+
+#alert {
+  position: 'absolute';
+  top: '2.5rem';
+  left: '50%';
+  transform: 'translateX(-50%)';
+  z-index: 999;
+}
+
+.alert-show {
 }
 
 .eyebrow,
@@ -69,7 +80,7 @@
   border-top: none;
 }
 
-.btn-goback{
+.btn-goback {
   display: flex;
   position: absolute;
   top: 1rem;

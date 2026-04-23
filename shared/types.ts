@@ -22,6 +22,9 @@ export interface Supplier {
 
 // Producto
 export interface Product {
+  codigo2: any;
+  codigo3: any;
+  codigo4: any;
   id: number;
   name: string;
   description?: string;
@@ -126,7 +129,7 @@ export interface OrderItem {
 }
 
 export type CreateOrderDTO = {
-  type: 'compra' | 'venta';
+  type: 'compra' | 'venta' | 'mayorista';
   items: {
     productId: number;
     quantityRequested: number;
@@ -184,20 +187,9 @@ export interface CreateProductRequest {
 
 export interface CreateInvoiceRequest {
   items: Array<{
-    productId: number;
+    orderItemId: number;
     quantity: number;
   }>;
-  documentType?: InvoiceDocumentType;
-  customer?: {
-    name?: string;
-    email?: string;
-    phone?: string;
-    identificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
-    identificationNumber?: string;
-    address?: string;
-  };
-  customerName?: string;
-  customerEmail?: string;
 }
 
 export interface UpdateStockRequest {

@@ -108,6 +108,10 @@ class InvoiceService {
 
     for (const item of items) {
       await ProductService.updateStock(item.productId, -item.quantity);
+      await OrderItemService.updateProcessedQuantity({
+        productId: item.productId,
+        quantity: item.quantity
+      });
     }
 
     return invoice;
