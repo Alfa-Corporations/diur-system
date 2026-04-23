@@ -59,13 +59,13 @@ class OrderController {
    */
   async getOrders(req, res) {
     try {
-      const { type, status, userId, limit = 10, offset = 0 } = req.query;
+      const { type, status, userId } = req.query;
       const filters = {};
       if (type) filters.type = type;
       if (status) filters.status = status;
       if (userId) filters.userId = parseInt(userId);
 
-      const orders = await OrderService.getOrders(filters, parseInt(limit), parseInt(offset));
+      const orders = await OrderService.getOrders(filters);
       res.json({ orders });
     } catch (error) {
       res.status(500).json({ message: error.message });

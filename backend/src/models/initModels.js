@@ -30,6 +30,9 @@ const initModels = () => {
 
   // Asociaciones de Cliente
   Customer.hasMany(Invoice, { foreignKey: 'customerId', as: 'invoices' });
+  // 🔵 Asociaciones de Cliente con Pedido
+  Customer.hasMany(Order, { foreignKey: 'customerId', as: 'orders' });
+  Order.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
 
   // Asociaciones de Factura
   Invoice.belongsTo(User, { foreignKey: 'userId', as: 'user' });

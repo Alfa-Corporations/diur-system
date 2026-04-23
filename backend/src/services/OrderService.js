@@ -62,8 +62,8 @@ class OrderService {
    * @param {number} offset - Desplazamiento
    * @returns {Promise<Array<Object>>} Lista de pedidos
    */
-  async getOrders(filters = {}, limit = 10, offset = 0) {
-    return await OrderRepository.findAll(filters, limit, offset);
+  async getOrders(filters = {}) {
+    return await OrderRepository.findAll(filters);
   }
 
   /**

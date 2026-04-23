@@ -8,6 +8,7 @@ const PermissionController = require('../controllers/PermissionController');
 const SyncService = require('../services/SyncService');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { validateProductData, validateInvoiceData } = require('../middlewares/validation.middleware');
+const CustomerController = require('../controllers/CustomerController');
 
 const router = express.Router();
 
@@ -24,6 +25,13 @@ router.post('/users', authorize('crud_users'), AuthController.register);
 router.get('/users', authorize('crud_users'), AuthController.listUsers);
 router.put('/users/:id', authorize('crud_users'), AuthController.updateUser);
 router.delete('/users/:id', authorize('crud_users'), AuthController.deleteUser);
+
+
+// 🔵 CRUD CUSTOMERS
+router.post('/customers', authorize('crear_clientes'), CustomerController.createCustomer);
+router.get('/customers', authorize('leer_clientes'), CustomerController.getCustomers);
+router.put('/customers/:id', authorize('actualizar_clientes'), CustomerController.updateCustomer);
+router.delete('/customers/:id', authorize('eliminar_clientes'), CustomerController.deleteCustomer);
 
 // Rutas de productos
 router.post('/products', authorize('crear_producto'), validateProductData, ProductController.createProduct);
@@ -45,7 +53,7 @@ router.post('/invoices/:id/cancel', InvoiceController.cancelInvoice);
 
 // Rutas de pedidos
 router.post('/orders', authorize('crear_orden'), OrderController.createOrder);
-router.get('/orders', OrderController.getOrders);
+router.get('/orders', authorize('leer_orden'), OrderController.getOrders);
 router.patch('/orders/:orderId/items/:productId/status', authorize('actualizar_orden'), OrderController.updateOrderItemStatus);
 router.put('/orders/:id/status', authorize('cancelar_orden'), OrderController.cancelOrder);
 router.get('/orders/:id', OrderController.getOrder);

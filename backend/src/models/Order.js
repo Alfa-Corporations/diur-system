@@ -22,7 +22,7 @@ const Order = db.define('Order', {
     },
   },
   type: {
-    type: DataTypes.ENUM('compra', 'venta'),
+    type: DataTypes.ENUM('compra', 'venta', 'venta al mayor'),
     allowNull: false,
     defaultValue: 'venta',
   },
@@ -35,9 +35,13 @@ const Order = db.define('Order', {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
   },
-  customerName: {
-    type: DataTypes.STRING,
+  customerId: {
+    type: DataTypes.INTEGER,
     allowNull: true,
+    references: {
+      model: 'customers',
+      key: 'id'
+    }
   },
   supplierId: {
     type: DataTypes.INTEGER,

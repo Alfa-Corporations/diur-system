@@ -17,7 +17,7 @@ export interface User {
 
 export interface Supplier {
   id: number;
-  name: string
+  name: string;
 }
 
 // Producto
@@ -55,14 +55,13 @@ export interface InvoiceItem {
 export interface Customer {
   id: number;
   name: string;
-  email?: string | null;
-  phone?: string | null;
-  identificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
-  identificationNumber?: string | null;
-  address?: string | null;
-  isFinalConsumer: boolean;
-  createdAt: string;
-  updatedAt: string;
+
+  identificationType?: string;
+  identificationNumber?: string;
+
+  email?: string;
+  phone?: string;
+  address?: string;
 }
 
 export type InvoiceDocumentType = 'consumer_final' | 'sales_note' | 'sri_invoice';
@@ -101,7 +100,7 @@ export interface Invoice {
 export interface Order {
   id: number;
   userId: number;
-  type: 'compra' | 'venta';
+  type: 'compra' | 'venta' | 'venta al mayor';
   status: 'pendiente' | 'en_transito' | 'facturado' | 'cancelado';
   total: number;
   customerName?: string;
@@ -129,7 +128,7 @@ export interface OrderItem {
 }
 
 export type CreateOrderDTO = {
-  type: 'compra' | 'venta' | 'mayorista';
+  type: 'compra' | 'venta' | 'venta al mayor';
   items: {
     productId: number;
     quantityRequested: number;

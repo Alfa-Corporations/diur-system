@@ -3,7 +3,7 @@ import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import { store } from '../redux/store';
 import { logout } from '../redux/slices/authSlice';
-import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, CreateInvoiceRequest, User, Product, Invoice, Order, OrderItem, Permission, CreateOrderDTO } from '../../../shared/types';
+import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, CreateInvoiceRequest, User, Product, Invoice, Order, OrderItem, Permission, CreateOrderDTO, Customer } from '../../../shared/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://diursystem.alfauzcat.com/api/v1';
 const BACKEND_BASE_HINT = API_BASE_URL.replace(/\/api\/v1$/, '');
@@ -212,7 +212,7 @@ class ApiService {
   }
 
   // Métodos de pedidos
-  async getOrders(params?: { limit?: number; offset?: number; status?: string; type?: string }): Promise<{ orders: Order[]; totalCount: number }> {
+  async getOrders(params?: { status?: string; type?: string }): Promise<{ orders: Order[]; totalCount: number }> {
     const response = await this.api.get('/orders', { params });
     return {
       orders: response.data.orders,
@@ -251,6 +251,30 @@ class ApiService {
 
   async deleteOrder(id: number): Promise<void> {
     await this.api.delete(`/orders/${id}`);
+  }
+
+  // Métodos de customers
+
+  async getCustomers(): Promise<{ customers: Customer[]; totalCount: number }> {
+    const response = await this.api.get('/customers');
+    return {
+      customers: response.data.customers,
+      totalCount: response.data.totalCount || response.data.customers.length
+    };
+  }
+
+  async createCustomer(data: { name: string; address?: string; phone?: string }): Promise<Customer> {
+    const response = await this.api.post('/customers', data);
+    return response.data;
+  }
+
+  async updateCustomer(id: number, data: { name?: string; address?: string; phone?: string }): Promise<Customer> {
+    const response = await this.api.put(`/customers/${id}`, data);
+    return response.data;
+  }
+
+  async deleteCustomer(id: number): Promise<void> {
+    await this.api.delete(`/customers/${id}`);
   }
 
   // Métodos de sincronización

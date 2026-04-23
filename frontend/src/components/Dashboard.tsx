@@ -36,7 +36,8 @@ const Dashboard: React.FC = () => {
     { label: 'Venta en el Local', path: '/pos', icon: '🛒', helper: 'Venta en local', permission: 'crear_orden' },
     { label: 'Dashboard Pedidos', path: '/orders/dashboard', icon: '📊', helper: 'Vista global de pedidos', permission: 'crear_orden' },
     { label: 'Facturas', path: '/invoices', icon: '🧾', helper: 'Ventas y cobros', permission: 'crear_factura' },
-    { label: 'Usuarios', path: '/users', icon: '👥', helper: 'Administración de accesos', permission: 'crud_users' }
+    { label: 'Usuarios', path: '/users', icon: '👥', helper: 'Administración de accesos', permission: 'crud_users' },
+    { label: 'Clientes', path: '/customer', icon: '👥', helper: 'Administración de clientes', permission: 'crud_users' }
   ];
 
   const availableMenuItems = menuItems.filter(item => !item.permission || hasPermission(item.permission) || user.role === 'admin');
