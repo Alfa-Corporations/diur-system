@@ -83,7 +83,7 @@ const OrdersDashboardPage: React.FC = () => {
   };
 
   const getTypeBadge = (type: Order['type']) => {
-    return <Badge bg={type === 'compra' ? 'info' : 'success'}>{type === 'compra' ? 'Compra' : 'Venta'}</Badge>;
+    return <Badge bg={type === 'compra' ? 'info' : 'success'}>{type}</Badge>;
   };
 
   // Estadísticas
