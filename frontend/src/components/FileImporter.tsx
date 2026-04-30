@@ -101,7 +101,8 @@ const FileImporter = () => {
         name: item.name || item.nombre || `Producto ${i}`,
         price: Number(item.price || item.precio || 0),
         stock: Number(item.stock || 0),
-        supplierId: item.idsupplier,
+        supplierId: item.supplierId || item.idsupplier || item.supplier_id,
+        providerName: item.providerName || item.supplier || item.proveedor || item.nombre_proveedor || item.supplierName || null,
         cost: Number(item.costavg || item.costlast || item.costo || 0),
 
         brand: item.brand || 'Genérico',
@@ -175,7 +176,7 @@ const FileImporter = () => {
     <div style={{ padding: 20 }}>
       <h2>Importador de Productos</h2>
 
-      <input type='file' onChange={handleFile} className='btn'/>
+      <input type='file' onChange={handleFile} className='btn' />
 
       <br />
       <br />

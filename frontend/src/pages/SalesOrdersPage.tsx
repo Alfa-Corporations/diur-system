@@ -247,13 +247,14 @@ const WholesaleSalesPage: React.FC = () => {
           <Button variant='outline-secondary' className='me-2' onClick={() => window.history.back()}>
             ← Volver
           </Button>
-          <Button variant='primary' onClick={() => setShowCreateModal(true)} disabled={!isOnline && loading}>
-            Nueva Venta
-          </Button>
         </div>
       </div>
 
       {!isOnline && <Alert variant='warning'>Modo offline - Los cambios se sincronizarán cuando se restablezca la conexión</Alert>}
+
+      <Button variant='primary' className='sales-orders-fab' onClick={() => setShowCreateModal(true)} disabled={!isOnline && loading} style={{ display: showCreateModal || !!selectedOrder ? 'none' : 'flex' }}>
+        +
+      </Button>
 
       {error && <Alert variant='danger'>{error}</Alert>}
 

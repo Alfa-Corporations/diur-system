@@ -31,70 +31,70 @@ class ProductService {
     if (!Array.isArray(productsData) || productsData.length === 0) {
       throw new Error('Debe enviar un array de productos');
     }
-    
+
+    const normalizedProducts = productsData.map((product) => ({
+      ...product,
+      price: Number(product.price ?? product.precio ?? 0),
+      stock: Number(product.stock ?? 0),
+      supplierId: product.supplierId ? Number(product.supplierId) : undefined,
+      providerName: product.providerName || product.supplier || product.proveedor || product.supplierName || product.provider || null,
+    }));
+
     // ✅ Validar productos
-    const invalidProducts = productsData.filter(
-      p => !p.name || !p.price || !p.partnumber || !p.providerName
+    const invalidProducts = normalizedProducts.filter(
+      (p) => !p.name || p.price === 0 || !p.partnumber || (!p.providerName && !p.supplierId)
     );
-    
+
     if (invalidProducts.length > 0) {
       throw new Error(
-        `Hay ${invalidProducts.length} productos inválidos (name, price, partnumber, providerName requeridos)`
+        `Hay ${invalidProducts.length} productos inválidos (name, price, partnumber y supplierId/providerName requeridos)`
       );
     }
-    console.log(productsData);
-    
+
     // ✅ Obtener partnumbers
-    const partnumbers = productsData.map(p => p.partnumber);
-    console.log(partnumbers);
+    const partnumbers = normalizedProducts.map((p) => p.partnumber);
 
     // ✅ Validar duplicados en BD
     const existingProducts = await ProductRepository.findBypartnumbers(partnumbers);
-
     if (existingProducts.length > 0) {
-      const existingpartnumbers = existingProducts.map(p => p.partnumber);
+      const existingpartnumbers = existingProducts.map((p) => p.partnumber);
       throw new Error(`partnumbers ya existentes: ${existingpartnumbers.join(', ')}`);
     }
 
     // 🧠 =========================
     // 🔥 PROVEEDORES (OPTIMIZADO)
     // =========================
+    const productsWithProvider = [];
+    const providerNames = [...new Set(normalizedProducts
+      .filter((p) => !p.supplierId)
+      .map((p) => p.providerName)
+      .filter(Boolean))];
 
-    // 1. Obtener nombres únicos de proveedores
-    const providerNames = [...new Set(productsData.map(p => p.providerName))];
+    const existingProviders = providerNames.length > 0
+      ? await SupplierRepository.findBynames(providerNames)
+      : [];
 
-    // 2. Buscar proveedores existentes
-    const existingProviders = await SupplierRepository.findBynames(providerNames);
-
-    // 3. Mapear proveedores existentes
     const providerMap = new Map();
-    existingProviders.forEach(p => {
-      providerMap.set(p.name, p.id);
-    });
+    existingProviders.forEach((p) => providerMap.set(p.name, p.id));
 
-    // 4. Crear los que no existen
     for (const name of providerNames) {
       if (!providerMap.has(name)) {
-        const newProvider = await SupplierRepository.create({
-          name
-        });
-
+        const newProvider = await SupplierRepository.create({ name });
         providerMap.set(name, newProvider.id);
       }
     }
 
-    // 🧠 =========================
-    // 🔗 ASIGNAR providerId
-    // =========================
-
-    const productsWithProvider = productsData.map(p => ({
-      ...p,
-      providerId: providerMap.get(p.providerName)
-    }));
+    for (const product of normalizedProducts) {
+      const supplierId = product.supplierId || providerMap.get(product.providerName);
+      const { providerName, ...productPayload } = product;
+      productsWithProvider.push({
+        ...productPayload,
+        supplierId,
+      });
+    }
 
     // ✅ Crear productos masivamente
     const createdProducts = await ProductRepository.bulkCreate(productsWithProvider);
-
     return createdProducts;
   }
 

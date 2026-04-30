@@ -29,10 +29,10 @@ class ProductController {
   async createProducts(req, res) {
     try {
       const { products } = req.body;
-      const product = await ProductService.createProducts(products);
+      const createdProducts = await ProductService.createProducts(products);
       res.status(201).json({
-        message: 'Product created successfully',
-        product,
+        message: 'Products created successfully',
+        products: createdProducts,
       });
     } catch (error) {
       res.status(400).json({ message: error.message });
@@ -59,7 +59,7 @@ class ProductController {
    */
   async getProducts(req, res) {
     try {
-      const { category, isActive} = req.query;
+      const { category, isActive } = req.query;
       const filters = {};
       if (category) filters.category = category;
       if (isActive !== undefined) filters.isActive = isActive === 'true';
@@ -121,6 +121,9 @@ class ProductController {
         res.status(404).json({ message: 'Product not found' });
       }
     } catch (error) {
+      if (error.message && error.message.includes('movimientos asociados')) {
+        return res.status(409).json({ message: error.message });
+      }
       res.status(500).json({ message: 'Internal server error' });
     }
   }

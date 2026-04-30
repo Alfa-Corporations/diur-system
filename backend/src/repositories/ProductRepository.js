@@ -1,4 +1,4 @@
-const { Op } = require('sequelize');
+const { Op, Sequelize } = require('sequelize');
 const { Product, Suppliers } = require('../models');
 
 /**
@@ -87,8 +87,16 @@ class ProductRepository {
   async delete(id) {
     const product = await Product.findByPk(id);
     if (!product) return false;
-    await product.destroy();
-    return true;
+
+    try {
+      await product.destroy();
+      return true;
+    } catch (error) {
+      if (error instanceof Sequelize.ForeignKeyConstraintError) {
+        throw new Error('No se puede eliminar el producto porque tiene movimientos asociados');
+      }
+      throw error;
+    }
   }
 
   /**
@@ -109,7 +117,8 @@ class ProductRepository {
           as: 'supplier',
           attributes: ['id', 'name'] // 👈 evita traer todo
         }
-      ] });
+      ]
+    });
   }
 }
 
