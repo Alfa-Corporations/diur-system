@@ -50,13 +50,12 @@ export interface Customer {
   email?: string | null;
   phone?: string | null;
   identificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
-  identificationNumber?: number | null;
+  identificationNumber?: string | null;
   address?: string | null;
   isFinalConsumer?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
-
 
 export type InvoiceDocumentType = 'consumer_final' | 'sales_note' | 'sri_invoice';
 

@@ -11,7 +11,6 @@ import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure } from '
 import { fetchCustomersStart, fetchCustomersSuccess, fetchCustomersFailure } from '../redux/slices/customerSlice';
 
 import apiService from '../services/apiService';
-import localDBService from '../services/localDBService';
 import socketService from '../services/socketService';
 import type { Order, OrderItem } from '../../../shared/types';
 
@@ -24,12 +23,12 @@ const WholesaleSalesPage: React.FC = () => {
   const { user } = useAppSelector((state: RootState) => state.auth);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<Array<{ productId: number; quantity: number }>>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [tempQuantity, setTempQuantity] = useState<{ [key: number]: number }>({});
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline] = useState(navigator.onLine);
 
   const ordersRef = useRef(orders);
   useEffect(() => {
@@ -174,7 +173,7 @@ const WholesaleSalesPage: React.FC = () => {
 
     try {
       // ✅ enviar SOLO lo que se procesa en esta acción
-      const res = await apiService.updateOrderItemStatus(orderId, productId, {
+      await apiService.updateOrderItemStatus(orderId, productId, {
         status: newProcessed === item.quantityRequested ? 'facturado' : 'en_transito',
         quantityProcessed: qty
       });
@@ -282,9 +281,9 @@ const WholesaleSalesPage: React.FC = () => {
               </div>
 
               {/* Cliente */}
-              <div className='mb-2'>
+              <div className='mb-2 d-flex flex-column'>
                 <small className='text-muted'>Cliente</small>
-                <div>{order.customerName}</div>
+                <b>{order.customer?.name}</b>
               </div>
 
               {/* Productos */}
@@ -456,22 +455,28 @@ const WholesaleSalesPage: React.FC = () => {
       {/* ========================= */}
       {/* MODAL DETALLE */}
       {/* ========================= */}
+      {/* Modal de detalle de pedido */}
       <Modal show={!!selectedOrder} onHide={() => setSelectedOrder(null)} size='lg' centered>
         <Modal.Header closeButton>
-          <Modal.Title>Venta #{selectedOrder?.id}</Modal.Title>
+          <Modal.Title>Pedido #{selectedOrder?.id}</Modal.Title>
         </Modal.Header>
 
         <Modal.Body>
           {selectedOrder && (
             <div>
-              {/* INFO */}
+              {/* 🔵 INFO GENERAL */}
               <div className='mb-3 p-3 border rounded'>
-                <div className='d-flex justify-content-between'>
+                <div className='d-flex justify-content-between align-items-center mb-2'>
                   <strong>Estado</strong>
                   {getStatusBadge(selectedOrder.status)}
                 </div>
 
-                <div className='d-flex justify-content-between mt-2'>
+                <div className='d-flex justify-content-between'>
+                  <span>Cliente</span>
+                  <strong>{selectedOrder.customer?.name}</strong>
+                </div>
+
+                <div className='d-flex justify-content-between'>
                   <span>Total</span>
                   <strong>${selectedOrder.total}</strong>
                 </div>
@@ -481,25 +486,57 @@ const WholesaleSalesPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* ITEMS */}
+              {/* 🛒 PRODUCTOS */}
+              <h6 className='mb-3'>Productos</h6>
+
               {selectedOrder.items?.map(item => {
                 const progress = (item.quantityProcessed / item.quantityRequested) * 100;
 
                 return (
-                  <div key={item.id} className='border rounded p-3 mb-3'>
-                    <strong>{item.product?.name}</strong>
-
-                    <div className='mt-2'>
-                      {item.quantityProcessed} / {item.quantityRequested}
+                  <div key={item.id} className='border rounded p-3 mb-3 shadow-sm'>
+                    {/* 🔹 NOMBRE */}
+                    <div className='mb-2'>
+                      <strong style={{ fontSize: '1rem' }}>{item.product?.name}</strong>
                     </div>
 
-                    <div className='progress mt-2'>
-                      <div className='progress-bar' style={{ width: `${progress}%` }} />
+                    {/* 🔹 PROGRESO */}
+                    <div className='mb-2'>
+                      <div className='d-flex justify-content-between'>
+                        <small className='text-muted'>Progreso</small>
+                        <small>
+                          {item.quantityProcessed} / {item.quantityRequested}
+                        </small>
+                      </div>
+
+                      <div className='progress' style={{ height: '8px' }}>
+                        <div className='progress-bar' role='progressbar' style={{ width: `${progress}%` }} />
+                      </div>
                     </div>
 
-                    <div className='d-flex gap-2 mt-3'>
+                    {/* 🔹 INFO */}
+                    <div className='d-flex justify-content-between mb-2'>
+                      <div>
+                        <small className='text-muted'>Solicitado</small>
+                        <div>{item.quantityRequested}</div>
+                      </div>
+
+                      <div>
+                        <small className='text-muted'>Procesado</small>
+                        <div>{item.quantityProcessed}</div>
+                      </div>
+
+                      <div className='text-end'>
+                        <small className='text-muted'>Estado</small>
+                        <div>{selectedOrder.status === 'cancelado' ? getStatusBadge('cancelado') : getItemStatusBadge(item.status)}</div>
+                      </div>
+                    </div>
+
+                    {/* 🔹 INPUT CANTIDAD */}
+                    <div className='d-flex gap-2 mt-3 align-items-center'>
                       <Form.Control
                         type='number'
+                        min={1}
+                        placeholder='Cantidad'
                         value={tempQuantity[item.productId] || ''}
                         onChange={e =>
                           setTempQuantity({
@@ -507,13 +544,31 @@ const WholesaleSalesPage: React.FC = () => {
                             [item.productId]: parseInt(e.target.value)
                           })
                         }
+                        style={{ maxWidth: '90px' }}
                       />
 
-                      <Button onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, tempQuantity[item.productId] || 1)}>Procesar</Button>
+                      <Button
+                        disabled={selectedOrder.status === 'cancelado' || item.quantityProcessed === item.quantityRequested}
+                        variant='outline-success'
+                        size='sm'
+                        className='w-100'
+                        onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, tempQuantity[item.productId] || 1)}
+                      >
+                        📦 Ingresar
+                      </Button>
                     </div>
+
+                    {/* 🔹 BOTÓN RÁPIDO COMPLETAR */}
+                    {item.quantityProcessed < item.quantityRequested && (
+                      <Button variant='outline-primary' size='sm' className='w-100 mt-2' onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, item.quantityRequested - item.quantityProcessed)}>
+                        ⚡ Completar todo
+                      </Button>
+                    )}
                   </div>
                 );
               })}
+
+              {selectedOrder.items?.length === 0 && <div className='text-center text-muted'>No hay productos en este pedido</div>}
             </div>
           )}
         </Modal.Body>

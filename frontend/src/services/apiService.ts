@@ -263,12 +263,23 @@ class ApiService {
     };
   }
 
-  async createCustomer(data: { name: string; address?: string; phone?: string }): Promise<Customer> {
+  async createCustomer(data: { name: string; address?: string; phone?: string; email?: string; identificationType?: 'none' | 'cedula' | 'ruc' | 'passport'; identificationNumber?: string | number; isFinalConsumer?: boolean }): Promise<Customer> {
     const response = await this.api.post('/customers', data);
     return response.data;
   }
 
-  async updateCustomer(id: number, data: { name?: string; address?: string; phone?: string }): Promise<Customer> {
+  async updateCustomer(
+    id: number,
+    data: {
+      name?: string;
+      address?: string;
+      phone?: string;
+      email?: string;
+      identificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
+      identificationNumber?: string | number;
+      isFinalConsumer?: boolean;
+    }
+  ): Promise<Customer> {
     const response = await this.api.put(`/customers/${id}`, data);
     return response.data;
   }

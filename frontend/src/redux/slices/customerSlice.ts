@@ -1,10 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-
-interface Customer {
-  id: number;
-  name: string;
-  // 👉 puedes agregar más campos luego (address, phone, etc.)
-}
+import type { Customer } from '../../interfaces/types';
 
 interface CustomerState {
   customers: Customer[];

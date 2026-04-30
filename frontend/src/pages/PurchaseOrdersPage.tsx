@@ -601,7 +601,13 @@ const name = suppliers.filter(s => s.id === selectedSupplierId) || ''
                         style={{ maxWidth: '90px' }}
                       />
 
-                      <Button disabled={selectedOrder.status === 'cancelado'} variant='outline-success' size='sm' className='w-100' onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, tempQuantity[item.productId] || 1)}>
+                      <Button
+                        disabled={selectedOrder.status === 'cancelado' || item.quantityProcessed === item.quantityRequested}
+                        variant='outline-success'
+                        size='sm'
+                        className='w-100'
+                        onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, tempQuantity[item.productId] || 1)}
+                      >
                         📦 Ingresar
                       </Button>
                     </div>

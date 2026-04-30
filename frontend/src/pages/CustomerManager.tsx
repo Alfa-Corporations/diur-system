@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
-import { Button, Modal, Form, Table, Alert } from 'react-bootstrap';
+import { Button, Modal, Form, Alert } from 'react-bootstrap';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import type { RootState } from '../redux/store';
 import { fetchCustomersStart, fetchCustomersSuccess, fetchCustomersFailure } from '../redux/slices/customerSlice';
 import apiService from '../services/apiService';
-import type { Customer } from '../../../shared/types';
+import type { Customer } from '../interfaces/types';
 
 const CustomerManager: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -34,23 +34,6 @@ const CustomerManager: React.FC = () => {
     loadCustomers();
   }, []);
 
-  // 🔥 VALIDACIÓN
-  const validateForm = () => {
-    if (!formData.name) return 'El nombre es obligatorio';
-
-    if (!formData.isFinalConsumer) {
-      if (!formData.identificationNumber) {
-        return 'La identificación es obligatoria';
-      }
-    }
-
-    if (formData.email && !formData.email.includes('@')) {
-      return 'Correo inválido';
-    }
-
-    return '';
-  };
-
   const handleSave = async () => {
     if (!formData.name || !formData.identificationType) return;
 
@@ -60,7 +43,8 @@ const CustomerManager: React.FC = () => {
       identificationNumber: formData.identificationNumber || undefined,
       email: formData.email || undefined,
       phone: formData.phone || undefined,
-      address: formData.address || undefined
+      address: formData.address || undefined,
+      isFinalConsumer: formData.isFinalConsumer || false
     };
 
     try {
@@ -84,7 +68,7 @@ const CustomerManager: React.FC = () => {
     setFormData({
       name: customer.name,
       identificationType: customer.identificationType || 'cedula',
-      identificationNumber: customer.identificationNumber || 9999999999,
+      identificationNumber: customer.identificationNumber ?? undefined,
       address: customer.address || '',
       email: customer.email || '',
       phone: customer.phone || '',
@@ -211,12 +195,12 @@ const CustomerManager: React.FC = () => {
               <Form.Group className='mb-2'>
                 <Form.Label>Número *</Form.Label>
                 <Form.Control
-                  type='number'
+                  type='text'
                   value={formData.identificationNumber || ''}
                   onChange={e =>
                     setFormData({
                       ...formData,
-                      identificationNumber: Number(e.target.value)
+                      identificationNumber: e.target.value
                     })
                   }
                 />

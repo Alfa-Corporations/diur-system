@@ -56,12 +56,12 @@ export interface Customer {
   id: number;
   name: string;
 
-  identificationType?: string;
+  identificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
   identificationNumber?: string;
-
+  address?: string;
   email?: string;
   phone?: string;
-  address?: string;
+  isFinalConsumer?: boolean;
 }
 
 export type InvoiceDocumentType = 'consumer_final' | 'sales_note' | 'sri_invoice';
@@ -98,11 +98,13 @@ export interface Invoice {
 
 // Pedido
 export interface Order {
+  customer?: any;
   id: number;
   userId: number;
   type: 'compra' | 'venta' | 'venta al mayor';
   status: 'pendiente' | 'en_transito' | 'facturado' | 'cancelado';
   total: number;
+  supplier?: number;
   customerName?: string;
   customerAddress?: string;
   deliveryUserId?: number;
@@ -134,6 +136,7 @@ export type CreateOrderDTO = {
     quantityRequested: number;
   }[];
   customerName?: string;
+  customerId?: number;
   supplier?: number;
   customerAddress?: string;
 };
@@ -186,9 +189,24 @@ export interface CreateProductRequest {
 
 export interface CreateInvoiceRequest {
   items: Array<{
-    orderItemId: number;
+    productId: number;
     quantity: number;
   }>;
+  documentType?: InvoiceDocumentType;
+  customer?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    identificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
+    identificationNumber?: string;
+    address?: string;
+  };
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  customerIdentificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
+  customerIdentification?: string;
+  customerAddress?: string;
 }
 
 export interface UpdateStockRequest {

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Provider } from 'react-redux';
 import { store } from './redux/store';
 import { useAppSelector, useAppDispatch } from './hooks/redux';
+import { usePermissions } from './hooks/permissions';
 import { logout, restoreSession } from './redux/slices/authSlice';
 import { addNotification, loadFromStorage, setOnline, startSync, syncSuccess, syncFailure } from './redux/slices/syncSlice';
 import apiService from './services/apiService';
@@ -21,6 +22,7 @@ import OrdersDashboardPage from './pages/OrdersDashboardPage';
 import POSPage from './pages/POSPage';
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
 import SalesOrdersPage from './pages/SalesOrdersPage';
+import LocalSalesOrdersPage from './pages/LocalSalesOrdersPage';
 import FileImporter from './components/FileImporter';
 import CustomerManager from './pages/CustomerManager';
 
@@ -31,6 +33,7 @@ import CustomerManager from './pages/CustomerManager';
 const AppContent: React.FC = () => {
   const dispatch = useAppDispatch();
   const { isAuthenticated, user } = useAppSelector(state => state.auth);
+  const { hasPermission } = usePermissions();
   const { isOnline } = useAppSelector(state => state.sync);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isSyncingPending, setIsSyncingPending] = useState(false);
@@ -151,6 +154,7 @@ const AppContent: React.FC = () => {
           <Route path='/orders/dashboard' element={isAuthenticated ? <OrdersDashboardPage /> : <Navigate to='/login' />} />
           <Route path='/orders/purchase' element={isAuthenticated ? <PurchaseOrdersPage /> : <Navigate to='/login' />} />
           <Route path='/orders/sale' element={isAuthenticated ? <SalesOrdersPage /> : <Navigate to='/login' />} />
+          <Route path='/orders/local' element={isAuthenticated ? hasPermission('leer_orden') || user?.role === 'admin' ? <LocalSalesOrdersPage /> : <Navigate to='/dashboard' /> : <Navigate to='/login' />} />
           <Route path='/pos' element={isAuthenticated ? <POSPage /> : <Navigate to='/login' />} />
           <Route path='/' element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
         </Routes>

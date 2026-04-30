@@ -11,7 +11,7 @@ class OrderController {
    */
   async createOrder(req, res) {
     try {
-      const { type, items, customerName, customerAddress } = req.body;
+      const { type, items, customerId } = req.body;
       const userId = req.user?.id;
 
       if (!userId) {
@@ -25,8 +25,7 @@ class OrderController {
       const orderData = {
         userId,
         type,
-        customerName,
-        customerAddress,
+        customerId,
       };
 
       const order = await OrderService.createOrder(orderData, items);

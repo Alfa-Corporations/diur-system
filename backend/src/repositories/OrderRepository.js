@@ -1,4 +1,4 @@
-const { Order, OrderItem } = require('../models');
+const { Order, OrderItem, Customer } = require('../models');
 
 /**
  * Repositorio para operaciones de Pedido
@@ -50,10 +50,11 @@ class OrderRepository {
     return await Order.findAll({
       where,
       include: [
-        { model: OrderItem, as: 'items', include: ['product'] }
+        { model: OrderItem, as: 'items', include: ['product'] },
+        { model: Customer, as: 'customer', attributes: {
+            exclude: [ 'createdAt', 'updatedAt']
+        } }
       ],
-      limit,
-      offset,
       order: [['createdAt', 'DESC']]
     });
   }
