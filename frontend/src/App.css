@@ -331,6 +331,111 @@
   box-shadow: var(--shadow);
 }
 
+.sales-page {
+  padding: 1.4rem 0;
+}
+
+.sales-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.75rem;
+}
+
+.sales-title {
+  font-size: clamp(2rem, 2.5vw, 2.6rem);
+  font-weight: 800;
+  color: #0f172a;
+  margin-top: 0.75rem;
+}
+
+.sales-subtitle {
+  max-width: 54rem;
+  color: rgba(15, 23, 42, 0.72);
+  line-height: 1.75;
+  margin: 0.85rem 0 0;
+}
+
+.sales-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem;
+}
+
+.sales-option-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 190px;
+  padding: 1.35rem;
+  border-radius: 24px;
+  border: 1px solid rgba(219, 228, 240, 0.95);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 18px 35px rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    background 0.25s ease;
+  text-align: left;
+}
+
+.sales-option-card:hover,
+.sales-option-card:focus-visible {
+  transform: translateY(-5px);
+  box-shadow: 0 28px 50px rgba(15, 23, 42, 0.14);
+  border-color: rgba(37, 99, 235, 0.3);
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+}
+
+.sales-option-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.sales-option-card strong {
+  display: block;
+  font-size: 1.25rem;
+  margin-bottom: 0.55rem;
+  color: #0f172a;
+}
+
+.sales-option-card p {
+  margin: 0;
+  color: rgba(15, 23, 42, 0.7);
+  line-height: 1.6;
+}
+
+.sales-option-note {
+  display: inline-flex;
+  margin-top: 1.2rem;
+  color: rgba(100, 116, 139, 0.9);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .sales-header,
+  .sales-page {
+    padding: 0;
+  }
+
+  .sales-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 992px) {
   .login-hero,
   .login-card .card-body,

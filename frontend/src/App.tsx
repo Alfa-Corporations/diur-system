@@ -25,6 +25,7 @@ import SalesOrdersPage from './pages/SalesOrdersPage';
 import LocalSalesOrdersPage from './pages/LocalSalesOrdersPage';
 import FileImporter from './components/FileImporter';
 import CustomerManager from './pages/CustomerManager';
+import Sales from './pages/Sales';
 
 /**
  * Componente principal de la aplicación
@@ -155,6 +156,7 @@ const AppContent: React.FC = () => {
           <Route path='/orders/purchase' element={isAuthenticated ? <PurchaseOrdersPage /> : <Navigate to='/login' />} />
           <Route path='/orders/sale' element={isAuthenticated ? <SalesOrdersPage /> : <Navigate to='/login' />} />
           <Route path='/orders/local' element={isAuthenticated ? hasPermission('leer_orden') || user?.role === 'admin' ? <LocalSalesOrdersPage /> : <Navigate to='/dashboard' /> : <Navigate to='/login' />} />
+          <Route path='/sales' element={isAuthenticated ? <Sales /> : <Navigate to='/login' />} />
           <Route path='/pos' element={isAuthenticated ? <POSPage /> : <Navigate to='/login' />} />
           <Route path='/' element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
         </Routes>
