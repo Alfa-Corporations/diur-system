@@ -62,8 +62,7 @@ class SocketService {
       return;
     }
 
-    const socketUrl = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL?.replace(/\/api\/v1$/, '') || 'http://localhost:8001';
-
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || 'https://diursystem.alfauzcat.com'
     this.socket = io(socketUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],
@@ -72,6 +71,8 @@ class SocketService {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 30000
     });
+
+    console.log(socketUrl);
 
     this.socket.on('connect', () => {
       console.log('Connected to Socket.IO server');
