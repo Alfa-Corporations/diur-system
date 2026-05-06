@@ -27,7 +27,6 @@ const WholesaleSalesPage: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<Array<{ productId: number; quantity: number }>>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
   const [tempQuantity, setTempQuantity] = useState<{ [key: number]: number }>({});
   const [isOnline] = useState(navigator.onLine);
   const [filters, setFilters] = useState({ search: '' });
@@ -453,9 +452,7 @@ const WholesaleSalesPage: React.FC = () => {
                 {/* 🔵 LISTA PRODUCTOS */}
                 <div style={{ maxHeight: '200px', overflowY: 'auto' }} className='mb-3 border rounded p-2'>
                   {filteredProducts
-                    .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
-                    .slice(0, 10)
-                    .map(product => (
+                            .map(product => (
                       <div key={product.id} className='d-flex justify-content-between align-items-center border-bottom py-2'>
                         <div>
                           <div style={{ fontWeight: 500 }}>{product.name}</div>
