@@ -289,6 +289,11 @@ class ApiService {
   }
 
   // Métodos de sincronización
+  async getSuppliers(): Promise<{ suppliers: Array<{ id: number; name: string }> }> {
+    const response = await this.api.get('/suppliers');
+    return response.data;
+  }
+
   async getPendingEvents(): Promise<any[]> {
     const response = await this.api.get('/sync/pending');
     return response.data.pendingEvents;

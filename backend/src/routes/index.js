@@ -5,6 +5,7 @@ const ProductController = require('../controllers/ProductController');
 const InvoiceController = require('../controllers/InvoiceController');
 const OrderController = require('../controllers/OrderController');
 const PermissionController = require('../controllers/PermissionController');
+const SupplierController = require('../controllers/SupplierController');
 const SyncService = require('../services/SyncService');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { validateProductData, validateInvoiceData } = require('../middlewares/validation.middleware');
@@ -32,6 +33,13 @@ router.post('/customers', authorize('crear_clientes'), CustomerController.create
 router.get('/customers', authorize('leer_clientes'), CustomerController.getCustomers);
 router.put('/customers/:id', authorize('actualizar_clientes'), CustomerController.updateCustomer);
 router.delete('/customers/:id', authorize('eliminar_clientes'), CustomerController.deleteCustomer);
+
+// 🟣 CRUD SUPPLIERS
+router.get('/suppliers', SupplierController.getSuppliers);
+router.get('/suppliers/:id', SupplierController.getSupplier);
+router.post('/suppliers', authorize('crud_users'), SupplierController.createSupplier);
+router.put('/suppliers/:id', authorize('crud_users'), SupplierController.updateSupplier);
+router.delete('/suppliers/:id', authorize('crud_users'), SupplierController.deleteSupplier);
 
 // Rutas de productos
 router.post('/products', authorize('crear_producto'), validateProductData, ProductController.createProduct);
