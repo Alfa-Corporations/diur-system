@@ -13,6 +13,7 @@ import { fetchCustomersStart, fetchCustomersSuccess, fetchCustomersFailure } fro
 import apiService from '../services/apiService';
 import socketService from '../services/socketService';
 import type { Order, OrderItem } from '../../../shared/types';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const WholesaleSalesPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -29,6 +30,8 @@ const WholesaleSalesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [tempQuantity, setTempQuantity] = useState<{ [key: number]: number }>({});
   const [isOnline] = useState(navigator.onLine);
+  const [filters, setFilters] = useState({ search: '' });
+  const [showScanner, setShowScanner] = useState(false);
 
   const ordersRef = useRef(orders);
   useEffect(() => {
@@ -46,6 +49,62 @@ const WholesaleSalesPage: React.FC = () => {
       socketService.off('notification', handleSocketNotification);
     };
   }, []);
+
+  // =========================
+  // SCANNER
+  // =========================
+  useEffect(() => {
+    if (!showScanner) return;
+
+    const scanner = new Html5Qrcode('reader');
+    let lastScan = '';
+    let isRunning = false;
+
+    scanner
+      .start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: 250 },
+        async decodedText => {
+          // 🚫 Evitar lecturas duplicadas
+          if (decodedText === lastScan) return;
+          lastScan = decodedText;
+
+          try {
+            setFilters({ search: decodedText });
+
+            // 🔊 (opcional) sonido de éxito
+            const audio = new Audio('/scan.mp3');
+            audio.play().catch(() => {});
+
+            // ⏹ detener scanner correctamente
+            if (isRunning) {
+              isRunning = false;
+              await scanner.stop();
+              setShowScanner(false);
+            }
+          } catch (error) {
+            console.error('Error al procesar escaneo:', error);
+          }
+        },
+        () => {
+          // 👇 ignoramos errores frecuentes del escáner
+        }
+      )
+      .then(() => {
+        isRunning = true;
+      })
+      .catch(error => {
+        console.error('Error al iniciar scanner:', error);
+      });
+
+    return () => {
+      if (isRunning) {
+        scanner.stop().catch(() => {
+          // Ignorar errores al detener el scanner
+        });
+      }
+    };
+  }, [showScanner]);
 
   // ========================
   // SOCKETS
@@ -213,6 +272,13 @@ const WholesaleSalesPage: React.FC = () => {
     }
   };
 
+  // 🔍 Normalizar texto para búsqueda flexible
+  const filteredProducts = products.filter(p => {
+    const s = filters.search.toLowerCase();
+
+    return s === '' || p.name.toLowerCase().includes(s) || p.partnumber.toLowerCase().includes(s);
+  });
+
   const handleCancelOrder = async (orderId: number) => {
     const updated = await apiService.updateOrderStatus(orderId, 'cancelado');
     dispatch(cancelOrderSuccess(updated));
@@ -318,6 +384,23 @@ const WholesaleSalesPage: React.FC = () => {
         </div>
       )}
 
+      {/* SCANNER */}
+      {showScanner && (
+        <div className='modal d-block' style={{ backgroundColor: 'rgba(0,0,0,0.9)' }}>
+          <div className='modal-dialog modal-fullscreen'>
+            <div className='modal-content bg-dark'>
+              <div className='modal-header'>
+                <h5 className='modal-title text-white'>📷 Escanear Código de Barras</h5>
+                <button type='button' className='btn-close btn-close-white' onClick={() => setShowScanner(false)}></button>
+              </div>
+              <div className='modal-body p-0'>
+                <div id='reader' style={{ width: '100%' }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ========================= */}
       {/* MODAL CREAR VENTA */}
       {/* ========================= */}
@@ -351,11 +434,25 @@ const WholesaleSalesPage: React.FC = () => {
             {/* 🔍 BUSCADOR */}
             {selectedCustomerId && (
               <>
-                <Form.Control type='text' placeholder='Buscar producto...' className='mb-3' onChange={e => setSearchTerm(e.target.value)} />
+                <div className='d-flex mb-3 gap-2'>
+                  {/* BUSCADOR */}
+                  <div className='mb-4 d-flex'>
+                    <input
+                      className='form-control form-control-lg'
+                      placeholder='🔍 Buscar por nombre o código de barras...'
+                      onChange={e => setFilters({ search: e.target.value })}
+                      style={{ borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+                    />
+                    {/* <button className='btn btn-light border d-flex align-items-center gap-2 shadow-sm' onClick={() => setShowScanner(true)}>
+                      <span>📷</span>
+                      <span className='d-none d-md-inline'>Escanear</span>
+                    </button> */}
+                  </div>
+                </div>
 
                 {/* 🔵 LISTA PRODUCTOS */}
                 <div style={{ maxHeight: '200px', overflowY: 'auto' }} className='mb-3 border rounded p-2'>
-                  {products
+                  {filteredProducts
                     .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
                     .slice(0, 10)
                     .map(product => (

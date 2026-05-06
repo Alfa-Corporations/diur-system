@@ -6,6 +6,7 @@ import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure } from '
 import type { Product, CreateOrderDTO } from '../../../shared/types';
 import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const POSPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -13,12 +14,14 @@ const POSPage: React.FC = () => {
 
   const [cart, setCart] = useState<Array<{ product: Product; quantity: number; price: number }>>([]);
   //const [barcodeInput, setBarcodeInput] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
+  //const [searchTerm, setSearchTerm] = useState('');
+  //const [selectedCategory, setSelectedCategory] = useState('');
   const [page, setPage] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showCart, setShowCart] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [filters, setFilters] = useState({ search: '' });
 
   const barcodeRef = useRef<HTMLInputElement>(null);
   const itemsPerPage = 12;
@@ -40,6 +43,62 @@ const POSPage: React.FC = () => {
     };
   }, []);
 
+  // =========================
+  // SCANNER
+  // =========================
+  useEffect(() => {
+    if (!showScanner) return;
+
+    const scanner = new Html5Qrcode('reader');
+    let lastScan = '';
+    let isRunning = false;
+
+    scanner
+      .start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: 250 },
+        async decodedText => {
+          // 🚫 Evitar lecturas duplicadas
+          if (decodedText === lastScan) return;
+          lastScan = decodedText;
+
+          try {
+            setFilters({ search: decodedText });
+
+            // 🔊 (opcional) sonido de éxito
+            const audio = new Audio('/scan.mp3');
+            audio.play().catch(() => {});
+
+            // ⏹ detener scanner correctamente
+            if (isRunning) {
+              isRunning = false;
+              await scanner.stop();
+              setShowScanner(false);
+            }
+          } catch (error) {
+            console.error('Error al procesar escaneo:', error);
+          }
+        },
+        () => {
+          // 👇 ignoramos errores frecuentes del escáner
+        }
+      )
+      .then(() => {
+        isRunning = true;
+      })
+      .catch(error => {
+        console.error('Error al iniciar scanner:', error);
+      });
+
+    return () => {
+      if (isRunning) {
+        scanner.stop().catch(() => {
+          // Ignorar errores al detener el scanner
+        });
+      }
+    };
+  }, [showScanner]);
+
   const loadProducts = async () => {
     dispatch(fetchProductsStart());
     try {
@@ -58,21 +117,11 @@ const POSPage: React.FC = () => {
   };
 
   // 🔍 Normalizar texto para búsqueda flexible
-  const normalize = (str: string) =>
-    str
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
+  const filteredProducts = products.filter(p => {
+    const s = filters.search.toLowerCase();
 
-  const filteredProducts = useMemo(() => {
-    const term = normalize(searchTerm);
-    return products.filter(p => {
-      const matchesTerm = [p.name, p.partnumber, p.barcode, p.codigo2, p.codigo3, p.codigo4].filter(Boolean).some(field => normalize(field!).includes(term));
-
-      const matchesCategory = !selectedCategory || p.category === selectedCategory;
-      return matchesTerm && matchesCategory;
-    });
-  }, [products, searchTerm, selectedCategory]);
+    return s === '' || p.name.toLowerCase().includes(s) || p.partnumber.toLowerCase().includes(s);
+  });
 
   const paginatedProducts = useMemo(() => {
     const start = page * itemsPerPage;
@@ -88,7 +137,7 @@ const POSPage: React.FC = () => {
       return [...prev, { product, quantity: 1, price: product.price }];
     });
 
-    setShowAlert(true)
+    setShowAlert(true);
     setTimeout(() => {
       setShowAlert(false);
     }, 2000);
@@ -100,14 +149,6 @@ const POSPage: React.FC = () => {
   };
 
   const total = useMemo(() => cart.reduce((a, b) => a + b.quantity * b.price, 0), [cart]);
-
-  /* const handleBarcode = (value: string) => {
-    const code = value.trim().replace(/[\n\r]/g, '');
-    const product = products.find(p => p.barcode === code || p.partnumber === code);
-    if (product) addToCart(product);
-    else alert('Producto no encontrado');
-    setBarcodeInput('');
-  }; */
 
   const createSale = async () => {
     if (!cart.length) return;
@@ -163,39 +204,41 @@ const POSPage: React.FC = () => {
       <div className='row'>
         {/* 🟦 PRODUCTOS */}
         <div className='col-lg-8'>
-          {/* BARCODE */}
-          {/* <Card className='mb-3'>
-            <Card.Body>
-              <InputGroup>
-                <InputGroup.Text>📦 Código</InputGroup.Text>
-                <Form.Control
-                  ref={barcodeRef}
-                  value={barcodeInput}
-                  placeholder='Escanear o escribir...'
-                  onChange={e => {
-                    const v = e.target.value;
-                    setBarcodeInput(v);
-                    if (v.includes('\n')) handleBarcode(v);
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleBarcode(barcodeInput);
-                  }}
-                />
-              </InputGroup>
-            </Card.Body>
-          </Card> */}
+          {/* SCANNER */}
+          {showScanner && (
+            <div className='modal d-block' style={{ backgroundColor: 'rgba(0,0,0,0.9)' }}>
+              <div className='modal-dialog modal-fullscreen'>
+                <div className='modal-content bg-dark'>
+                  <div className='modal-header'>
+                    <h5 className='modal-title text-white'>📷 Escanear Código de Barras</h5>
+                    <button type='button' className='btn-close btn-close-white' onClick={() => setShowScanner(false)}></button>
+                  </div>
+                  <div className='modal-body p-0'>
+                    <div id='reader' style={{ width: '100%' }}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* SEARCH + CATEGORY FILTER */}
           <div className='d-flex mb-3 gap-2'>
-            <Form.Control placeholder='Buscar producto...' value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-            <Form.Select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}>
+            {/* BUSCADOR */}
+            <div className='mb-4 d-flex'>
+              <input className='form-control form-control-lg' placeholder='🔍 Buscar por nombre o código de barras...' onChange={e => setFilters({ search: e.target.value })} style={{ borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} />
+              <button className='btn btn-light border d-flex align-items-center gap-2 shadow-sm' onClick={() => setShowScanner(true)}>
+                <span>📷</span>
+                <span className='d-none d-md-inline'>Escanear</span>
+              </button>
+            </div>
+            {/* <Form.Select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}>
               <option value=''>Todas las categorías</option>
               {[...new Set(products.map(p => p.category))].map(cat => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
               ))}
-            </Form.Select>
+            </Form.Select> */}
           </div>
 
           {/* GRID PRODUCTOS */}
