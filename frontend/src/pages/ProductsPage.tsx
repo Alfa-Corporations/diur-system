@@ -251,7 +251,7 @@ const ProductsPage: React.FC = () => {
   const filteredProducts = products.filter(p => {
     const s = filters.search.toLowerCase();
 
-    return s === '' || p.name.toLowerCase().includes(s) || p.partnumber.toLowerCase().includes(s);
+    return s === '' || p.name.toLowerCase().includes(s) || p.partnumber.toLowerCase().includes(s) || p.codigo2.toLowerCase().includes(s)|| p.codigo3.toLowerCase().includes(s) || p.codigo4.toLowerCase().includes(s);
   });
 
   // =========================
