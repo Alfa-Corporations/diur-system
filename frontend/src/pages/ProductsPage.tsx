@@ -250,8 +250,7 @@ const ProductsPage: React.FC = () => {
   // =========================
   const filteredProducts = products.filter(p => {
     const s = filters.search.toLowerCase();
-
-    return s === '' || p.name.toLowerCase().includes(s) || p.partnumber.toLowerCase().includes(s) || p.codigo2.includes(s)|| p.codigo3.includes(s) || p.codigo4.includes(s);
+    return s === '' || p.name.toLowerCase().includes(s) || p.partnumber.toLowerCase().includes(s) || p.codigo2?.toLowerCase().includes(s) || p.codigo3?.toLowerCase().includes(s) || p.codigo4?.toLowerCase().includes(s);
   });
 
   // =========================
@@ -488,9 +487,9 @@ const ProductsPage: React.FC = () => {
                   <path
                     d='M13 3H7C5.89543 3 5 3.89543 5 5V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V9M13 3L19 9M13 3V8C13 8.55228 13.4477 9 14 9H19M12 13V17M14 15H10'
                     stroke='#75a379'
-                    stroke-width='2'
-                    stroke-linecap='round'
-                    stroke-linejoin='round'
+                    strokeWidth='2'
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
                   />
                 </svg>
               </span>
