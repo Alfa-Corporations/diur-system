@@ -191,6 +191,8 @@ export interface CreateInvoiceRequest {
   items: Array<{
     productId: number;
     quantity: number;
+    price?: number;
+    orderItemId?: number;
   }>;
   documentType?: InvoiceDocumentType;
   customer?: {

@@ -1,6 +1,7 @@
 const InvoiceRepository = require('../repositories/InvoiceRepository');
 const ProductService = require('./ProductService');
-const { Customer } = require('../models');
+const OrderService = require('./OrderService');
+const { Customer, OrderItem } = require('../models');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -73,8 +74,8 @@ class InvoiceService {
       if (!await ProductService.checkStock(item.productId, item.quantity)) {
         throw new Error(`Insufficient stock for product ${product.name}`);
       }
-      item.price = product.price;
-      item.total = item.quantity * product.price;
+      item.price = item.price ?? product.price;
+      item.total = item.quantity * item.price;
       total += item.total;
     }
 
@@ -108,10 +109,19 @@ class InvoiceService {
 
     for (const item of items) {
       await ProductService.updateStock(item.productId, -item.quantity);
-      await OrderItemService.updateProcessedQuantity({
-        productId: item.productId,
-        quantity: item.quantity
-      });
+
+      if (item.orderItemId) {
+        const orderItem = await OrderItem.findByPk(item.orderItemId);
+        if (orderItem) {
+          const newProcessed = (orderItem.quantityProcessed || 0) + item.quantity;
+          const newStatus = newProcessed === orderItem.quantityRequested ? 'facturado' : 'en_transito';
+          await orderItem.update({
+            quantityProcessed: newProcessed,
+            status: newStatus
+          });
+          await OrderService.checkOrderCompletion(orderItem.orderId);
+        }
+      }
     }
 
     return invoice;

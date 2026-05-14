@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
@@ -19,6 +19,9 @@ interface Supplier {
 interface ProductFormData {
   name: string;
   partnumber: string;
+  codigo2: string;
+  codigo3: string;
+  codigo4: string;
   brand: string;
   categoria: string;
   price: string;
@@ -47,10 +50,15 @@ const ProductsPage: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   const [filters, setFilters] = useState({ search: '' });
+  const [page, setPage] = useState(0);
+  const itemsPerPage = 8;
 
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
     partnumber: '',
+    codigo2: '',
+    codigo3: '',
+    codigo4: '',
     brand: '',
     categoria: '',
     price: '',
@@ -210,6 +218,7 @@ const ProductsPage: React.FC = () => {
 
           try {
             setFilters({ search: decodedText });
+            setPage(0);
 
             // 🔊 (opcional) sonido de éxito
             const audio = new Audio('/scan.mp3');
@@ -246,12 +255,27 @@ const ProductsPage: React.FC = () => {
   }, [showScanner]);
 
   // =========================
-  // FILTER
+  // FILTER + PAGINACIÓN
   // =========================
-  const filteredProducts = products.filter(p => {
+  const filteredProducts = useMemo(() => {
     const s = filters.search.toLowerCase();
-    return s === '' || p.name.toLowerCase().includes(s) || p.partnumber.toLowerCase().includes(s) || p.codigo2?.toLowerCase().includes(s) || p.codigo3?.toLowerCase().includes(s) || p.codigo4?.toLowerCase().includes(s);
-  });
+    return products.filter(p => {
+      return s === '' || p.name.toLowerCase().includes(s) || p.partnumber.toLowerCase().includes(s) || p.codigo2?.toLowerCase().includes(s) || p.codigo3?.toLowerCase().includes(s) || p.codigo4?.toLowerCase().includes(s);
+    });
+  }, [products, filters.search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));
+
+  const paginatedProducts = useMemo(() => {
+    const start = page * itemsPerPage;
+    return filteredProducts.slice(start, start + itemsPerPage);
+  }, [filteredProducts, page]);
+
+  useEffect(() => {
+    if (page >= totalPages) {
+      setPage(totalPages - 1);
+    }
+  }, [page, totalPages]);
 
   // =========================
   // CRUD
@@ -267,6 +291,9 @@ const ProductsPage: React.FC = () => {
     const data: any = {
       name: formData.name,
       partnumber: formData.partnumber,
+      codigo2: formData.codigo2,
+      codigo3: formData.codigo3,
+      codigo4: formData.codigo4,
       brand: formData.brand,
       categoria: formData.categoria,
       price: formData.price ? parseFloat(formData.price) : 0,
@@ -303,6 +330,9 @@ const ProductsPage: React.FC = () => {
     setFormData({
       name: '',
       partnumber: '',
+      codigo2: '',
+      codigo3: '',
+      codigo4: '',
       brand: '',
       categoria: '',
       price: '',
@@ -324,6 +354,9 @@ const ProductsPage: React.FC = () => {
     setFormData({
       name: product.name || '',
       partnumber: product.partnumber || '',
+      codigo2: product.codigo2 || '',
+      codigo3: product.codigo3 || '',
+      codigo4: product.codigo4 || '',
       brand: (product as any).brand || '',
       categoria: (product as any).categoria || '',
       price: product.price?.toString() || '',
@@ -551,11 +584,19 @@ const ProductsPage: React.FC = () => {
 
       {/* BUSCADOR */}
       <div className='mb-4'>
-        <input className='form-control form-control-lg' placeholder='🔍 Buscar por nombre o código de barras...' onChange={e => setFilters({ search: e.target.value })} style={{ borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} />
+        <input
+          className='form-control form-control-lg'
+          placeholder='🔍 Buscar por nombre o código de barras...'
+          onChange={e => {
+            setFilters({ search: e.target.value });
+            setPage(0);
+          }}
+          style={{ borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+        />
       </div>
 
       {/* LISTA */}
-      <div className='row'>
+      <div className='list-products' style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1rem' }}>
         {filteredProducts.length === 0 ? (
           <div className='col-12'>
             <div className='alert alert-info text-center'>
@@ -563,11 +604,11 @@ const ProductsPage: React.FC = () => {
             </div>
           </div>
         ) : (
-          filteredProducts.map(p => (
-            <div key={p.id} className='col-md-6 col-lg-4 mb-4'>
+          paginatedProducts.map(p => (
+            <div key={p.id} className='mb-2 item'>
               <div className='card shadow-sm h-100' style={{ borderRadius: '12px', overflow: 'hidden', border: 'none' }}>
                 <div className='card-body'>
-                  <h5 className='card-title fw-bold mb-2'>{p.name}</h5>
+                  <h5 className='fs-6 fw-bold mb-2'>{p.name}</h5>
 
                   <div className='mb-2'>
                     <small className='text-muted'>Código:</small>
@@ -578,7 +619,7 @@ const ProductsPage: React.FC = () => {
 
                   <div className='row text-center mb-2'>
                     <div className='col-6'>
-                      <small className='text-muted'>Precio A</small>
+                      <small className='text-muted'>Precio</small>
                       <p className='mb-0 fw-bold text-success'>${(Number(p.price) || 0).toFixed(2)}</p>
                     </div>
                     <div className='col-6'>
@@ -587,7 +628,7 @@ const ProductsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {(p as any).pricecaja || (p as any).priceb ? (
+                  {/* {(p as any).pricecaja || (p as any).priceb ? (
                     <div className='row text-center mb-2'>
                       {(p as any).pricecaja && (
                         <div className='col-6'>
@@ -602,7 +643,7 @@ const ProductsPage: React.FC = () => {
                         </div>
                       )}
                     </div>
-                  ) : null}
+                  ) : null} */}
 
                   {(p as any).categoria && (
                     <div className='mb-2'>
@@ -611,31 +652,51 @@ const ProductsPage: React.FC = () => {
                   )}
 
                   {/* BOTONES DE CÓDIGO DE BARRAS */}
-                  <div className='d-flex gap-2 mt-3 mb-3'>
-                    <button className='btn btn-sm btn-outline-primary flex-grow-1' onClick={() => downloadBarcode(p)} title='Descargar código de barras'>
-                      📥 Descargar
-                    </button>
-                    <button className='btn btn-sm btn-outline-secondary flex-grow-1' onClick={() => printBarcode(p)} title='Imprimir código de barras'>
-                      🖨️ Imprimir
-                    </button>
-                  </div>
-
-                  {canManage && (
-                    <div className='d-flex gap-2 mt-3'>
-                      <button className='btn btn-sm btn-warning flex-grow-1' onClick={() => handleEditClick(p)}>
-                        ✏️ Editar
+                  <div style={{ position: 'relative', bottom: '0' }}>
+                    <div className='d-flex gap-2 mt-3 mb-3'>
+                      <button className='btn btn-sm btn-outline-primary flex-grow-1' onClick={() => downloadBarcode(p)} title='Descargar código de barras'>
+                        📥
                       </button>
-                      <button className='btn btn-sm btn-danger flex-grow-1' onClick={() => handleDelete(p.id)}>
-                        🗑️ Eliminar
+                      <button className='btn btn-sm btn-outline-secondary flex-grow-1' onClick={() => printBarcode(p)} title='Imprimir código de barras'>
+                        🖨️
                       </button>
                     </div>
-                  )}
+
+                    {canManage && (
+                      <div className='d-flex gap-2 mt-3'>
+                        <button className='btn btn-sm btn-warning flex-grow-1' onClick={() => handleEditClick(p)}>
+                          ✏️
+                        </button>
+                        <button className='btn btn-sm btn-danger flex-grow-1' onClick={() => handleDelete(p.id)}>
+                          🗑️
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           ))
         )}
       </div>
+
+      {/* PAGINACIÓN INTELIGENTE */}
+      {filteredProducts.length > 0 && (
+        <div className='d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 mt-3'>
+          <div className='text-muted'>
+            Mostrando {filteredProducts.length === 0 ? 0 : page * itemsPerPage + 1} - {Math.min(filteredProducts.length, (page + 1) * itemsPerPage)} de {filteredProducts.length} resultados
+            {filteredProducts.length > itemsPerPage && ` · Página ${page + 1} de ${totalPages}`}
+          </div>
+          <div className='btn-group'>
+            <button className='btn btn-outline-secondary' disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+              ← Anterior
+            </button>
+            <button className='btn btn-outline-secondary' disabled={(page + 1) * itemsPerPage >= filteredProducts.length} onClick={() => setPage(p => p + 1)}>
+              Siguiente →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* SCANNER */}
       {showScanner && (
@@ -682,9 +743,23 @@ const ProductsPage: React.FC = () => {
                         <label className='form-label fw-bold'>Nombre *</label>
                         <input className='form-control' placeholder='Nombre del producto' value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                       </div>
-                      <div className='col-md-4'>
-                        <label className='form-label fw-bold'>Código/Partnumber</label>
-                        <input className='form-control' placeholder='P-123456' value={formData.partnumber} onChange={e => setFormData({ ...formData, partnumber: e.target.value })} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                        <div className='col-md-4'>
+                          <label className='form-label fw-bold'>Código/Partnumber</label>
+                          <input className='form-control' placeholder='P-123456' value={formData.partnumber} onChange={e => setFormData({ ...formData, partnumber: e.target.value })} />
+                        </div>
+                        <div className='col-md-4'>
+                          <label className='form-label fw-bold'>Código 2</label>
+                          <input className='form-control' placeholder='P-123456' value={formData?.codigo2} onChange={e => setFormData({ ...formData, codigo2: e.target.value })} />
+                        </div>
+                        <div className='col-md-4'>
+                          <label className='form-label fw-bold'>Código 2</label>
+                          <input className='form-control' placeholder='P-123456' value={formData?.codigo3} onChange={e => setFormData({ ...formData, codigo3: e.target.value })} />
+                        </div>
+                        <div className='col-md-4'>
+                          <label className='form-label fw-bold'>Códig 4</label>
+                          <input className='form-control' placeholder='P-123456' value={formData?.codigo4} onChange={e => setFormData({ ...formData, codigo4: e.target.value })} />
+                        </div>
                       </div>
                     </div>
 

@@ -27,7 +27,9 @@ const WholesaleSalesPage: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<Array<{ productId: number; quantity: number }>>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
-  const [tempQuantity, setTempQuantity] = useState<{ [key: number]: number }>({});
+  const [invoiceQuantities, setInvoiceQuantities] = useState<{ [key: number]: number }>({});
+  const [invoicePriceTier, setInvoicePriceTier] = useState<{ [key: number]: 1 | 2 | 3 }>({});
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [isOnline] = useState(navigator.onLine);
   const [filters, setFilters] = useState({ search: '' });
   const [showScanner, setShowScanner] = useState(false);
@@ -156,8 +158,10 @@ const WholesaleSalesPage: React.FC = () => {
     try {
       const res = await apiService.getOrders({ type: 'venta al mayor' });
       dispatch(fetchOrdersSuccess({ orders: res.orders, totalCount: res.orders.length }));
+      return res.orders;
     } catch {
       dispatch(fetchOrdersFailure('Error al cargar pedidos'));
+      return [];
     }
   };
 
@@ -219,55 +223,117 @@ const WholesaleSalesPage: React.FC = () => {
     }
   };
 
-  // ========================
-  // UPDATE ITEM
-  // ========================
-  const handleUpdateItemStatus = async (orderId: number, productId: number, qty: number) => {
-    const order = orders.find(o => o.id === orderId);
-    const item = order?.items?.find(i => i.productId === productId);
-    if (!item) return;
+  const getProductPriceByTier = (product: any, tier: 1 | 2 | 3) => {
+    if (!product) return 0;
+    if (tier === 2) return Number(product.pricecaja ?? product.price ?? 0);
+    if (tier === 3) return Number(product.priceb ?? product.price ?? 0);
+    return Number(product.price ?? 0);
+  };
 
-    const newProcessed = item.quantityProcessed + qty;
+  const handleInvoiceItem = async (orderId: number, item: OrderItem) => {
+    const product = item.product as any;
+    const remaining = item.quantityRequested - item.quantityProcessed;
+    const quantity = invoiceQuantities[item.productId] || 0;
+    const tier = invoicePriceTier[item.productId] || 1;
 
+    if (quantity <= 0) {
+      alert('Ingresa una cantidad válida para facturar.');
+      return;
+    }
+
+    if (quantity > remaining) {
+      alert('La cantidad no puede ser mayor al restante.');
+      return;
+    }
+
+    const price = getProductPriceByTier(product, tier);
+
+    const invoicePayload = {
+      customer: {
+        name: selectedOrder?.customer?.name || 'Cliente Mayorista',
+        email: selectedOrder?.customer?.email || undefined,
+        phone: selectedOrder?.customer?.phone || undefined,
+        identificationType: selectedOrder?.customer?.identificationType || 'none',
+        identificationNumber: selectedOrder?.customer?.identificationNumber || undefined,
+        address: selectedOrder?.customer?.address || undefined
+      },
+      items: [
+        {
+          productId: item.productId,
+          quantity,
+          price,
+          orderItemId: item.id
+        }
+      ]
+    };
+
+    setInvoiceLoading(true);
     try {
-      // ✅ enviar SOLO lo que se procesa en esta acción
-      await apiService.updateOrderItemStatus(orderId, productId, {
-        status: newProcessed === item.quantityRequested ? 'facturado' : 'en_transito',
-        quantityProcessed: qty
-      });
+      const invoice = await apiService.createInvoice(invoicePayload as any);
+      alert(`Factura creada: ${invoice.invoiceNumber || invoice.id}`);
 
-      // ✅ actualizar redux inmediatamente (optimistic UI)
-      dispatch(
-        updateOrderItemStatusSuccess({
-          orderId,
-          item: {
-            ...item,
-            quantityProcessed: newProcessed,
-            status: newProcessed === item.quantityRequested ? 'facturado' : 'en_transito'
-          }
-        })
-      );
-
-      // ✅ emitir socket (ESTO TE FALTABA)
-      socketService.emit('order_updated', {
-        orderId,
-        productId,
-        quantityProcessed: newProcessed,
-        status: newProcessed === item.quantityRequested ? 'facturado' : 'en_transito'
-      });
-
-      // ✅ limpiar input
-      setTempQuantity(prev => ({
-        ...prev,
-        [productId]: 0
-      }));
-
-      // ✅ UX: cerrar modal automáticamente
-      setSelectedOrder(null);
+      const refreshedOrders = await loadOrders();
+      const updated = refreshedOrders.find(order => order.id === orderId) || null;
+      setSelectedOrder(updated);
+      setInvoiceQuantities(prev => ({ ...prev, [item.productId]: 0 }));
     } catch (error: any) {
-      console.log('ERROR BACK:', error.response?.data);
+      alert(error.response?.data?.message || error.message || 'Error creando la factura');
+    } finally {
+      setInvoiceLoading(false);
+    }
+  };
 
-      alert(error.response?.data?.message || 'Error al procesar');
+  const handleBulkInvoice = async (orderId: number) => {
+    if (!selectedOrder) return;
+
+    const itemsToInvoice = selectedOrder.items?.filter(item => {
+      const quantity = invoiceQuantities[item.productId] || 0;
+      const remaining = item.quantityRequested - item.quantityProcessed;
+      return quantity > 0 && quantity <= remaining;
+    }) || [];
+
+    if (itemsToInvoice.length === 0) {
+      alert('No hay productos con cantidades válidas para facturar.');
+      return;
+    }
+
+    const invoiceItems = itemsToInvoice.map(item => {
+      const quantity = invoiceQuantities[item.productId] || 0;
+      const tier = invoicePriceTier[item.productId] || 1;
+      const price = getProductPriceByTier(item.product as any, tier);
+      return {
+        productId: item.productId,
+        quantity,
+        price,
+        orderItemId: item.id
+      };
+    });
+
+    const invoicePayload = {
+      customer: {
+        name: selectedOrder.customer?.name || 'Cliente Mayorista',
+        email: selectedOrder.customer?.email || undefined,
+        phone: selectedOrder.customer?.phone || undefined,
+        identificationType: selectedOrder.customer?.identificationType || 'none',
+        identificationNumber: selectedOrder.customer?.identificationNumber || undefined,
+        address: selectedOrder.customer?.address || undefined
+      },
+      items: invoiceItems
+    };
+
+    setInvoiceLoading(true);
+    try {
+      const invoice = await apiService.createInvoice(invoicePayload as any);
+      alert(`Factura creada: ${invoice.invoiceNumber || invoice.id}`);
+
+      const refreshedOrders = await loadOrders();
+      const updated = refreshedOrders.find(order => order.id === orderId) || null;
+      setSelectedOrder(updated);
+      setInvoiceQuantities({});
+    } catch (error: any) {
+      alert(error.response?.data?.message || error.message || 'Error creando la factura');
+    } finally {
+      setInvoiceLoading(false);
     }
   };
 
@@ -368,7 +434,15 @@ const WholesaleSalesPage: React.FC = () => {
 
               {/* Acciones */}
               <div className='d-flex gap-2'>
-                <Button variant='outline-info' size='sm' onClick={() => setSelectedOrder(order)}>
+                <Button
+                  variant='outline-info'
+                  size='sm'
+                  onClick={() => {
+                    setSelectedOrder(order);
+                    setInvoiceQuantities({});
+                    setInvoicePriceTier({});
+                  }}
+                >
                   Ver
                 </Button>
 
@@ -451,31 +525,30 @@ const WholesaleSalesPage: React.FC = () => {
 
                 {/* 🔵 LISTA PRODUCTOS */}
                 <div style={{ maxHeight: '200px', overflowY: 'auto' }} className='mb-3 border rounded p-2'>
-                  {filteredProducts
-                            .map(product => (
-                      <div key={product.id} className='d-flex justify-content-between align-items-center border-bottom py-2'>
-                        <div>
-                          <div style={{ fontWeight: 500 }}>{product.name}</div>
-                          <small className='text-muted'>{product.partnumber}</small>
-                        </div>
-
-                        <Button
-                          size='sm'
-                          variant='outline-primary'
-                          onClick={() => {
-                            const exists = orderItems.find(i => i.productId === product.id);
-
-                            if (exists) {
-                              setOrderItems(orderItems.map(i => (i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i)));
-                            } else {
-                              setOrderItems([...orderItems, { productId: product.id, quantity: 1 }]);
-                            }
-                          }}
-                        >
-                          +
-                        </Button>
+                  {filteredProducts.map(product => (
+                    <div key={product.id} className='d-flex justify-content-between align-items-center border-bottom py-2'>
+                      <div>
+                        <div style={{ fontWeight: 500 }}>{product.name}</div>
+                        <small className='text-muted'>{product.partnumber}</small>
                       </div>
-                    ))}
+
+                      <Button
+                        size='sm'
+                        variant='outline-primary'
+                        onClick={() => {
+                          const exists = orderItems.find(i => i.productId === product.id);
+
+                          if (exists) {
+                            setOrderItems(orderItems.map(i => (i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i)));
+                          } else {
+                            setOrderItems([...orderItems, { productId: product.id, quantity: 1 }]);
+                          }
+                        }}
+                      >
+                        +
+                      </Button>
+                    </div>
+                  ))}
                 </div>
 
                 {/* 🛒 CARRITO */}
@@ -584,6 +657,17 @@ const WholesaleSalesPage: React.FC = () => {
               {/* 🛒 PRODUCTOS */}
               <h6 className='mb-3'>Productos</h6>
 
+              {/* BOTÓN FACTURAR SELECCIONADOS */}
+              <div className='mb-3'>
+                <Button
+                  variant='success'
+                  onClick={() => handleBulkInvoice(selectedOrder.id)}
+                  disabled={invoiceLoading || selectedOrder.status === 'cancelado' || !Object.values(invoiceQuantities).some(q => q > 0)}
+                >
+                  {invoiceLoading ? 'Facturando...' : '📄 Facturar Seleccionados'}
+                </Button>
+              </div>
+
               {selectedOrder.items?.map(item => {
                 const progress = (item.quantityProcessed / item.quantityRequested) * 100;
 
@@ -626,37 +710,65 @@ const WholesaleSalesPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* 🔹 INPUT CANTIDAD */}
+                    {/* 🔹 REMANENTE */}
+                    <div className='d-flex justify-content-between align-items-center mb-2'>
+                      <div>
+                        <small className='text-muted'>Restante</small>
+                        <div>{item.quantityRequested - item.quantityProcessed}</div>
+                      </div>
+                      <div>
+                        <small className='text-muted'>Precio</small>
+                        <Form.Select size='sm' value={invoicePriceTier[item.productId] || 1} onChange={e => setInvoicePriceTier({ ...invoicePriceTier, [item.productId]: Number(e.target.value) as 1 | 2 | 3 })}>
+                          <option value={1}>Precio 1 - ${(Number((item.product as any)?.price) || 0).toFixed(2)}</option>
+                          <option value={2}>Precio 2 - ${(Number((item.product as any)?.pricecaja) || Number((item.product as any)?.price) || 0).toFixed(2)}</option>
+                          <option value={3}>Precio 3 - ${(Number((item.product as any)?.priceb) || Number((item.product as any)?.price) || 0).toFixed(2)}</option>
+                        </Form.Select>
+                      </div>
+                    </div>
+
+                    {/* 🔹 INPUT CANTIDAD FACTURAR */}
                     <div className='d-flex gap-2 mt-3 align-items-center'>
                       <Form.Control
                         type='number'
                         min={1}
-                        placeholder='Cantidad'
-                        value={tempQuantity[item.productId] || ''}
+                        max={item.quantityRequested - item.quantityProcessed}
+                        placeholder='Cantidad a facturar'
+                        value={invoiceQuantities[item.productId] || ''}
                         onChange={e =>
-                          setTempQuantity({
-                            ...tempQuantity,
-                            [item.productId]: parseInt(e.target.value)
+                          setInvoiceQuantities({
+                            ...invoiceQuantities,
+                            [item.productId]: Number(e.target.value)
                           })
                         }
-                        style={{ maxWidth: '90px' }}
+                        style={{ maxWidth: '120px' }}
+                        disabled={selectedOrder.status === 'cancelado' || item.quantityProcessed === item.quantityRequested}
                       />
 
                       <Button
-                        disabled={selectedOrder.status === 'cancelado' || item.quantityProcessed === item.quantityRequested}
+                        disabled={selectedOrder.status === 'cancelado' || item.quantityProcessed === item.quantityRequested || invoiceLoading}
                         variant='outline-success'
                         size='sm'
                         className='w-100'
-                        onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, tempQuantity[item.productId] || 1)}
+                        onClick={() => handleInvoiceItem(selectedOrder.id, item)}
                       >
-                        📦 Ingresar
+                        {invoiceLoading ? 'Facturando...' : 'Facturar ahora'}
                       </Button>
                     </div>
 
                     {/* 🔹 BOTÓN RÁPIDO COMPLETAR */}
                     {item.quantityProcessed < item.quantityRequested && (
-                      <Button variant='outline-primary' size='sm' className='w-100 mt-2' onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, item.quantityRequested - item.quantityProcessed)}>
-                        ⚡ Completar todo
+                      <Button
+                        variant='outline-primary'
+                        size='sm'
+                        className='w-100 mt-2'
+                        onClick={() => {
+                          setInvoiceQuantities({
+                            ...invoiceQuantities,
+                            [item.productId]: item.quantityRequested - item.quantityProcessed
+                          });
+                        }}
+                      >
+                        ⚡ Usar restante
                       </Button>
                     )}
                   </div>

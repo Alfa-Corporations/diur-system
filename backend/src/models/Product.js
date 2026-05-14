@@ -174,6 +174,176 @@ const Product = db.define('Product', {
     allowNull: true,
   },
 
+  // 🔥 CAMPOS ADICIONALES DE PRECIOS
+  pricec: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  priced: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  pricee: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  pricef: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  priceg: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  priceh: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  // 🔥 CAMPOS ADICIONALES VARIOS
+  pesoitem: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  foto2: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  simboloa: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  noteunidad: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  otraunidad: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  otraunidad2: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  monedapvpa: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+
+  monedapvpb: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+
+  monedapvpc: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+
+  monedapvpd: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+
+  unidadescaja: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+
+  laboratorio: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  ubicaciones: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  // 🔥 CAMPOS DE PRECIOS PÚBLICOS
+  pvpapublico: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  pvpbpublico: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  pvpcpublico: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  pvpdpublico: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  descesp: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  // 🔥 CAMPOS ADICIONALES DE PRECIOS 2
+  pricea2: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  priceb2: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  pricec2: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  priced2: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
+
+  // 🔥 CAMPOS PENDIENTES
+  qpendout: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+
+  salidapend: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+
+  entradapend: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+
+  combo: {
+    type: DataTypes.BOOLEAN,
+    allowNull: true,
+  },
+
+  formula: {
+    type: DataTypes.BOOLEAN,
+    allowNull: true,
+  },
+
 }, {
   tableName: 'products',
   timestamps: true,

@@ -32,13 +32,36 @@ class ProductService {
       throw new Error('Debe enviar un array de productos');
     }
 
-    const normalizedProducts = productsData.map((product) => ({
-      ...product,
-      price: Number(product.price ?? product.precio ?? 0),
-      stock: Number(product.stock ?? 0),
-      supplierId: product.supplierId ? Number(product.supplierId) : undefined,
-      providerName: product.providerName || product.supplier || product.proveedor || product.supplierName || product.provider || null,
-    }));
+    // 🔥 Obtener campos válidos del modelo Product
+    const validFields = Object.keys(Product.rawAttributes);
+
+    const normalizedProducts = productsData.map((product) => {
+      // 🔥 Filtrar solo campos que existen en el modelo
+      const filteredProduct = {};
+      validFields.forEach(field => {
+        if (product.hasOwnProperty(field)) {
+          // 🔥 Convertir tipos de datos según el modelo
+          const attr = Product.rawAttributes[field];
+          if (attr.type.constructor.name === 'DECIMAL' && typeof product[field] === 'string') {
+            filteredProduct[field] = Number(product[field]) || 0;
+          } else if (attr.type.constructor.name === 'INTEGER' && typeof product[field] === 'string') {
+            filteredProduct[field] = Number(product[field]) || 0;
+          } else if (attr.type.constructor.name === 'BOOLEAN') {
+            filteredProduct[field] = Boolean(product[field]);
+          } else {
+            filteredProduct[field] = product[field];
+          }
+        }
+      });
+
+      return {
+        ...filteredProduct,
+        price: Number(product.price ?? product.precio ?? 0),
+        stock: Number(product.stock ?? 0),
+        supplierId: product.supplierId ? Number(product.supplierId) : undefined,
+        providerName: product.providerName || product.supplier || product.proveedor || product.supplierName || product.provider || null,
+      };
+    });
 
     // ✅ Validar productos
     const invalidProducts = normalizedProducts.filter(
