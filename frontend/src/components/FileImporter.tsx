@@ -11,6 +11,8 @@ const FileImporter = () => {
   const [processedCount, setProcessedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [importErrors, setImportErrors] = useState<any[]>([]);
+  const [failedItemsToRetry, setFailedItemsToRetry] = useState<any[]>([]);
+  const [manualRepairLoading, setManualRepairLoading] = useState(false);
   const [showErrorReport, setShowErrorReport] = useState(false);
 
   // 📥 Leer archivo
@@ -180,9 +182,11 @@ const FileImporter = () => {
 
         // 🔥 CAMPOS ADICIONALES DEL ERP
         interno: item.interno || i,
+        codigo1: item.codigo1 || '',
         codigo2: item.codigo2 || '',
         codigo3: item.codigo3 || '',
         codigo4: item.codigo4 || '',
+        codigo5: item.codigo5 || '',
         brand: item.brand || 'Genérico',
         pricecaja: Number(item.pricecaja || item.price || 0),
         priceb: Number(item.priceb || item.price || 0),
@@ -256,6 +260,132 @@ const FileImporter = () => {
     });
   };
 
+  const normalizePartNumber = (item: any, index: number) => {
+    const rawCode = item.partnumber || item.codigo || item.codigo1 || item.codigo2 || item.codigo3 || item.codigo4 || item.codigo5 || item.interno;
+    const normalized = String(rawCode || `auto-${index + 1}-${Date.now()}`).trim();
+    return normalized || `auto-${index + 1}-${Date.now()}`;
+  };
+
+  const repairProductData = (product: any, index: number) => {
+    const repaired = {
+      ...product,
+      name: String(product.name || product.nombre || `Producto ${index + 1}`).trim() || `Producto ${index + 1}`,
+      partnumber: normalizePartNumber(product, index),
+      price: Number(product.price ?? product.precio ?? 0),
+      stock: Number(product.stock ?? 0),
+      providerName: product.providerName || product.supplier || product.proveedor || product.nombre_proveedor || product.supplierName || 'SIN PROVEEDOR',
+      codigo1: product.codigo1 || '',
+      codigo2: product.codigo2 || '',
+      codigo3: product.codigo3 || '',
+      codigo4: product.codigo4 || '',
+      codigo5: product.codigo5 || ''
+    };
+
+    if (!(repaired.price > 0)) {
+      repaired.price = 1;
+    }
+    if (!(repaired.stock >= 0)) {
+      repaired.stock = 0;
+    }
+    if (!repaired.providerName) {
+      repaired.providerName = 'SIN PROVEEDOR';
+    }
+
+    return repaired;
+  };
+
+  const retryFailedProducts = async (chunk: any[], chunkStartIndex: number) => {
+    const failedProducts: any[] = [];
+    let successCount = 0;
+
+    for (let chunkIndex = 0; chunkIndex < chunk.length; chunkIndex += 1) {
+      const original = chunk[chunkIndex];
+      const repaired = repairProductData(original, chunkStartIndex + chunkIndex);
+
+      try {
+        await apiService.createProduct(repaired);
+        successCount += 1;
+      } catch (err: any) {
+        const errorMessage = err?.response?.data?.message || err?.message || 'Error desconocido';
+        if (String(errorMessage).toLowerCase().includes('partnumber already exists')) {
+          repaired.partnumber = `${repaired.partnumber}-${Date.now()}`;
+          try {
+            await apiService.createProduct(repaired);
+            successCount += 1;
+            continue;
+          } catch (retryError: any) {
+            failedProducts.push({
+              index: chunkStartIndex + chunkIndex + 1,
+              name: repaired.name,
+              partnumber: repaired.partnumber,
+              price: repaired.price,
+              stock: repaired.stock,
+              providerName: repaired.providerName,
+              payload: repaired,
+              issues: [retryError?.response?.data?.message || retryError?.message || 'Error duplicado de código']
+            });
+            continue;
+          }
+        }
+
+        failedProducts.push({
+          index: chunkStartIndex + chunkIndex + 1,
+          name: repaired.name,
+          partnumber: repaired.partnumber,
+          price: repaired.price,
+          stock: repaired.stock,
+          providerName: repaired.providerName,
+          payload: repaired,
+          issues: [errorMessage]
+        });
+      }
+    }
+
+    return { successCount, failedProducts };
+  };
+
+  const handleManualRepairBatch = async () => {
+    if (failedItemsToRetry.length === 0) {
+      alert('No hay productos pendientes para reparar');
+      return;
+    }
+
+    setManualRepairLoading(true);
+
+    try {
+      const retry = await retryFailedProducts(failedItemsToRetry, 0);
+      const remainingFailed = retry.failedProducts;
+
+      if (retry.successCount > 0) {
+        alert(`Reparación automática completada. Productos subidos: ${retry.successCount}`);
+      }
+
+      if (remainingFailed.length === 0) {
+        setImportErrors([]);
+        setFailedItemsToRetry([]);
+      } else {
+        setImportErrors([
+          {
+            chunkIndex: 0,
+            chunkSize: remainingFailed.length,
+            error: 'Reparación manual incompleta',
+            statusCode: undefined,
+            serverError: undefined,
+            validationErrors: undefined,
+            repairedCount: retry.successCount,
+            failedProducts: remainingFailed
+          }
+        ] as any[]);
+        setFailedItemsToRetry(remainingFailed.map((product: any) => product.payload));
+      }
+    } catch (error: any) {
+      console.error('Error reparando lote manual:', error);
+      alert(error.message || 'Error reparando lote manual');
+    } finally {
+      setManualRepairLoading(false);
+    }
+  };
+
   // 🚀 Enviar a API usando apiService
   const sendToAPI = async () => {
     try {
@@ -283,38 +413,23 @@ const FileImporter = () => {
         } catch (err: any) {
           console.error(`Error en lote ${chunkIndex}`, err);
 
-          // 🔥 Capturar errores detallados
-          const errorDetails = {
-            chunkIndex,
-            chunkSize: chunk.length,
-            error: err.message || 'Error desconocido',
-            statusCode: err.response?.status,
-            serverError: err.response?.data?.message,
-            validationErrors: err.response?.data?.errors,
-            failedProducts: chunk.map((product: any, index: number) => ({
-              index: i + index + 1, // Número de fila original
-              name: product.name || 'Sin nombre',
-              partnumber: product.partnumber || 'Sin código',
-              price: product.price,
-              stock: product.stock,
-              providerName: product.providerName,
-              issues: []
-            }))
-          };
+          const retry = await retryFailedProducts(chunk, i);
+          successCount += retry.successCount;
 
-          // 🔥 Intentar identificar problemas específicos
-          if (err.response?.data?.message) {
-            errorDetails.failedProducts.forEach((product: any) => {
-              // Verificar campos requeridos
-              if (!product.name) product.issues.push('Nombre requerido');
-              if (!product.partnumber) product.issues.push('Código/partnumber requerido');
-              if (!product.price || product.price <= 0) product.issues.push('Precio inválido');
-              if (!product.stock || product.stock < 0) product.issues.push('Stock inválido');
-              if (!product.providerName) product.issues.push('Proveedor requerido');
-            });
+          if (retry.failedProducts.length > 0) {
+            const errorDetails = {
+              chunkIndex,
+              chunkSize: chunk.length,
+              error: err.message || 'Error desconocido',
+              statusCode: err.response?.status,
+              serverError: err.response?.data?.message,
+              validationErrors: err.response?.data?.errors,
+              repairedCount: retry.successCount,
+              failedProducts: retry.failedProducts
+            };
+
+            allErrors.push(errorDetails);
           }
-
-          allErrors.push(errorDetails);
         }
 
         // ✅ progreso
@@ -326,6 +441,9 @@ const FileImporter = () => {
 
       // 🔥 resultado final
       setImportErrors(allErrors);
+
+      const failedPayloads = allErrors.flatMap(errorChunk => errorChunk.failedProducts.map((product: any) => product.payload));
+      setFailedItemsToRetry(failedPayloads);
 
       if (allErrors.length > 0) {
         setShowErrorReport(true);
@@ -361,9 +479,14 @@ const FileImporter = () => {
         </div>
       )}
 
-      <button onClick={sendToAPI} disabled={loading || data.length === 0} className='btn btn-success mb-3'>
-        {loading ? 'Enviando...' : 'Enviar a Base de Datos'}
-      </button>
+      <div className='d-flex gap-2 mb-3'>
+        <button onClick={sendToAPI} disabled={loading || data.length === 0} className='btn btn-success'>
+          {loading ? 'Enviando...' : 'Enviar a Base de Datos'}
+        </button>
+        <button onClick={handleManualRepairBatch} disabled={manualRepairLoading || failedItemsToRetry.length === 0} className='btn btn-warning'>
+          {manualRepairLoading ? 'Reparando...' : 'Reparar lote manual'}
+        </button>
+      </div>
 
       {loading && (
         <div className='mb-3'>
@@ -404,6 +527,12 @@ const FileImporter = () => {
                   <h5 className='text-danger'>
                     ❌ Lote #{errorChunk.chunkIndex} - {errorChunk.chunkSize} productos
                   </h5>
+
+                  {errorChunk.repairedCount != null && (
+                    <Alert variant='success'>
+                      <strong>Reparados automáticamente:</strong> {errorChunk.repairedCount}
+                    </Alert>
+                  )}
 
                   <Alert variant='danger'>
                     <strong>Error del servidor:</strong> {errorChunk.serverError || errorChunk.error}

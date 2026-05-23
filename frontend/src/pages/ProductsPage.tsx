@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
@@ -19,9 +19,11 @@ interface Supplier {
 interface ProductFormData {
   name: string;
   partnumber: string;
+  codigo1: string;
   codigo2: string;
   codigo3: string;
   codigo4: string;
+  codigo5: string;
   brand: string;
   categoria: string;
   price: string;
@@ -56,9 +58,11 @@ const ProductsPage: React.FC = () => {
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
     partnumber: '',
+    codigo1: '',
     codigo2: '',
     codigo3: '',
     codigo4: '',
+    codigo5: '',
     brand: '',
     categoria: '',
     price: '',
@@ -72,6 +76,7 @@ const ProductsPage: React.FC = () => {
     piezas: '',
     importacion: false
   });
+  const [barcodeTargetField, setBarcodeTargetField] = useState<'partnumber' | 'codigo1' | 'codigo2' | 'codigo3' | 'codigo4' | 'codigo5'>('partnumber');
 
   // =========================
   // LOCAL STORAGE
@@ -97,7 +102,7 @@ const ProductsPage: React.FC = () => {
   // =========================
   // LOAD SUPPLIERS
   // =========================
-  const loadSuppliers = async () => {
+  const loadSuppliers = useCallback(async () => {
     try {
       const cachedSuppliers = getCachedSuppliers();
       if (cachedSuppliers.length > 0) {
@@ -126,12 +131,12 @@ const ProductsPage: React.FC = () => {
         setSuppliers(cached);
       }
     }
-  };
+  }, [isOnline]);
 
   // =========================
   // SYNC
   // =========================
-  const syncProducts = async () => {
+  const syncProducts = useCallback(async () => {
     try {
       const { products: apiProducts } = await apiService.getProducts();
 
@@ -149,12 +154,12 @@ const ProductsPage: React.FC = () => {
     } catch {
       console.log('⚠️ Sync falló');
     }
-  };
+  }, [dispatch]);
 
   // =========================
   // LOAD
   // =========================
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     dispatch(fetchProductsStart());
 
     const local = getFromLocal();
@@ -173,7 +178,7 @@ const ProductsPage: React.FC = () => {
     }
 
     await loadSuppliers();
-  };
+  }, [isOnline, dispatch, syncProducts, loadSuppliers]);
 
   useEffect(() => {
     void loadProducts();
@@ -217,8 +222,12 @@ const ProductsPage: React.FC = () => {
           lastScan = decodedText;
 
           try {
-            setFilters({ search: decodedText });
-            setPage(0);
+            if (showModal) {
+              setFormData(prev => ({ ...prev, [barcodeTargetField]: decodedText }));
+            } else {
+              setFilters({ search: decodedText });
+              setPage(0);
+            }
 
             // 🔊 (opcional) sonido de éxito
             const audio = new Audio('/scan.mp3');
@@ -252,7 +261,7 @@ const ProductsPage: React.FC = () => {
         });
       }
     };
-  }, [showScanner]);
+  }, [showScanner, showModal, barcodeTargetField]);
 
   // =========================
   // FILTER + PAGINACIÓN
@@ -260,7 +269,16 @@ const ProductsPage: React.FC = () => {
   const filteredProducts = useMemo(() => {
     const s = filters.search.toLowerCase();
     return products.filter(p => {
-      return s === '' || p.name.toLowerCase().includes(s) || p.partnumber.toLowerCase().includes(s) || p.codigo2?.toLowerCase().includes(s) || p.codigo3?.toLowerCase().includes(s) || p.codigo4?.toLowerCase().includes(s);
+      return (
+        s === '' ||
+        p.name.toLowerCase().includes(s) ||
+        p.partnumber.toLowerCase().includes(s) ||
+        p.codigo1?.toLowerCase().includes(s) ||
+        p.codigo2?.toLowerCase().includes(s) ||
+        p.codigo3?.toLowerCase().includes(s) ||
+        p.codigo4?.toLowerCase().includes(s) ||
+        p.codigo5?.toLowerCase().includes(s)
+      );
     });
   }, [products, filters.search]);
 
@@ -291,9 +309,11 @@ const ProductsPage: React.FC = () => {
     const data: any = {
       name: formData.name,
       partnumber: formData.partnumber,
+      codigo1: formData.codigo1,
       codigo2: formData.codigo2,
       codigo3: formData.codigo3,
       codigo4: formData.codigo4,
+      codigo5: formData.codigo5,
       brand: formData.brand,
       categoria: formData.categoria,
       price: formData.price ? parseFloat(formData.price) : 0,
@@ -330,9 +350,11 @@ const ProductsPage: React.FC = () => {
     setFormData({
       name: '',
       partnumber: '',
+      codigo1: '',
       codigo2: '',
       codigo3: '',
       codigo4: '',
+      codigo5: '',
       brand: '',
       categoria: '',
       price: '',
@@ -354,9 +376,11 @@ const ProductsPage: React.FC = () => {
     setFormData({
       name: product.name || '',
       partnumber: product.partnumber || '',
+      codigo1: (product as any).codigo1 || '',
       codigo2: product.codigo2 || '',
       codigo3: product.codigo3 || '',
       codigo4: product.codigo4 || '',
+      codigo5: (product as any).codigo5 || '',
       brand: (product as any).brand || '',
       categoria: (product as any).categoria || '',
       price: product.price?.toString() || '',
@@ -506,7 +530,7 @@ const ProductsPage: React.FC = () => {
   // UI
   // =========================
   return (
-    <div className='container-fluid p-4' style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+    <div className='container-fluid' style={{ backgroundColor: '#f8f9fa', minHeight: '100vh', paddingTop: '1rem' }}>
       <div className='mb-4 text-center'>
         {/* TÍTULO */}
         <h2 className='fw-bold mb-3'>📦 Gestión de Productos</h2>
@@ -596,7 +620,7 @@ const ProductsPage: React.FC = () => {
       </div>
 
       {/* LISTA */}
-      <div className='list-products' style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1rem' }}>
+      <div className='list-products' style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.5rem' }}>
         {filteredProducts.length === 0 ? (
           <div className='col-12'>
             <div className='alert alert-info text-center'>
@@ -606,9 +630,11 @@ const ProductsPage: React.FC = () => {
         ) : (
           paginatedProducts.map(p => (
             <div key={p.id} className='mb-2 item'>
-              <div className='card shadow-sm h-100' style={{ borderRadius: '12px', overflow: 'hidden', border: 'none' }}>
-                <div className='card-body'>
-                  <h5 className='fs-6 fw-bold mb-2'>{p.name}</h5>
+              <div className='card shadow-sm h-100' style={{ borderRadius: '12px', overflow: 'hidden', border: 'none', position: 'relative' }}>
+                <div className='card-body d-flex flex-column align-items-center' style={{ minHeight: '19rem' }}>
+                  <h5 className='fs-6 fw-bold mb-2' style={{ maxHeight: '5rem', overflow: 'hidden' }}>
+                    {p.name}
+                  </h5>
 
                   <div className='mb-2'>
                     <small className='text-muted'>Código:</small>
@@ -617,7 +643,7 @@ const ProductsPage: React.FC = () => {
                     </p>
                   </div>
 
-                  <div className='row text-center mb-2'>
+                  <div className='text-center mb-2 d-flex w-100'>
                     <div className='col-6'>
                       <small className='text-muted'>Precio</small>
                       <p className='mb-0 fw-bold text-success'>${(Number(p.price) || 0).toFixed(2)}</p>
@@ -652,7 +678,7 @@ const ProductsPage: React.FC = () => {
                   )}
 
                   {/* BOTONES DE CÓDIGO DE BARRAS */}
-                  <div style={{ position: 'relative', bottom: '0' }}>
+                  <div style={{ position: 'absolute', bottom: '0.5rem' }}>
                     <div className='d-flex gap-2 mt-3 mb-3'>
                       <button className='btn btn-sm btn-outline-primary flex-grow-1' onClick={() => downloadBarcode(p)} title='Descargar código de barras'>
                         📥
@@ -743,23 +769,54 @@ const ProductsPage: React.FC = () => {
                         <label className='form-label fw-bold'>Nombre *</label>
                         <input className='form-control' placeholder='Nombre del producto' value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                        <div className='col-md-4'>
-                          <label className='form-label fw-bold'>Código/Partnumber</label>
-                          <input className='form-control' placeholder='P-123456' value={formData.partnumber} onChange={e => setFormData({ ...formData, partnumber: e.target.value })} />
-                        </div>
-                        <div className='col-md-4'>
-                          <label className='form-label fw-bold'>Código 2</label>
-                          <input className='form-control' placeholder='P-123456' value={formData?.codigo2} onChange={e => setFormData({ ...formData, codigo2: e.target.value })} />
-                        </div>
-                        <div className='col-md-4'>
-                          <label className='form-label fw-bold'>Código 2</label>
-                          <input className='form-control' placeholder='P-123456' value={formData?.codigo3} onChange={e => setFormData({ ...formData, codigo3: e.target.value })} />
-                        </div>
-                        <div className='col-md-4'>
-                          <label className='form-label fw-bold'>Códig 4</label>
-                          <input className='form-control' placeholder='P-123456' value={formData?.codigo4} onChange={e => setFormData({ ...formData, codigo4: e.target.value })} />
-                        </div>
+                    </div>
+
+                    <div className='row mb-3'>
+                      <div className='col-md-4'>
+                        <label className='form-label fw-bold'>Código/Partnumber</label>
+                        <input className='form-control' placeholder='P-123456' value={formData.partnumber} onChange={e => setFormData({ ...formData, partnumber: e.target.value })} />
+                      </div>
+                      <div className='col-md-4'>
+                        <label className='form-label fw-bold'>Código 1</label>
+                        <input className='form-control' placeholder='Código 1' value={formData.codigo1} onChange={e => setFormData({ ...formData, codigo1: e.target.value })} />
+                      </div>
+                      <div className='col-md-4'>
+                        <label className='form-label fw-bold'>Código 2</label>
+                        <input className='form-control' placeholder='Código 2' value={formData.codigo2} onChange={e => setFormData({ ...formData, codigo2: e.target.value })} />
+                      </div>
+                    </div>
+
+                    <div className='row mb-3'>
+                      <div className='col-md-4'>
+                        <label className='form-label fw-bold'>Código 3</label>
+                        <input className='form-control' placeholder='Código 3' value={formData.codigo3} onChange={e => setFormData({ ...formData, codigo3: e.target.value })} />
+                      </div>
+                      <div className='col-md-4'>
+                        <label className='form-label fw-bold'>Código 4</label>
+                        <input className='form-control' placeholder='Código 4' value={formData.codigo4} onChange={e => setFormData({ ...formData, codigo4: e.target.value })} />
+                      </div>
+                      <div className='col-md-4'>
+                        <label className='form-label fw-bold'>Código 5</label>
+                        <input className='form-control' placeholder='Código 5' value={formData.codigo5} onChange={e => setFormData({ ...formData, codigo5: e.target.value })} />
+                      </div>
+                    </div>
+
+                    <div className='row mb-3'>
+                      <div className='col-md-6'>
+                        <label className='form-label fw-bold'>Campo para escaneo</label>
+                        <select className='form-control' value={barcodeTargetField} onChange={e => setBarcodeTargetField(e.target.value as any)}>
+                          <option value='partnumber'>Partnumber</option>
+                          <option value='codigo1'>Código 1</option>
+                          <option value='codigo2'>Código 2</option>
+                          <option value='codigo3'>Código 3</option>
+                          <option value='codigo4'>Código 4</option>
+                          <option value='codigo5'>Código 5</option>
+                        </select>
+                      </div>
+                      <div className='col-md-6 d-flex align-items-end'>
+                        <button type='button' className='btn btn-outline-primary w-100' onClick={() => setShowScanner(true)}>
+                          Escanear código y pegar en {barcodeTargetField}
+                        </button>
                       </div>
                     </div>
 

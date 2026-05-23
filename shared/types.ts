@@ -22,9 +22,11 @@ export interface Supplier {
 
 // Producto
 export interface Product {
+  codigo1?: any;
   codigo2: any;
   codigo3: any;
   codigo4: any;
+  codigo5?: any;
   id: number;
   name: string;
   description?: string;
@@ -185,6 +187,11 @@ export interface CreateProductRequest {
   stock: number;
   category?: string;
   partnumber: string;
+  codigo1?: string;
+  codigo2?: string;
+  codigo3?: string;
+  codigo4?: string;
+  codigo5?: string;
 }
 
 export interface CreateInvoiceRequest {

@@ -149,6 +149,11 @@ const Product = db.define('Product', {
     allowNull: true,
   },
 
+  codigo1: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
   codigo2: {
     type: DataTypes.STRING,
     allowNull: true,
@@ -160,6 +165,11 @@ const Product = db.define('Product', {
   },
 
   codigo4: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  codigo5: {
     type: DataTypes.STRING,
     allowNull: true,
   },

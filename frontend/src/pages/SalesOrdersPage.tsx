@@ -250,12 +250,12 @@ const WholesaleSalesPage: React.FC = () => {
 
     const invoicePayload = {
       customer: {
-        name: selectedOrder?.customer?.name || 'Cliente Mayorista',
+        name: selectedOrder?.customer?.name || selectedOrder?.customerName || 'Cliente Mayorista',
         email: selectedOrder?.customer?.email || undefined,
         phone: selectedOrder?.customer?.phone || undefined,
         identificationType: selectedOrder?.customer?.identificationType || 'none',
         identificationNumber: selectedOrder?.customer?.identificationNumber || undefined,
-        address: selectedOrder?.customer?.address || undefined
+        address: selectedOrder?.customer?.address || selectedOrder?.customerAddress || undefined
       },
       items: [
         {
@@ -286,11 +286,12 @@ const WholesaleSalesPage: React.FC = () => {
   const handleBulkInvoice = async (orderId: number) => {
     if (!selectedOrder) return;
 
-    const itemsToInvoice = selectedOrder.items?.filter(item => {
-      const quantity = invoiceQuantities[item.productId] || 0;
-      const remaining = item.quantityRequested - item.quantityProcessed;
-      return quantity > 0 && quantity <= remaining;
-    }) || [];
+    const itemsToInvoice =
+      selectedOrder.items?.filter(item => {
+        const quantity = invoiceQuantities[item.productId] || 0;
+        const remaining = item.quantityRequested - item.quantityProcessed;
+        return quantity > 0 && quantity <= remaining;
+      }) || [];
 
     if (itemsToInvoice.length === 0) {
       alert('No hay productos con cantidades válidas para facturar.');
@@ -311,12 +312,12 @@ const WholesaleSalesPage: React.FC = () => {
 
     const invoicePayload = {
       customer: {
-        name: selectedOrder.customer?.name || 'Cliente Mayorista',
+        name: selectedOrder.customer?.name || selectedOrder.customerName || 'Cliente Mayorista',
         email: selectedOrder.customer?.email || undefined,
         phone: selectedOrder.customer?.phone || undefined,
         identificationType: selectedOrder.customer?.identificationType || 'none',
         identificationNumber: selectedOrder.customer?.identificationNumber || undefined,
-        address: selectedOrder.customer?.address || undefined
+        address: selectedOrder.customer?.address || selectedOrder.customerAddress || undefined
       },
       items: invoiceItems
     };
@@ -641,7 +642,7 @@ const WholesaleSalesPage: React.FC = () => {
 
                 <div className='d-flex justify-content-between'>
                   <span>Cliente</span>
-                  <strong>{selectedOrder.customer?.name}</strong>
+                  <strong>{selectedOrder.customer?.name || selectedOrder.customerName || 'N/A'}</strong>
                 </div>
 
                 <div className='d-flex justify-content-between'>
@@ -659,11 +660,7 @@ const WholesaleSalesPage: React.FC = () => {
 
               {/* BOTÓN FACTURAR SELECCIONADOS */}
               <div className='mb-3'>
-                <Button
-                  variant='success'
-                  onClick={() => handleBulkInvoice(selectedOrder.id)}
-                  disabled={invoiceLoading || selectedOrder.status === 'cancelado' || !Object.values(invoiceQuantities).some(q => q > 0)}
-                >
+                <Button variant='success' onClick={() => handleBulkInvoice(selectedOrder.id)} disabled={invoiceLoading || selectedOrder.status === 'cancelado' || !Object.values(invoiceQuantities).some(q => q > 0)}>
                   {invoiceLoading ? 'Facturando...' : '📄 Facturar Seleccionados'}
                 </Button>
               </div>

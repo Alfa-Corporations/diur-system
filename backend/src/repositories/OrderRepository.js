@@ -29,7 +29,8 @@ class OrderRepository {
   async findById(id) {
     return await Order.findByPk(id, {
       include: [
-        { model: OrderItem, as: 'items', include: ['product'] }
+        { model: OrderItem, as: 'items', include: ['product'] },
+        { model: Customer, as: 'customer', attributes: { exclude: ['createdAt', 'updatedAt'] } }
       ]
     });
   }
@@ -51,9 +52,11 @@ class OrderRepository {
       where,
       include: [
         { model: OrderItem, as: 'items', include: ['product'] },
-        { model: Customer, as: 'customer', attributes: {
-            exclude: [ 'createdAt', 'updatedAt']
-        } }
+        {
+          model: Customer, as: 'customer', attributes: {
+            exclude: ['createdAt', 'updatedAt']
+          }
+        }
       ],
       order: [['createdAt', 'DESC']]
     });

@@ -141,8 +141,18 @@ class ProductService {
    * @returns {Promise<Object>} Producto actualizado
    */
   async updateProduct(id, updateData) {
-    delete updateData.partnumber
-    delete updateData.stock
+    const existingProduct = await ProductRepository.findById(id);
+    if (!existingProduct) {
+      throw new Error('Product not found');
+    }
+
+    if (updateData.partnumber && updateData.partnumber !== existingProduct.partnumber) {
+      const duplicate = await ProductRepository.findBypartnumber(updateData.partnumber);
+      if (duplicate && duplicate.id !== existingProduct.id) {
+        throw new Error('partnumber already exists');
+      }
+    }
+
     return await ProductRepository.update(id, updateData);
   }
 
