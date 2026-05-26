@@ -57,6 +57,14 @@ class OfflineSyncService {
       customer: data.customer as CreateInvoiceRequest['customer'],
       customerName: typeof data.customerName === 'string' ? data.customerName : undefined,
       customerEmail: typeof data.customerEmail === 'string' ? data.customerEmail : undefined,
+      customerPhone: typeof data.customerPhone === 'string' ? data.customerPhone : undefined,
+      customerIdentificationType: data.customerIdentificationType as CreateInvoiceRequest['customerIdentificationType'],
+      customerIdentification: typeof data.customerIdentification === 'string' ? data.customerIdentification : undefined,
+      customerAddress: typeof data.customerAddress === 'string' ? data.customerAddress : undefined,
+      paymentMethod: data.paymentMethod as CreateInvoiceRequest['paymentMethod'],
+      paymentReference: typeof data.paymentReference === 'string' ? data.paymentReference : undefined,
+      amountReceived: typeof data.amountReceived === 'number' ? data.amountReceived : undefined,
+      changeAmount: typeof data.changeAmount === 'number' ? data.changeAmount : undefined,
       items: Array.isArray(data.items)
         ? data.items.map(item => {
             const parsedItem = item as { productId: number; quantity: number };

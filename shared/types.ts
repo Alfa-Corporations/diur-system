@@ -79,7 +79,7 @@ export interface Invoice {
   documentType?: InvoiceDocumentType;
   sriStatus?: 'not_applicable' | 'pending' | 'authorized' | 'rejected';
   sriAuthorizationNumber?: string;
-  paymentMethod?: 'cash' | 'card' | 'check' | 'transfer' | 'other';
+  paymentMethod?: 'cash' | 'card' | 'check' | 'transfer' | 'credit' | 'other';
   paymentReference?: string;
   amountReceived?: number;
   changeAmount?: number;
@@ -216,6 +216,10 @@ export interface CreateInvoiceRequest {
   customerIdentificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
   customerIdentification?: string;
   customerAddress?: string;
+  paymentMethod?: 'cash' | 'card' | 'check' | 'transfer' | 'credit' | 'other';
+  paymentReference?: string;
+  amountReceived?: number;
+  changeAmount?: number;
 }
 
 export interface UpdateStockRequest {

@@ -168,7 +168,11 @@ class InvoiceController {
       const filters = {};
       const requestedStatus = typeof status === 'string' ? status : undefined;
 
-      if (req.user.role === 'admin' && userId) {
+      // Si no es admin, filtrar solo por sus propias facturas
+      if (req.user.role !== 'admin') {
+        filters.userId = req.user.id;
+      } else if (userId) {
+        // Si es admin y se solicita específicamente un userId, usarlo
         filters.userId = parseInt(userId, 10);
       }
 

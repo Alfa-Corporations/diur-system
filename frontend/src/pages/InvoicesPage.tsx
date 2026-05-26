@@ -12,6 +12,7 @@ const PAYMENT_OPTIONS = [
   { value: 'card', label: 'Tarjeta' },
   { value: 'check', label: 'Cheque' },
   { value: 'transfer', label: 'Transferencia' },
+  { value: 'credit', label: 'Crédito' },
   { value: 'other', label: 'Otro' }
 ] as const;
 
@@ -287,7 +288,8 @@ const InvoicesPage: React.FC = () => {
 
     const targetStatus = invoiceStatusSelection === 'paid' ? 'paid' : 'pending';
     const invoiceTotal = calculateTotal(invoiceItems);
-    const receivedAmount = targetStatus === 'paid' ? (paymentMethod === 'cash' ? toNumber(amountReceived) : invoiceTotal) : undefined;
+    // Para crédito, no hay monto recibido. Para otros métodos no-cash, se asume que se recibe el total
+    const receivedAmount = targetStatus === 'paid' ? (paymentMethod === 'cash' ? toNumber(amountReceived) : paymentMethod === 'credit' ? 0 : invoiceTotal) : undefined;
     const computedChange = targetStatus === 'paid' ? Math.max((receivedAmount || 0) - invoiceTotal, 0) : undefined;
     const customerPayload = buildCustomerPayload();
     const eventTimestamp = new Date();
@@ -309,6 +311,7 @@ const InvoicesPage: React.FC = () => {
       customer: customerPayload,
       customerName: customerPayload.name,
       customerEmail: customerPayload.email,
+      ...(targetStatus === 'paid' && { paymentMethod }),
       items: invoiceItems.map(item => ({
         productId: item.productId,
         quantity: item.quantity
@@ -355,6 +358,10 @@ const InvoicesPage: React.FC = () => {
               documentType,
               sriStatus: 'not_applicable',
               total: invoiceTotal,
+              paymentMethod: targetStatus === 'paid' ? paymentMethod : undefined,
+              paymentReference: targetStatus === 'paid' ? paymentReference : undefined,
+              amountReceived: targetStatus === 'paid' ? receivedAmount : undefined,
+              changeAmount: targetStatus === 'paid' ? computedChange : undefined,
               customerName: customerPayload.name,
               customerEmail: customerPayload.email,
               customerPhone: customerPayload.phone,
@@ -1035,14 +1042,23 @@ const InvoicesPage: React.FC = () => {
                             ))}
                           </select>
                         </div>
-                        <div className='col-12 col-md-3'>
-                          <label className='form-label'>Dinero recibido</label>
-                          <input type='number' className='form-control' min='0' step='0.01' placeholder='0.00' value={amountReceived} onChange={e => setAmountReceived(e.target.value)} />
-                        </div>
-                        <div className='col-12 col-md-3'>
-                          <label className='form-label'>Cambio / Vuelto</label>
-                          <input type='text' className='form-control' value={formatCurrency(changePreview)} readOnly />
-                        </div>
+                        {paymentMethod !== 'credit' && (
+                          <>
+                            <div className='col-12 col-md-3'>
+                              <label className='form-label'>Dinero recibido</label>
+                              <input type='number' className='form-control' min='0' step='0.01' placeholder='0.00' value={amountReceived} onChange={e => setAmountReceived(e.target.value)} />
+                            </div>
+                            <div className='col-12 col-md-3'>
+                              <label className='form-label'>Cambio / Vuelto</label>
+                              <input type='text' className='form-control' value={formatCurrency(changePreview)} readOnly />
+                            </div>
+                          </>
+                        )}
+                        {paymentMethod === 'credit' && (
+                          <div className='col-12 col-md-6 alert alert-info'>
+                            <small>Se creará una cuenta por cobrar. El cliente podrá pagar esta factura más tarde.</small>
+                          </div>
+                        )}
                         <div className='col-12 col-md-8'>
                           <label className='form-label'>Referencia</label>
                           <input type='text' className='form-control' placeholder='Últimos 4 dígitos, banco, nro. cheque...' value={paymentReference} onChange={e => setPaymentReference(e.target.value)} />
@@ -1133,16 +1149,23 @@ const InvoicesPage: React.FC = () => {
                     ))}
                   </select>
                 </div>
-                <div className='row g-3'>
-                  <div className='col-12 col-md-6'>
-                    <label className='form-label'>Dinero recibido</label>
-                    <input type='number' className='form-control' min='0' step='0.01' placeholder='0.00' value={amountReceived} onChange={e => setAmountReceived(e.target.value)} />
+                {paymentMethod !== 'credit' && (
+                  <div className='row g-3'>
+                    <div className='col-12 col-md-6'>
+                      <label className='form-label'>Dinero recibido</label>
+                      <input type='number' className='form-control' min='0' step='0.01' placeholder='0.00' value={amountReceived} onChange={e => setAmountReceived(e.target.value)} />
+                    </div>
+                    <div className='col-12 col-md-6'>
+                      <label className='form-label'>Cambio / Vuelto</label>
+                      <input type='text' className='form-control' value={formatCurrency(changePreview)} readOnly />
+                    </div>
                   </div>
-                  <div className='col-12 col-md-6'>
-                    <label className='form-label'>Cambio / Vuelto</label>
-                    <input type='text' className='form-control' value={formatCurrency(changePreview)} readOnly />
+                )}
+                {paymentMethod === 'credit' && (
+                  <div className='alert alert-info'>
+                    <small>Esta factura se marcará como pagada pero no se recibirá dinero en este momento. El cliente tiene una cuenta por cobrar.</small>
                   </div>
-                </div>
+                )}
                 <div className='mb-3 mt-3'>
                   <label className='form-label'>Referencia / Nota</label>
                   <input type='text' className='form-control' placeholder='Ej: VISA 4455, cheque 1021, transferencia móvil...' value={paymentReference} onChange={e => setPaymentReference(e.target.value)} />

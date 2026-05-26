@@ -58,7 +58,7 @@ const Invoice = db.define('Invoice', {
     defaultValue: 'pending',
   },
   paymentMethod: {
-    type: DataTypes.ENUM('cash', 'card', 'check', 'transfer', 'other'),
+    type: DataTypes.ENUM('cash', 'card', 'check', 'transfer', 'credit', 'other'),
     allowNull: true,
   },
   paymentReference: {

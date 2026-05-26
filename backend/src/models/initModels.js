@@ -8,7 +8,8 @@ const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const Permission = require('./Permission');
 const UserPermission = require('./UserPermission');
-const Supplier = require('./Suppliers')
+const Supplier = require('./Suppliers');
+const AccountsReceivable = require('./AccountsReceivable');
 
 const initModels = () => {
 
@@ -38,6 +39,7 @@ const initModels = () => {
   Invoice.belongsTo(User, { foreignKey: 'userId', as: 'user' });
   Invoice.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
   Invoice.hasMany(InvoiceItem, { foreignKey: 'invoiceId', as: 'items' });
+  Invoice.hasOne(AccountsReceivable, { foreignKey: 'invoiceId', as: 'accountsReceivable' });
 
   // Asociaciones de Item de Factura
   InvoiceItem.belongsTo(Invoice, { foreignKey: 'invoiceId', as: 'invoice' });
@@ -64,6 +66,11 @@ const initModels = () => {
 
   // Asociación adicional para InvoiceItem con OrderItem
   InvoiceItem.belongsTo(OrderItem, { foreignKey: 'orderItemId', as: 'orderItem' });
+
+  // Asociaciones de Cuentas por Cobrar
+  AccountsReceivable.belongsTo(Invoice, { foreignKey: 'invoiceId', as: 'invoice' });
+  AccountsReceivable.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
+  Customer.hasMany(AccountsReceivable, { foreignKey: 'customerId', as: 'accountsReceivable' });
 };
 
 module.exports = initModels;

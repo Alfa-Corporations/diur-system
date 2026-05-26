@@ -1,7 +1,7 @@
 const InvoiceRepository = require('../repositories/InvoiceRepository');
 const ProductService = require('./ProductService');
 const OrderService = require('./OrderService');
-const { Customer, OrderItem } = require('../models');
+const { Customer, OrderItem, AccountsReceivable } = require('../models');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -107,6 +107,11 @@ class InvoiceService {
       ...customerSnapshot,
     }, items);
 
+    // Si el método de pago es crédito, crear una cuenta por cobrar
+    if (baseInvoiceData.paymentMethod === 'credit' && customer.id) {
+      await this.createAccountReceivable(invoice.id, customer.id, total);
+    }
+
     for (const item of items) {
       await ProductService.updateStock(item.productId, -item.quantity);
 
@@ -199,7 +204,70 @@ class InvoiceService {
       await ProductService.updateStock(item.productId, item.quantity);
     }
 
+    // Si la factura tiene una cuenta por cobrar, también cancelarla
+    const accountsReceivable = await AccountsReceivable.findOne({ where: { invoiceId: id } });
+    if (accountsReceivable) {
+      await accountsReceivable.destroy();
+    }
+
     return await this.updateInvoiceStatus(id, 'cancelled');
+  }
+
+  /**
+   * Crea una cuenta por cobrar para una factura con pago a crédito
+   * @param {number} invoiceId - ID de la factura
+   * @param {number} customerId - ID del cliente
+   * @param {number} amount - Monto de la deuda
+   * @returns {Promise<Object>} Cuenta por cobrar creada
+   */
+  async createAccountReceivable(invoiceId, customerId, amount) {
+    return await AccountsReceivable.create({
+      invoiceId,
+      customerId,
+      totalAmount: amount,
+      paidAmount: 0,
+      pendingAmount: amount,
+      status: 'pending',
+    });
+  }
+
+  /**
+   * Registra un pago parcial o total de una cuenta por cobrar
+   * @param {number} accountsReceivableId - ID de la cuenta por cobrar
+   * @param {number} paymentAmount - Monto pagado
+   * @returns {Promise<Object>} Cuenta actualizada
+   */
+  async recordPayment(accountsReceivableId, paymentAmount) {
+    const account = await AccountsReceivable.findByPk(accountsReceivableId);
+    if (!account) {
+      throw new Error('Accounts receivable record not found');
+    }
+
+    const newPaidAmount = Number(account.paidAmount) + Number(paymentAmount);
+    const newPendingAmount = Math.max(0, Number(account.totalAmount) - newPaidAmount);
+    const newStatus = newPendingAmount === 0 ? 'paid' : newPaidAmount > 0 ? 'partial' : 'pending';
+
+    await account.update({
+      paidAmount: newPaidAmount,
+      pendingAmount: newPendingAmount,
+      status: newStatus,
+      lastPaymentDate: new Date(),
+    });
+
+    return account;
+  }
+
+  /**
+   * Obtiene todas las cuentas por cobrar de un cliente
+   * @param {number} customerId - ID del cliente
+   * @returns {Promise<Array>} Cuentas por cobrar del cliente
+   */
+  async getCustomerAccountsReceivable(customerId) {
+    return await AccountsReceivable.findAll({
+      where: { customerId },
+      include: [{ association: 'invoice', include: [{ association: 'items' }] }],
+      order: [['createdAt', 'DESC']],
+    });
   }
 }
 
