@@ -289,6 +289,34 @@ class InvoiceController {
       res.status(400).json({ message: error.message });
     }
   }
+
+  /**
+   * Crea una cuenta por cobrar retroactivamente para una factura existente
+   * POST /invoices/:id/create-ar
+   */
+  async createAccountsReceivable(req, res) {
+    try {
+      const { id } = req.params;
+      const invoice = await InvoiceService.getInvoiceById(id);
+
+      if (!invoice.customerId) {
+        return res.status(400).json({ message: 'La factura no tiene cliente asignado' });
+      }
+
+      const ar = await InvoiceService.createAccountReceivable(
+        invoice.id,
+        invoice.customerId,
+        invoice.total
+      );
+
+      res.json({
+        message: 'Cuenta por cobrar creada exitosamente',
+        accountsReceivable: ar,
+      });
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
+  }
 }
 
 module.exports = new InvoiceController();

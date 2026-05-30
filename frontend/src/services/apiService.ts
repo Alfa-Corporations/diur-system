@@ -211,6 +211,25 @@ class ApiService {
     return response.data.invoice;
   }
 
+  // Cuentas por cobrar
+  async getAccountsReceivable(params?: { status?: string; customerId?: number }): Promise<{ accounts: any[] }> {
+    const response = await this.api.get('/accounts-receivable', { params });
+    return response.data;
+  }
+
+  async getAccountsReceivableById(id: number): Promise<any> {
+    const response = await this.api.get(`/accounts-receivable/${id}`);
+    return response.data.account;
+  }
+
+  async payAccountReceivable(id: number, amount: number, opts?: { paymentMethod?: string; paymentReference?: string }): Promise<{ account: any; payment: any }> {
+    const body: any = { amount };
+    if (opts?.paymentMethod) body.paymentMethod = opts.paymentMethod;
+    if (opts?.paymentReference) body.paymentReference = opts.paymentReference;
+    const response = await this.api.post(`/accounts-receivable/${id}/pay`, body);
+    return { account: response.data.account, payment: response.data.payment };
+  }
+
   // Métodos de pedidos
   async getOrders(params?: { status?: string; type?: string }): Promise<{ orders: Order[]; totalCount: number }> {
     const response = await this.api.get('/orders', { params });

@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../hooks/redux';
 import { logout } from '../redux/slices/authSlice';
 import socketService from '../services/socketService';
 import { usePermissions } from '../hooks/permissions';
+import apiService from '../services/apiService';
 
 /**
  * Componente Dashboard
@@ -36,11 +37,31 @@ const Dashboard: React.FC = () => {
     { label: 'Ventas en el Local', path: '/sales', icon: '🛒', helper: 'Venta en local', permission: 'crear_orden' },
     { label: 'Dashboard Pedidos', path: '/orders/dashboard', icon: '📊', helper: 'Vista global de pedidos', permission: 'crear_orden' },
     { label: 'Facturas', path: '/invoices', icon: '🧾', helper: 'Ventas y cobros', permission: 'crear_factura' },
+    { label: 'Cuentas por Cobrar', path: '/accounts-receivable', icon: '💳', helper: 'Gestionar saldos pendientes', permission: 'crear_factura' },
     { label: 'Usuarios', path: '/users', icon: '👥', helper: 'Administración de accesos', permission: 'crud_users' },
     { label: 'Clientes', path: '/customer', icon: '👥', helper: 'Administración de clientes', permission: 'crud_users' }
   ];
 
   const availableMenuItems = menuItems.filter(item => !item.permission || hasPermission(item.permission) || user.role === 'admin');
+  const [pendingAccounts, setPendingAccounts] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadPending = async () => {
+      try {
+        const res = await apiService.getAccountsReceivable();
+        if (!mounted) return;
+        setPendingAccounts((res.accounts || []).length || 0);
+      } catch (err) {
+        setPendingAccounts(null);
+      }
+    };
+
+    void loadPending();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <div className='app-shell'>
@@ -98,6 +119,18 @@ const Dashboard: React.FC = () => {
                     </div>
                     <span className='metric-icon'>🌐</span>
                   </div>
+                </div>
+              </div>
+              <div className='col-12 col-md-4'>
+                <div className='stat-card clickable' onClick={() => navigate('/accounts-receivable')} style={{ cursor: 'pointer' }}>
+                  <div className='d-flex justify-content-between align-items-start'>
+                    <div>
+                      <div className='metric-label'>Cuentas por Cobrar</div>
+                      <div className='metric-value'>{pendingAccounts === null ? '—' : pendingAccounts}</div>
+                    </div>
+                    <span className='metric-icon'>💳</span>
+                  </div>
+                  <div className='small text-muted mt-2'>Ver y registrar pagos pendientes</div>
                 </div>
               </div>
               <div className='col-12 col-md-4'>

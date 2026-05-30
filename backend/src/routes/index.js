@@ -58,6 +58,13 @@ router.patch('/invoices/:id/status', InvoiceController.updateInvoiceStatus);
 router.delete('/invoices/:id', InvoiceController.cancelInvoice);
 router.post('/invoices/:id/send-email', InvoiceController.sendInvoiceEmail);
 router.post('/invoices/:id/cancel', InvoiceController.cancelInvoice);
+router.post('/invoices/:id/create-ar', InvoiceController.createAccountsReceivable);
+
+// Rutas de cuentas por cobrar
+const AccountsReceivableController = require('../controllers/AccountsReceivableController');
+router.get('/accounts-receivable', AccountsReceivableController.listPending);
+router.get('/accounts-receivable/:id', AccountsReceivableController.get);
+router.post('/accounts-receivable/:id/pay', AccountsReceivableController.pay);
 
 // Rutas de pedidos
 router.post('/orders', authorize('crear_orden'), OrderController.createOrder);

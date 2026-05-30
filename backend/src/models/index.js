@@ -10,6 +10,7 @@ const Permission = require('./Permission');
 const UserPermission = require('./UserPermission');
 const Suppliers = require('./Suppliers');
 const AccountsReceivable = require('./AccountsReceivable');
+const AccountsReceivablePayment = require('./AccountsReceivablePayment');
 
 module.exports = {
   User,
@@ -23,4 +24,5 @@ module.exports = {
   UserPermission,
   Suppliers,
   AccountsReceivable
+  , AccountsReceivablePayment
 };

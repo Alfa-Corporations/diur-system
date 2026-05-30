@@ -1,7 +1,7 @@
 const InvoiceRepository = require('../repositories/InvoiceRepository');
 const ProductService = require('./ProductService');
 const OrderService = require('./OrderService');
-const { Customer, OrderItem, AccountsReceivable } = require('../models');
+const { Customer, OrderItem, AccountsReceivable, AccountsReceivablePayment } = require('../models');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -108,8 +108,19 @@ class InvoiceService {
     }, items);
 
     // Si el método de pago es crédito, crear una cuenta por cobrar
+    // (incluso si creditAmount = 0, para permitir abonos posteriores)
     if (baseInvoiceData.paymentMethod === 'credit' && customer.id) {
-      await this.createAccountReceivable(invoice.id, customer.id, total);
+      const paidNow = Number(baseInvoiceData.amountReceived || 0);
+      const creditAmount = Math.max(0, Number(total) - paidNow);
+      console.log('[DEBUG] Creating AR: total=', total, 'paidNow=', paidNow, 'creditAmount=', creditAmount);
+      // Crear AR si hay saldo o si el usuario específicamente eligió crédito
+      if (creditAmount > 0) {
+        await this.createAccountReceivable(invoice.id, customer.id, creditAmount);
+      } else if (creditAmount === 0 && paidNow > 0) {
+        // Si pagó todo pero eligió método 'credit', crear AR con saldo 0 (permitirá abonos si se reversa)
+        console.log('[DEBUG] Creating AR with 0 balance (payment method = credit, fully paid)');
+        await this.createAccountReceivable(invoice.id, customer.id, 0);
+      }
     }
 
     for (const item of items) {
@@ -167,7 +178,26 @@ class InvoiceService {
       if (paymentData.changeAmount !== undefined) updateData.changeAmount = paymentData.changeAmount;
     }
 
-    return await InvoiceRepository.update(id, updateData);
+    const invoice = await InvoiceRepository.update(id, updateData);
+
+    if (paymentData.paymentMethod === 'credit' && invoice.customerId) {
+      const paidNow = Number(paymentData.amountReceived || 0);
+      const creditAmount = Math.max(0, Number(invoice.total || 0) - paidNow);
+      const existingAR = await AccountsReceivable.findOne({ where: { invoiceId: invoice.id } });
+
+      if (!existingAR) {
+        await this.createAccountReceivable(invoice.id, invoice.customerId, creditAmount);
+      } else if (existingAR.pendingAmount <= 0 && creditAmount > 0) {
+        await existingAR.update({
+          totalAmount: creditAmount,
+          paidAmount: 0,
+          pendingAmount: creditAmount,
+          status: 'pending'
+        });
+      }
+    }
+
+    return invoice;
   }
 
   async markInvoiceEmailSent(id, email) {
@@ -221,13 +251,15 @@ class InvoiceService {
    * @returns {Promise<Object>} Cuenta por cobrar creada
    */
   async createAccountReceivable(invoiceId, customerId, amount) {
+    const pendingAmount = Number(amount) || 0;
+    const status = pendingAmount === 0 ? 'paid' : 'pending';
     return await AccountsReceivable.create({
       invoiceId,
       customerId,
-      totalAmount: amount,
+      totalAmount: pendingAmount,
       paidAmount: 0,
-      pendingAmount: amount,
-      status: 'pending',
+      pendingAmount,
+      status,
     });
   }
 
@@ -237,11 +269,21 @@ class InvoiceService {
    * @param {number} paymentAmount - Monto pagado
    * @returns {Promise<Object>} Cuenta actualizada
    */
-  async recordPayment(accountsReceivableId, paymentAmount) {
+  async recordPayment(accountsReceivableId, paymentAmount, options = {}) {
     const account = await AccountsReceivable.findByPk(accountsReceivableId);
     if (!account) {
       throw new Error('Accounts receivable record not found');
     }
+
+    // registrar el abono en la tabla de pagos
+    const payment = await AccountsReceivablePayment.create({
+      accountsReceivableId,
+      amount: paymentAmount,
+      paymentMethod: options.paymentMethod || null,
+      paymentReference: options.paymentReference || null,
+      userId: options.userId || null,
+      createdAt: new Date()
+    });
 
     const newPaidAmount = Number(account.paidAmount) + Number(paymentAmount);
     const newPendingAmount = Math.max(0, Number(account.totalAmount) - newPaidAmount);
@@ -254,7 +296,9 @@ class InvoiceService {
       lastPaymentDate: new Date(),
     });
 
-    return account;
+    // devolver cuenta con el pago creado
+    const updated = await AccountsReceivable.findByPk(accountsReceivableId, { include: [{ association: 'payments' }, { association: 'customer' }, { association: 'invoice' }] });
+    return { account: updated, payment };
   }
 
   /**

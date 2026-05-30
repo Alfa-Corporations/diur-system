@@ -249,6 +249,7 @@ const WholesaleSalesPage: React.FC = () => {
     const price = getProductPriceByTier(product, tier);
 
     const invoicePayload = {
+      documentType: selectedOrder?.customer?.name || selectedOrder?.customerName ? 'sales_note' : 'consumer_final',
       customer: {
         name: selectedOrder?.customer?.name || selectedOrder?.customerName || 'Cliente Mayorista',
         email: selectedOrder?.customer?.email || undefined,
@@ -311,13 +312,14 @@ const WholesaleSalesPage: React.FC = () => {
     });
 
     const invoicePayload = {
+      documentType: selectedOrder.customer?.name || selectedOrder.customerName ? 'sales_note' : 'consumer_final',
       customer: {
-        name: selectedOrder.customer?.name || selectedOrder.customerName || 'Cliente Mayorista',
-        email: selectedOrder.customer?.email || undefined,
-        phone: selectedOrder.customer?.phone || undefined,
-        identificationType: selectedOrder.customer?.identificationType || 'none',
-        identificationNumber: selectedOrder.customer?.identificationNumber || undefined,
-        address: selectedOrder.customer?.address || selectedOrder.customerAddress || undefined
+        name: selectedOrder.customer.name,
+        email: selectedOrder.customer.email,
+        phone: selectedOrder.customer.phone,
+        identificationType: selectedOrder.customer.identificationType,
+        identificationNumber: selectedOrder.customer.identificationNumber,
+        address: selectedOrder.customer.address
       },
       items: invoiceItems
     };

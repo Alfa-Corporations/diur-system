@@ -10,6 +10,7 @@ const Permission = require('./Permission');
 const UserPermission = require('./UserPermission');
 const Supplier = require('./Suppliers');
 const AccountsReceivable = require('./AccountsReceivable');
+const AccountsReceivablePayment = require('./AccountsReceivablePayment');
 
 const initModels = () => {
 
@@ -70,6 +71,8 @@ const initModels = () => {
   // Asociaciones de Cuentas por Cobrar
   AccountsReceivable.belongsTo(Invoice, { foreignKey: 'invoiceId', as: 'invoice' });
   AccountsReceivable.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
+  AccountsReceivable.hasMany(AccountsReceivablePayment, { foreignKey: 'accountsReceivableId', as: 'payments' });
+  AccountsReceivablePayment.belongsTo(AccountsReceivable, { foreignKey: 'accountsReceivableId', as: 'account' });
   Customer.hasMany(AccountsReceivable, { foreignKey: 'customerId', as: 'accountsReceivable' });
 };
 

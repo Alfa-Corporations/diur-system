@@ -17,6 +17,7 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import ProductsPage from './pages/ProductsPage';
 import InvoicesPage from './pages/InvoicesPage';
+import AccountsReceivablePage from './pages/AccountsReceivablePage';
 import UserManagementPage from './pages/UserManagementPage';
 import OrdersDashboardPage from './pages/OrdersDashboardPage';
 import POSPage from './pages/POSPage';
@@ -150,6 +151,7 @@ const AppContent: React.FC = () => {
           <Route path='/products' element={isAuthenticated ? <ProductsPage /> : <Navigate to='/login' />} />
           <Route path='/products/importer' element={isAuthenticated ? <FileImporter /> : <Navigate to='/login' />} />
           <Route path='/invoices' element={isAuthenticated ? <InvoicesPage /> : <Navigate to='/login' />} />
+          <Route path='/accounts-receivable' element={isAuthenticated ? <AccountsReceivablePage /> : <Navigate to='/login' />} />
           <Route path='/users' element={isAuthenticated ? <UserManagementPage /> : <Navigate to='/login' />} />
           <Route path='/customer' element={isAuthenticated ? <CustomerManager /> : <Navigate to='/login' />} />
           <Route path='/orders/dashboard' element={isAuthenticated ? <OrdersDashboardPage /> : <Navigate to='/login' />} />

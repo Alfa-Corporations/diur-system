@@ -1,4 +1,5 @@
 const { AccountsReceivable, Invoice, Customer } = require('../models');
+const { Op } = require('sequelize');
 
 /**
  * Repositorio de Cuentas por Cobrar
@@ -23,7 +24,8 @@ class AccountsReceivableRepository {
     return await AccountsReceivable.findByPk(id, {
       include: [
         { association: 'invoice', include: [{ association: 'items' }] },
-        { association: 'customer' }
+        { association: 'customer' },
+        { association: 'payments' }
       ]
     });
   }
@@ -38,25 +40,79 @@ class AccountsReceivableRepository {
       where: { customerId },
       include: [
         { association: 'invoice', include: [{ association: 'items' }] },
-        { association: 'customer' }
+        { association: 'customer' },
+        { association: 'payments' }
       ],
       order: [['createdAt', 'DESC']]
     });
   }
 
   /**
-   * Encuentra todas las cuentas pendientes
-   * @returns {Promise<Array>} Cuentas pendientes
+   * Encuentra todas las cuentas pendientes (con saldo > 0)
+   * @returns {Promise<Array>} Cuentas con saldo pendiente
    */
   async findPending() {
-    return await AccountsReceivable.findAll({
-      where: { status: ['pending', 'partial', 'overdue'] },
-      include: [
-        { association: 'invoice' },
-        { association: 'customer' }
-      ],
-      order: [['createdAt', 'DESC']]
-    });
+    try {
+      const pendingAccounts = await AccountsReceivable.findAll({
+        where: {
+          status: { [Op.in]: ['pending', 'partial', 'overdue'] }
+        },
+        include: [
+          { association: 'invoice' },
+          { association: 'customer' },
+          { association: 'payments' }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      if (pendingAccounts.length > 0) {
+        return pendingAccounts;
+      }
+
+      const creditInvoices = await Invoice.findAll({
+        where: { paymentMethod: 'credit' },
+        include: [
+          { association: 'customer' },
+          { association: 'accountsReceivable', required: false }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      const invoicesToConvert = creditInvoices.filter(invoice => {
+        const paid = Number(invoice.amountReceived || 0);
+        const total = Number(invoice.total || 0);
+        const pending = Math.max(0, total - paid);
+        return pending > 0 && !invoice.accountsReceivable;
+      });
+
+      for (const invoice of invoicesToConvert) {
+        const paid = Number(invoice.amountReceived || 0);
+        const total = Number(invoice.total || 0);
+        const pendingAmount = Math.max(0, total - paid);
+
+        await AccountsReceivable.create({
+          invoiceId: invoice.id,
+          customerId: invoice.customerId,
+          totalAmount: pendingAmount,
+          paidAmount: 0,
+          pendingAmount,
+          status: 'pending'
+        });
+      }
+
+      return await AccountsReceivable.findAll({
+        where: { pendingAmount: { [Op.gt]: 0 } },
+        include: [
+          { association: 'invoice' },
+          { association: 'customer' },
+          { association: 'payments' }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+    } catch (error) {
+      console.error('[ERROR] findPending failed:', error.message);
+      throw error;
+    }
   }
 
   /**
@@ -112,7 +168,8 @@ class AccountsReceivableRepository {
       where,
       include: [
         { association: 'invoice', include: [{ association: 'items' }] },
-        { association: 'customer' }
+        { association: 'customer' },
+        { association: 'payments' }
       ],
       limit,
       offset,
@@ -129,7 +186,7 @@ class AccountsReceivableRepository {
     const paidAmount = await AccountsReceivable.sum('paidAmount');
     const pendingAmount = await AccountsReceivable.sum('pendingAmount');
     const pendingCount = await AccountsReceivable.count({
-      where: { status: ['pending', 'partial', 'overdue'] }
+      where: { status: { [Op.in]: ['pending', 'partial', 'overdue'] } }
     });
 
     return {

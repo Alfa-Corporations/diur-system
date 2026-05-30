@@ -288,8 +288,14 @@ const InvoicesPage: React.FC = () => {
 
     const targetStatus = invoiceStatusSelection === 'paid' ? 'paid' : 'pending';
     const invoiceTotal = calculateTotal(invoiceItems);
-    // Para crédito, no hay monto recibido. Para otros métodos no-cash, se asume que se recibe el total
-    const receivedAmount = targetStatus === 'paid' ? (paymentMethod === 'cash' ? toNumber(amountReceived) : paymentMethod === 'credit' ? 0 : invoiceTotal) : undefined;
+    // Para crédito permitimos ingresar un monto en efectivo (parte pagada ahora) y el resto queda a crédito.
+    let receivedAmount: number | undefined;
+    if (targetStatus === 'paid') {
+      receivedAmount = toNumber(amountReceived) || (paymentMethod === 'credit' ? 0 : invoiceTotal);
+    } else {
+      receivedAmount = paymentMethod === 'credit' ? toNumber(amountReceived) : undefined;
+    }
+
     const computedChange = targetStatus === 'paid' ? Math.max((receivedAmount || 0) - invoiceTotal, 0) : undefined;
     const customerPayload = buildCustomerPayload();
     const eventTimestamp = new Date();
@@ -301,22 +307,33 @@ const InvoicesPage: React.FC = () => {
       return;
     }
 
-    if (targetStatus === 'paid' && paymentMethod === 'cash' && receivedAmount !== undefined && receivedAmount < invoiceTotal) {
+    if (targetStatus === 'paid' && (receivedAmount === undefined || receivedAmount < invoiceTotal)) {
       alert('El monto recibido no puede ser menor al total de la factura.');
       return;
     }
 
-    const invoiceData = {
+    const invoiceData: any = {
       documentType,
       customer: customerPayload,
       customerName: customerPayload.name,
       customerEmail: customerPayload.email,
-      ...(targetStatus === 'paid' && { paymentMethod }),
       items: invoiceItems.map(item => ({
         productId: item.productId,
         quantity: item.quantity
       }))
     };
+
+    // Siempre incluir método de pago y monto recibido cuando se use crédito;
+    // si la factura queda pagada, también enviar método y montos.
+    if (paymentMethod === 'credit') {
+      invoiceData.paymentMethod = 'credit';
+      invoiceData.amountReceived = toNumber(amountReceived);
+      invoiceData.changeAmount = computedChange;
+    } else if (targetStatus === 'paid') {
+      invoiceData.paymentMethod = paymentMethod;
+      invoiceData.amountReceived = receivedAmount;
+      invoiceData.changeAmount = computedChange;
+    }
 
     try {
       let savedInvoice: Invoice;
@@ -335,14 +352,17 @@ const InvoicesPage: React.FC = () => {
               customerIdentificationType: customerPayload.identificationType,
               customerIdentification: customerPayload.identificationNumber,
               customerAddress: customerPayload.address,
-              updatedAt: eventTimestampIso
+              updatedAt: eventTimestampIso,
+              paymentMethod: invoiceData.paymentMethod,
+              amountReceived: invoiceData.amountReceived,
+              changeAmount: invoiceData.changeAmount
             } as Invoice);
 
         if (!isOnline) {
           await localDBService.addPendingEvent({
             id: `actualizar_factura_${eventId}`,
             type: 'actualizar_factura',
-            data: { id: editingInvoice.id, ...invoiceData, status: targetStatus, paymentMethod, paymentReference, amountReceived: receivedAmount, changeAmount: computedChange },
+            data: { id: editingInvoice.id, ...invoiceData, status: targetStatus, paymentMethod: invoiceData.paymentMethod, paymentReference, amountReceived: invoiceData.amountReceived, changeAmount: invoiceData.changeAmount },
             timestamp: eventTimestampIso,
             synced: false
           });
@@ -358,10 +378,10 @@ const InvoicesPage: React.FC = () => {
               documentType,
               sriStatus: 'not_applicable',
               total: invoiceTotal,
-              paymentMethod: targetStatus === 'paid' ? paymentMethod : undefined,
+              paymentMethod: invoiceData.paymentMethod,
               paymentReference: targetStatus === 'paid' ? paymentReference : undefined,
-              amountReceived: targetStatus === 'paid' ? receivedAmount : undefined,
-              changeAmount: targetStatus === 'paid' ? computedChange : undefined,
+              amountReceived: invoiceData.amountReceived,
+              changeAmount: invoiceData.changeAmount,
               customerName: customerPayload.name,
               customerEmail: customerPayload.email,
               customerPhone: customerPayload.phone,
@@ -415,10 +435,10 @@ const InvoicesPage: React.FC = () => {
         customerIdentificationType: savedInvoice.customerIdentificationType || customerPayload.identificationType,
         customerIdentification: savedInvoice.customerIdentification || customerPayload.identificationNumber,
         customerAddress: savedInvoice.customerAddress || customerPayload.address,
-        paymentMethod: targetStatus === 'paid' ? paymentMethod : savedInvoice.paymentMethod,
+        paymentMethod: (invoiceData as any).paymentMethod ?? savedInvoice.paymentMethod,
         paymentReference: targetStatus === 'paid' ? paymentReference : savedInvoice.paymentReference,
-        amountReceived: targetStatus === 'paid' ? receivedAmount : savedInvoice.amountReceived,
-        changeAmount: targetStatus === 'paid' ? computedChange : savedInvoice.changeAmount,
+        amountReceived: (invoiceData as any).amountReceived ?? savedInvoice.amountReceived,
+        changeAmount: (invoiceData as any).changeAmount ?? savedInvoice.changeAmount,
         paidAt: targetStatus === 'paid' ? savedInvoice.paidAt || eventTimestampIso : savedInvoice.paidAt
       };
 
@@ -508,7 +528,7 @@ const InvoicesPage: React.FC = () => {
     if (!invoiceToPay) return;
 
     const invoiceTotal = toNumber(invoiceToPay.total);
-    const receivedAmount = paymentMethod === 'cash' ? toNumber(amountReceived) : invoiceTotal;
+    const receivedAmount = paymentMethod === 'cash' ? toNumber(amountReceived) : paymentMethod === 'credit' ? 0 : invoiceTotal;
     const computedChange = Math.max(receivedAmount - invoiceTotal, 0);
     const paymentTimestamp = new Date();
     const paymentTimestampIso = paymentTimestamp.toISOString();
@@ -841,7 +861,7 @@ const InvoicesPage: React.FC = () => {
                       )}
                       {canEditInvoices && invoice.status !== 'cancelled' && (
                         <>
-                          <button className='btn btn-sm btn-outline-primary' onClick={() => handleEdit(invoice)}>
+                          <button disabled={invoice.status === 'paid'} className='btn btn-sm btn-outline-primary' onClick={() => handleEdit(invoice)}>
                             ✏️ Editar
                           </button>
                           <button className='btn btn-sm btn-outline-danger' onClick={() => handleDelete(invoice)}>
