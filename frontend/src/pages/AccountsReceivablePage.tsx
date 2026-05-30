@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../services/apiService';
-import localDBService from '../services/localDBService';
+//import localDBService from '../services/localDBService';
 
 const toNumber = (v: unknown) => {
   const n = Number(v);
@@ -32,8 +32,8 @@ const AccountsReceivablePage: React.FC = () => {
     } catch (err) {
       // fall back local
       try {
-        const local = (await localDBService.getAccountsReceivable?.()) || [];
-        setAccounts(local);
+        //const local = (await localDBService.getAccountsReceivable?.()) || [];
+        //setAccounts(local);
       } catch {
         setAccounts([]);
       }
