@@ -141,7 +141,7 @@ const compraOrdersPage: React.FC = () => {
 
     dispatch(createOrderStart());
 
-const name = suppliers.filter(s => s.id === selectedSupplierId) || ''
+    const name = suppliers.filter(s => s.id === selectedSupplierId) || '';
 
     try {
       const orderData = {
@@ -157,6 +157,9 @@ const name = suppliers.filter(s => s.id === selectedSupplierId) || ''
       if (isOnline) {
         const createdOrder = await apiService.createOrder(orderData);
         dispatch(createOrderSuccess(createdOrder));
+
+        // Alerta con número de orden
+        alert(`Orden creada: #${createdOrder.id}`);
 
         socketService.emit('order_created', {
           order: createdOrder,

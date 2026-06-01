@@ -27,6 +27,8 @@ import LocalSalesOrdersPage from './pages/LocalSalesOrdersPage';
 import FileImporter from './components/FileImporter';
 import CustomerManager from './pages/CustomerManager';
 import Sales from './pages/Sales';
+import BackButton from './components/BackButton';
+import { useLocation } from 'react-router-dom';
 
 /**
  * Componente principal de la aplicación
@@ -145,6 +147,8 @@ const AppContent: React.FC = () => {
   return (
     <Router>
       <div className='App'>
+        {/* Botón de retroceso minimalista: oculto en la pantalla principal y login */}
+        <BackButtonWrapper />
         <Routes>
           <Route path='/login' element={isAuthenticated ? <Navigate to='/dashboard' /> : <Login />} />
           <Route path='/dashboard' element={isAuthenticated ? <Dashboard /> : <Navigate to='/login' />} />
@@ -164,6 +168,17 @@ const AppContent: React.FC = () => {
         </Routes>
       </div>
     </Router>
+  );
+};
+
+const BackButtonWrapper: React.FC = () => {
+  const loc = useLocation();
+  const path = loc.pathname || '';
+  if (path === '/dashboard' || path === '/login' || path === '/') return null;
+  return (
+    <div style={{ position: 'fixed', top: 12, left: 12, zIndex: 1200 }}>
+      <BackButton />
+    </div>
   );
 };
 

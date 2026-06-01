@@ -210,6 +210,9 @@ const WholesaleSalesPage: React.FC = () => {
 
       dispatch(createOrderSuccess(created));
 
+      // Mostrar alerta con número de orden para facilitar edición posterior
+      alert(`Orden creada: #${created.id}`);
+
       socketService.emit('order_created', {
         order: created,
         userId: user?.id

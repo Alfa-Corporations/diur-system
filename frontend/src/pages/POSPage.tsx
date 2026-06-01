@@ -19,6 +19,11 @@ const POSPage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showCart, setShowCart] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer' | 'credit' | 'other'>('cash');
+  const [receiveNow, setReceiveNow] = useState(false);
+  const [receivedAmount, setReceivedAmount] = useState<number | ''>('');
+  const [receivedMethod, setReceivedMethod] = useState<'cash' | 'transfer' | 'other'>('cash');
   const [showAlert, setShowAlert] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [filters, setFilters] = useState({ search: '' });
@@ -150,30 +155,77 @@ const POSPage: React.FC = () => {
 
   const total = useMemo(() => cart.reduce((a, b) => a + b.quantity * b.price, 0), [cart]);
 
-  const createSale = async () => {
+  const processPayment = async () => {
     if (!cart.length) return;
-    const order: CreateOrderDTO = {
-      type: 'venta',
-      items: cart.map(item => ({
-        productId: item.product.id,
-        quantityRequested: item.quantity
-      }))
+
+    const items = cart.map(i => ({ productId: i.product.id, quantity: i.quantity, price: i.price }));
+    const paidNow = Number(receiveNow && receivedAmount ? receivedAmount : paymentMethod === 'credit' ? 0 : total) || 0;
+
+    const invoicePayload: any = {
+      items,
+      paymentMethod: paymentMethod === 'credit' ? 'credit' : paymentMethod,
+      amountReceived: paidNow,
+      changeAmount: paidNow > total ? Number((paidNow - total).toFixed(2)) : 0
     };
 
+    if (receiveNow && receivedMethod) {
+      invoicePayload.paymentReference = receivedMethod;
+    }
+
     if (isOnline) {
-      await apiService.createOrder(order);
-      alert('Venta procesada');
+      try {
+        const invoice = await apiService.createInvoice(invoicePayload);
+        alert(`Factura creada: ${invoice.invoiceNumber || invoice.id}`);
+      } catch (err: any) {
+        console.error(err);
+        alert(err?.message || 'Error al crear factura');
+      }
     } else {
       await localDBService.addPendingEvent({
-        id: `sale_${Date.now()}`,
-        type: 'crear_orden',
-        data: order,
+        id: `invoice_${Date.now()}`,
+        type: 'crear_factura',
+        data: invoicePayload,
         timestamp: new Date().toISOString(),
         synced: false
       });
-      alert('Guardado offline');
+      alert('Factura guardada offline');
     }
+
     setCart([]);
+    setShowPayment(false);
+    setShowCart(false);
+    // reset payment fields
+    setPaymentMethod('cash');
+    setReceiveNow(false);
+    setReceivedAmount('');
+    setReceivedMethod('cash');
+  };
+
+  const createOrderFromCart = async () => {
+    if (!cart.length) return;
+    const order: CreateOrderDTO = {
+      type: 'venta',
+      items: cart.map(item => ({ productId: item.product.id, quantityRequested: item.quantity }))
+    };
+
+    if (isOnline) {
+      try {
+        const created = await apiService.createOrder(order);
+        const id = created?.id || null;
+        alert(id ? `Orden creada: #${id}` : 'Orden creada');
+      } catch (err: any) {
+        console.error(err);
+        alert(err?.message || 'Error al crear orden');
+      }
+    } else {
+      const tempId = Date.now();
+      await localDBService.addPendingEvent({ id: `sale_${tempId}`, type: 'crear_orden', data: order, timestamp: new Date().toISOString(), synced: false });
+      alert(`Orden guardada offline (id provisional: ${tempId})`);
+    }
+
+    setCart([]);
+    setShowPayment(false);
+    setShowCart(false);
   };
 
   return (
@@ -194,9 +246,6 @@ const POSPage: React.FC = () => {
       {/* HEADER */}
       <div className='d-flex justify-content-between align-items-center mb-3'>
         <h3>🛒 POS Sistema</h3>
-        <Button variant='outline-secondary' onClick={() => window.history.back()}>
-          ← Volver
-        </Button>
       </div>
 
       {!isOnline && <Alert variant='warning'>Modo offline activo</Alert>}
@@ -319,7 +368,17 @@ const POSPage: React.FC = () => {
                         <strong>${total.toFixed(2)}</strong>
                       </div>
 
-                      <Button className='w-100 mt-3' variant='success' onClick={createSale}>
+                      <Button className='w-100 mt-2' variant='outline-primary' onClick={() => setShowPayment(true)}>
+                        Seleccionar pago
+                      </Button>
+
+                      <Button
+                        className='w-100 mt-2'
+                        variant='success'
+                        onClick={() => {
+                          setShowPayment(true);
+                        }}
+                      >
                         💰 Procesar venta
                       </Button>
                     </>
@@ -331,6 +390,63 @@ const POSPage: React.FC = () => {
         </Modal>
 
         {/* 🟩 CARRITO */}
+        <Modal show={showPayment} centered onHide={() => setShowPayment(false)}>
+          <ModalHeader closeButton>
+            <ModalTitle>Procesar pago</ModalTitle>
+          </ModalHeader>
+          <ModalBody>
+            <div className='d-flex flex-column gap-2'>
+              <div>
+                <label className='form-label'>Método de pago</label>
+                <select className='form-select' value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as any)}>
+                  <option value='cash'>Efectivo</option>
+                  <option value='card'>Tarjeta</option>
+                  <option value='transfer'>Transferencia</option>
+                  <option value='credit'>Crédito</option>
+                  <option value='other'>Otro</option>
+                </select>
+              </div>
+
+              {paymentMethod === 'credit' && (
+                <div>
+                  <div className='form-check mb-2'>
+                    <input className='form-check-input' type='checkbox' checked={receiveNow} id='receiveNow' onChange={e => setReceiveNow(e.target.checked)} />
+                    <label className='form-check-label' htmlFor='receiveNow'>
+                      Recibir abono ahora (opcional)
+                    </label>
+                  </div>
+
+                  {receiveNow && (
+                    <div className='d-flex gap-2 align-items-center'>
+                      <input type='number' className='form-control' placeholder='Monto recibido' value={receivedAmount as any} onChange={e => setReceivedAmount(e.target.value === '' ? '' : Number(e.target.value))} />
+                      <select className='form-select' value={receivedMethod} onChange={e => setReceivedMethod(e.target.value as any)}>
+                        <option value='cash'>Efectivo</option>
+                        <option value='transfer'>Transferencia</option>
+                        <option value='other'>Otro</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className='mt-2'>
+                <strong>Total:</strong> ${total.toFixed(2)}
+              </div>
+
+              <div className='d-flex gap-2 mt-3'>
+                <Button variant='secondary' onClick={() => setShowPayment(false)}>
+                  Cancelar
+                </Button>
+                <Button variant='outline-success' onClick={createOrderFromCart}>
+                  Guardar como orden
+                </Button>
+                <Button variant='primary' onClick={processPayment}>
+                  Confirmar pago
+                </Button>
+              </div>
+            </div>
+          </ModalBody>
+        </Modal>
       </div>
       <button
         className='btn shadow'
