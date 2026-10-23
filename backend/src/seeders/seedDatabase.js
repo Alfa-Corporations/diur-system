@@ -39,6 +39,8 @@ const seedDatabase = async () => {
       { name: 'ver_reportes', description: 'Ver reportes' },
       { name: 'acceso_pos', description: 'Acceso a POS' },
       { name: 'acceso_administrativo', description: 'Acceso administrativo completo' },
+      { name: 'leer_clientes', description: 'Ver los cliente' },
+      { name: 'ver_totales', description: 'Ver los totales' },
     ];
 
     const permissions = [];
