@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
+import { usePermissions } from '../hooks/permissions';
 import { fetchInvoicesStart, fetchInvoicesSuccess, fetchInvoicesFailure, createInvoiceSuccess, updateInvoiceSuccess, cancelInvoiceSuccess } from '../redux/slices/invoiceSlice';
 import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure } from '../redux/slices/productSlice';
 import apiService from '../services/apiService';
@@ -8,11 +9,11 @@ import localDBService from '../services/localDBService';
 import type { Invoice, InvoiceItem } from '../../../shared/types';
 
 const PAYMENT_OPTIONS = [
+  { value: 'credit', label: 'Crédito' },
   { value: 'cash', label: 'Efectivo' },
   { value: 'card', label: 'Tarjeta' },
   { value: 'check', label: 'Cheque' },
   { value: 'transfer', label: 'Transferencia' },
-  { value: 'credit', label: 'Crédito' },
   { value: 'other', label: 'Otro' }
 ] as const;
 
@@ -39,6 +40,7 @@ const InvoicesPage: React.FC = () => {
   const { products } = useAppSelector(state => state.products);
   const { isOnline } = useAppSelector(state => state.sync);
   const { user } = useAppSelector(state => state.auth);
+  const { hasPermission } = usePermissions();
   const isAdmin = user?.role === 'admin';
 
   const [showModal, setShowModal] = useState(false);
@@ -50,7 +52,7 @@ const InvoicesPage: React.FC = () => {
   const [quantity, setQuantity] = useState('1');
   const [productSearch, setProductSearch] = useState('');
   const [invoiceStatusSelection, setInvoiceStatusSelection] = useState<Invoice['status']>('pending');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('credit');
   const [paymentReference, setPaymentReference] = useState('');
   const [amountReceived, setAmountReceived] = useState('');
   const [printAfterPayment, setPrintAfterPayment] = useState(true);
@@ -210,7 +212,7 @@ const InvoicesPage: React.FC = () => {
 
   const resetPaymentState = () => {
     setInvoiceStatusSelection('pending');
-    setPaymentMethod('cash');
+    setPaymentMethod('credit');
     setPaymentReference('');
     setAmountReceived('');
     setPrintAfterPayment(true);
@@ -699,7 +701,7 @@ const InvoicesPage: React.FC = () => {
     }, 250);
   };
 
-  const canCreateInvoices = Boolean(user);
+  const canCreateInvoices = user?.role === 'admin';
   const canPayInvoices = Boolean(user);
   const canEditInvoices = user?.role === 'admin' || user?.role === 'caja';
   const isDeletedView = isAdmin && invoiceViewMode === 'deleted';
@@ -772,10 +774,12 @@ const InvoicesPage: React.FC = () => {
           </div>
         </div>
         <div className='col-12 col-md-4'>
-          <div className='stat-card'>
-            <div className='metric-label'>Monto total</div>
-            <div className='metric-value'>{formatCurrency(totalBilled)}</div>
-          </div>
+          {hasPermission('ver_totales') && (
+            <div className='stat-card'>
+              <div className='metric-label'>Monto total</div>
+              <div className='metric-value'>{formatCurrency(totalBilled)}</div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -819,7 +823,7 @@ const InvoicesPage: React.FC = () => {
                     <span className={`badge ${getInvoiceStatusClass(invoice.status)}`}>{getInvoiceStatusLabel(invoice.status)}</span>
                   </div>
 
-                  <div className='invoice-mobile-card__amount'>{formatCurrency(invoice.total)}</div>
+                  {hasPermission('ver_totales') && <div className='invoice-mobile-card__amount'>{formatCurrency(invoice.total)}</div>}
 
                   <div className='invoice-mobile-meta'>
                     <div className='invoice-mobile-meta__item'>
@@ -1161,7 +1165,7 @@ const InvoicesPage: React.FC = () => {
                 <p className='mb-3'>Selecciona cómo deseas registrar el pago de esta factura.</p>
                 <div className='mb-3'>
                   <label className='form-label'>Método de pago</label>
-                  <select className='form-select' value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as PaymentMethod)}>
+                  <select className='form-select' defaultValue='credit' value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as PaymentMethod)}>
                     {PAYMENT_OPTIONS.map(option => (
                       <option key={option.value} value={option.value}>
                         {option.label}

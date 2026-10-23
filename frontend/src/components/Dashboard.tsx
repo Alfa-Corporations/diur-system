@@ -32,14 +32,14 @@ const Dashboard: React.FC = () => {
 
   const menuItems = [
     { label: 'Productos', path: '/products', icon: '📦', helper: 'Inventario y stock', permission: 'gestionar_productos' },
-    { label: 'Compras', path: '/orders/purchase', icon: '📥', helper: 'Gestión de compras', permission: 'crear_orden' },
     { label: 'Venta al Mayor', path: '/orders/sale', icon: '📤', helper: 'Gestión de ventas', permission: 'crear_orden' },
-    { label: 'Ventas en el Local', path: '/sales', icon: '🛒', helper: 'Venta en local', permission: 'crear_orden' },
+    { label: 'Clientes', path: '/customer', icon: '👥', helper: 'Administración de clientes', permission: 'crud_users' },
+    { label: 'Usuarios', path: '/users', icon: '👥', helper: 'Administración de accesos', permission: 'crud_users' },
     { label: 'Dashboard Pedidos', path: '/orders/dashboard', icon: '📊', helper: 'Vista global de pedidos', permission: 'crear_orden' },
     { label: 'Facturas', path: '/invoices', icon: '🧾', helper: 'Ventas y cobros', permission: 'crear_factura' },
     { label: 'Cuentas por Cobrar', path: '/accounts-receivable', icon: '💳', helper: 'Gestionar saldos pendientes', permission: 'crear_factura' },
-    { label: 'Usuarios', path: '/users', icon: '👥', helper: 'Administración de accesos', permission: 'crud_users' },
-    { label: 'Clientes', path: '/customer', icon: '👥', helper: 'Administración de clientes', permission: 'crud_users' }
+    /* { label: 'Compras', path: '/orders/purchase', icon: '📥', helper: 'Gestión de compras', permission: 'crear_orden' },
+    { label: 'Ventas en el Local', path: '/sales', icon: '🛒', helper: 'Venta en local', permission: 'crear_orden' }, */
   ];
 
   const availableMenuItems = menuItems.filter(item => !item.permission || hasPermission(item.permission) || user.role === 'admin');

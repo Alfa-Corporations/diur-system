@@ -158,6 +158,7 @@ const CustomerManager: React.FC = () => {
             <Form.Control value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} />
           </Form.Group>
 
+          {/*
           <Form.Check
             type='checkbox'
             label='Consumidor Final'
@@ -172,6 +173,7 @@ const CustomerManager: React.FC = () => {
             }
             className='mb-3'
           />
+          */}
 
           {!formData.isFinalConsumer && (
             <>
@@ -188,7 +190,7 @@ const CustomerManager: React.FC = () => {
                 >
                   <option value='cedula'>Cédula</option>
                   <option value='ruc'>RUC</option>
-                  <option value='passport'>Pasaporte</option>
+                  {/*<option value='passport'>Pasaporte</option>*/}
                 </Form.Select>
               </Form.Group>
 
@@ -200,7 +202,8 @@ const CustomerManager: React.FC = () => {
                   onChange={e =>
                     setFormData({
                       ...formData,
-                      identificationNumber: e.target.value
+                      identificationNumber: e.target.value,
+                      identificationType: (e.target.value).length > 10 ? 'ruc' : 'cedula'
                     })
                   }
                 />

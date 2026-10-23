@@ -380,11 +380,6 @@ const WholesaleSalesPage: React.FC = () => {
     <div className='container mt-4'>
       <div className='d-flex justify-content-between align-items-center mb-4'>
         <h2>Venta al Mayor</h2>
-        <div>
-          <Button variant='outline-secondary' className='me-2' onClick={() => window.history.back()}>
-            ← Volver
-          </Button>
-        </div>
       </div>
 
       {!isOnline && <Alert variant='warning'>Modo offline - Los cambios se sincronizarán cuando se restablezca la conexión</Alert>}
