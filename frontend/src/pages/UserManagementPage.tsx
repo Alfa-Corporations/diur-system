@@ -92,7 +92,7 @@ const UserManagementPage: React.FC = () => {
         const created = await apiService.createUser({
           username: formState.username,
           email: formState.email,
-          password: `${formState.username}123`,
+          password: `${formState.username.toLowerCase()}123`,
           role: formState.role
         });
         setUsers(prev => [created, ...prev]);

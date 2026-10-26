@@ -31,13 +31,13 @@ const Dashboard: React.FC = () => {
   if (!user) return null;
 
   const menuItems = [
-    { label: 'Productos', path: '/products', icon: '📦', helper: 'Inventario y stock', permission: 'gestionar_productos' },
-    { label: 'Venta al Mayor', path: '/orders/sale', icon: '📤', helper: 'Gestión de ventas', permission: 'crear_orden' },
-    { label: 'Clientes', path: '/customer', icon: '👥', helper: 'Administración de clientes', permission: 'crud_users' },
-    { label: 'Usuarios', path: '/users', icon: '👥', helper: 'Administración de accesos', permission: 'crud_users' },
-    { label: 'Dashboard Pedidos', path: '/orders/dashboard', icon: '📊', helper: 'Vista global de pedidos', permission: 'crear_orden' },
+    { label: 'Pedidos', path: '/orders/sale', icon: '📤', helper: 'Gestión de ventas', permission: 'crear_orden' },
     { label: 'Facturas', path: '/invoices', icon: '🧾', helper: 'Ventas y cobros', permission: 'crear_factura' },
+    { label: 'Clientes', path: '/customer', icon: '👥', helper: 'Administración de clientes', permission: 'crud_users' },
+    { label: 'Dashboard Pedidos', path: '/orders/dashboard', icon: '📊', helper: 'Vista global de pedidos', permission: 'crear_orden' },
     { label: 'Cuentas por Cobrar', path: '/accounts-receivable', icon: '💳', helper: 'Gestionar saldos pendientes', permission: 'crear_factura' },
+    { label: 'Productos', path: '/products', icon: '📦', helper: 'Inventario y stock', permission: 'gestionar_productos' },
+    { label: 'Usuarios', path: '/users', icon: '👥', helper: 'Administración de accesos', permission: 'crud_users' }
     /* { label: 'Compras', path: '/orders/purchase', icon: '📥', helper: 'Gestión de compras', permission: 'crear_orden' },
     { label: 'Ventas en el Local', path: '/sales', icon: '🛒', helper: 'Venta en local', permission: 'crear_orden' }, */
   ];
@@ -65,20 +65,20 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className='app-shell'>
-      <header className='app-topbar'>
-        <div className='container-fluid py-4'>
-          <div className='d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3'>
-            <div>
-              <span className='eyebrow mb-2'>Sistema DIUR</span>
-              <h2 className='mb-1'>Panel principal</h2>
-              <p className='mb-0'>Una vista clara para operar desde móvil, tablet o escritorio.</p>
-            </div>
+      <header className=''>
+        <div className='container-fluid pb-1'>
+          <div className='d-flex justify-content-between align-center'>
+            <span className='eyebrow mb-2'>Sistema DIUR</span>
+            <button className='btn-exit' onClick={handleLogout}>
+              <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#1d4ed8'>
+                <path d='M200-120q-33 0-56.5-23.5T120-200v-120q0-17 11.5-28.5T160-360q17 0 28.5 11.5T200-320v120h560v-560H200v120q0 17-11.5 28.5T160-600q-17 0-28.5-11.5T120-640v-120q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm266-320H160q-17 0-28.5-11.5T120-480q0-17 11.5-28.5T160-520h306l-74-74q-12-12-11.5-28t11.5-28q12-12 28.5-12.5T449-651l143 143q6 6 8.5 13t2.5 15q0 8-2.5 15t-8.5 13L449-309q-12 12-28.5 11.5T392-310q-11-12-11.5-28t11.5-28l74-74Z' />
+              </svg>
+            </button>
+          </div>
+          <div className='d-flex flex-lg-row justify-content-between align-items-lg-center gap-3'>
             <div className='d-flex flex-wrap align-items-center gap-2'>
               <span className='user-chip'>👋 {user.username}</span>
               <span className='role-chip'>{user.role.toUpperCase()}</span>
-              <button className='btn btn-outline-primary btn-sm' onClick={handleLogout}>
-                Cerrar sesión
-              </button>
             </div>
           </div>
         </div>

@@ -14,6 +14,14 @@
   padding: 1rem;
 }
 
+.btn-exit {
+  border: transparent;
+  background: transparent;
+  position: relative;
+  top: 1rem;
+  right: 1rem;
+}
+
 #alert {
   position: 'absolute';
   top: '2.5rem';
@@ -26,7 +34,7 @@
   width: 100% !important;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: .5rem;
+  gap: 0.5rem;
 }
 
 .item {
