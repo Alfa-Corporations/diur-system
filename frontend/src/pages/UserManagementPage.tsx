@@ -5,7 +5,7 @@ import apiService from '../services/apiService';
 import type { User, Permission } from '../../../shared/types';
 
 const UserManagementPage: React.FC = () => {
-  const navigate = useNavigate();
+  //const navigate = useNavigate();
   const { user } = useAppSelector(state => state.auth);
   const { isOnline } = useAppSelector(state => state.sync);
 
