@@ -33,6 +33,7 @@ const WholesaleSalesPage: React.FC = () => {
   const [isOnline] = useState(navigator.onLine);
   const [filters, setFilters] = useState({ search: '' });
   const [showScanner, setShowScanner] = useState(false);
+  const [invoiceNumber, setInvoiceNumber] = useState(0);
 
   const ordersRef = useRef(orders);
   useEffect(() => {
@@ -324,6 +325,7 @@ const WholesaleSalesPage: React.FC = () => {
         identificationNumber: selectedOrder.customer.identificationNumber,
         address: selectedOrder.customer.address
       },
+      invoiceNumberExternal: invoiceNumber,
       items: invoiceItems
     };
 
@@ -616,7 +618,7 @@ const WholesaleSalesPage: React.FC = () => {
           </Button>
 
           <Button variant='primary' onClick={handleCreateOrder} disabled={orderItems.length === 0 || !selectedCustomerId}>
-            Crear Venta
+            Crear Pedido
           </Button>
         </Modal.Footer>
       </Modal>
@@ -653,6 +655,7 @@ const WholesaleSalesPage: React.FC = () => {
                 <div className='mt-2 text-muted' style={{ fontSize: '0.85rem' }}>
                   {new Date(selectedOrder.createdAt).toLocaleString()}
                 </div>
+                <Form.Control type='number' required placeholder='REFERENCIA' className='mt-2' onChange={e => setInvoiceNumber(Number(e.target.value))}></Form.Control>
               </div>
 
               {/* 🛒 PRODUCTOS */}

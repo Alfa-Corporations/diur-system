@@ -767,7 +767,7 @@ const ProductsPage: React.FC = () => {
                     <div className='row mb-3'>
                       <div className='col-md-8'>
                         <label className='form-label fw-bold'>Nombre *</label>
-                        <input className='form-control' placeholder='Nombre del producto' value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
+                        <input className='form-control' placeholder='Nombre del producto' value={formData.name} onChange={e => setFormData({ ...formData, name: (e.target.value).toUpperCase() })} required />
                       </div>
                     </div>
 

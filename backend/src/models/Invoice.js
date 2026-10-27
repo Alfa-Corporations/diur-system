@@ -13,6 +13,11 @@ const Invoice = db.define('Invoice', {
     autoIncrement: true,
     allowNull: false,
   },
+  invoiceNumberExternal: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
+  },
   invoiceNumber: {
     type: DataTypes.STRING,
     allowNull: false,

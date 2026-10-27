@@ -218,7 +218,7 @@ const CustomerManager: React.FC = () => {
 
           <Form.Group className='mb-2'>
             <Form.Label>Correo</Form.Label>
-            <Form.Control type='email' value={formData.email || ''} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+            <Form.Control type='email' value={formData.email || ''} onChange={e => setFormData({ ...formData, email: (e.target.value).toLowerCase() })} />
           </Form.Group>
 
           <Form.Group className='mb-2'>

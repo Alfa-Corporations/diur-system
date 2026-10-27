@@ -77,35 +77,6 @@ const Login: React.FC = () => {
     <div className='login-shell'>
       <div className='container py-4'>
         <div className='row align-items-center justify-content-center g-4'>
-          <div className='col-12 col-lg-5'>
-            <div className='login-hero'>
-              <span className='eyebrow mb-3'>DIUR SYSTEM</span>
-              <h1 className='mb-3'>Ventas, inventario y facturación en una sola vista</h1>
-              <p className='mb-4'>Una experiencia moderna, clara y optimizada para trabajar cómodamente desde el móvil o desde escritorio.</p>
-
-              <div className='login-feature'>
-                <span className='feature-icon'>📦</span>
-                <div>
-                  <strong>Control de inventario</strong>
-                  <p className='mb-0'>Consulta stock, productos y movimientos en tiempo real.</p>
-                </div>
-              </div>
-              <div className='login-feature'>
-                <span className='feature-icon'>🧾</span>
-                <div>
-                  <strong>Facturación rápida</strong>
-                  <p className='mb-0'>Gestiona ventas y documentos con un flujo simple e intuitivo.</p>
-                </div>
-              </div>
-              <div className='login-feature'>
-                <span className='feature-icon'>📱</span>
-                <div>
-                  <strong>Diseño responsive</strong>
-                  <p className='mb-0'>Trabaja sin fricción desde tablets, móviles y computadoras.</p>
-                </div>
-              </div>
-            </div>
-          </div>
           <div className='col-12 col-md-8 col-lg-5'>
             <div className='login-card card border-0'>
               <div className='card-body'>
@@ -153,6 +124,35 @@ const Login: React.FC = () => {
               </div>
             </div>
           </div>
+          {/* <div className='col-12 col-lg-5'>
+            <div className='login-hero'>
+              <span className='eyebrow mb-3'>DIUR SYSTEM</span>
+              <h1 className='mb-3'>Ventas, inventario y facturación en una sola vista</h1>
+              <p className='mb-4'>Una experiencia moderna, clara y optimizada para trabajar cómodamente desde el móvil o desde escritorio.</p>
+
+              <div className='login-feature'>
+                <span className='feature-icon'>📦</span>
+                <div>
+                  <strong>Control de inventario</strong>
+                  <p className='mb-0'>Consulta stock, productos y movimientos en tiempo real.</p>
+                </div>
+              </div>
+              <div className='login-feature'>
+                <span className='feature-icon'>🧾</span>
+                <div>
+                  <strong>Facturación rápida</strong>
+                  <p className='mb-0'>Gestiona ventas y documentos con un flujo simple e intuitivo.</p>
+                </div>
+              </div>
+              <div className='login-feature'>
+                <span className='feature-icon'>📱</span>
+                <div>
+                  <strong>Diseño responsive</strong>
+                  <p className='mb-0'>Trabaja sin fricción desde tablets, móviles y computadoras.</p>
+                </div>
+              </div>
+            </div>
+          </div> */}
         </div>
       </div>
     </div>
