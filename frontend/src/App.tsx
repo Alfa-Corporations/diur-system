@@ -26,6 +26,7 @@ import SalesOrdersPage from './pages/SalesOrdersPage';
 import LocalSalesOrdersPage from './pages/LocalSalesOrdersPage';
 import FileImporter from './components/FileImporter';
 import CustomerManager from './pages/CustomerManager';
+import HistoryClient from './pages/HistoryClient';
 import Sales from './pages/Sales';
 import BackButton from './components/BackButton';
 import { useLocation } from 'react-router-dom';
@@ -158,6 +159,7 @@ const AppContent: React.FC = () => {
           <Route path='/accounts-receivable' element={isAuthenticated ? <AccountsReceivablePage /> : <Navigate to='/login' />} />
           <Route path='/users' element={isAuthenticated ? <UserManagementPage /> : <Navigate to='/login' />} />
           <Route path='/customer' element={isAuthenticated ? <CustomerManager /> : <Navigate to='/login' />} />
+          <Route path='/customer/history/:customerId' element={isAuthenticated ? <HistoryClient /> : <Navigate to='/login' />} />
           <Route path='/orders/dashboard' element={isAuthenticated ? <OrdersDashboardPage /> : <Navigate to='/login' />} />
           <Route path='/orders/purchase' element={isAuthenticated ? <PurchaseOrdersPage /> : <Navigate to='/login' />} />
           <Route path='/orders/sale' element={isAuthenticated ? <SalesOrdersPage /> : <Navigate to='/login' />} />

@@ -72,6 +72,7 @@ export type InvoiceDocumentType = 'consumer_final' | 'sales_note' | 'sri_invoice
 export interface Invoice {
   id: number;
   invoiceNumber: string;
+  invoiceNumberExternal: string;
   userId: number;
   customerId?: number | null;
   total: number;

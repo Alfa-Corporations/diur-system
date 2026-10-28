@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Modal, Form, Alert } from 'react-bootstrap';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import type { RootState } from '../redux/store';
@@ -8,6 +9,7 @@ import apiService from '../services/apiService';
 import type { Customer } from '../interfaces/types';
 
 const CustomerManager: React.FC = () => {
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { customers } = useAppSelector((state: RootState) => state.customers);
 
@@ -131,13 +133,23 @@ const CustomerManager: React.FC = () => {
                 </p>
 
                 <div className='mt-auto d-flex justify-content-between'>
-                  <Button size='sm' variant='warning' onClick={() => handleEdit(c)}>
-                    Editar
-                  </Button>
+                  <button className='btn' onClick={() => handleEdit(c)}>
+                    <svg xmlns='http://www.w3.org/2000/svg' height='24px' viewBox='0 -960 960 960' width='24px' fill='#3b760e'>
+                      <path d='M200-200h57l391-391-57-57-391 391v57Zm-40 80q-17 0-28.5-11.5T120-160v-97q0-16 6-30.5t17-25.5l505-504q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L313-143q-11 11-25.5 17t-30.5 6h-97Zm600-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z' />
+                    </svg>
+                  </button>
 
-                  <Button size='sm' variant='danger' onClick={() => handleDelete(c.id)}>
-                    Eliminar
-                  </Button>
+                  <button className='btn' type='button' title='Ver historial de pedidos y facturas' aria-label={`Ver historial de ${c.name}`} onClick={() => navigate(`/customer/history/${c.id}`)}>
+                    <svg xmlns='http://www.w3.org/2000/svg' height='24px' viewBox='0 -960 960 960' width='24px' fill='#99970e'>
+                      <path d='M240-80q-50 0-85-35t-35-85v-80q0-17 11.5-28.5T160-320h80v-536q0-7 6-9.5t11 2.5l29 29q6 6 14 6t14-6l32-32q6-6 14-6t14 6l32 32q6 6 14 6t14-6l32-32q6-6 14-6t14 6l32 32q6 6 14 6t14-6l32-32q6-6 14-6t14 6l32 32q6 6 14 6t14-6l32-32q6-6 14-6t14 6l32 32q6 6 14 6t14-6l29-29q5-5 11-2.5t6 9.5v656q0 50-35 85t-85 35H240Zm480-80q17 0 28.5-11.5T760-200v-560H320v440h320q17 0 28.5 11.5T680-280v80q0 17 11.5 28.5T720-160ZM400-680h160q17 0 28.5 11.5T600-640q0 17-11.5 28.5T560-600H400q-17 0-28.5-11.5T360-640q0-17 11.5-28.5T400-680Zm0 120h160q17 0 28.5 11.5T600-520q0 17-11.5 28.5T560-480H400q-17 0-28.5-11.5T360-520q0-17 11.5-28.5T400-560Zm280-40q-17 0-28.5-11.5T640-640q0-17 11.5-28.5T680-680q17 0 28.5 11.5T720-640q0 17-11.5 28.5T680-600Zm0 120q-17 0-28.5-11.5T640-520q0-17 11.5-28.5T680-560q17 0 28.5 11.5T720-520q0 17-11.5 28.5T680-480ZM240-160h360v-80H200v40q0 17 11.5 28.5T240-160Zm-40 0v-80 80Z' />
+                    </svg>
+                  </button>
+
+                  <button className='btn' onClick={() => handleDelete(c.id)}>
+                    <svg xmlns='http://www.w3.org/2000/svg' height='24px' viewBox='0 -960 960 960' width='24px' fill='#5D0E07'>
+                      <path d='M280-120q-33 0-56.5-23.5T200-200v-520q-17 0-28.5-11.5T160-760q0-17 11.5-28.5T200-800h160q0-17 11.5-28.5T400-840h160q17 0 28.5 11.5T600-800h160q17 0 28.5 11.5T800-760q0 17-11.5 28.5T760-720v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM428.5-291.5Q440-303 440-320v-280q0-17-11.5-28.5T400-640q-17 0-28.5 11.5T360-600v280q0 17 11.5 28.5T400-280q17 0 28.5-11.5Zm160 0Q600-303 600-320v-280q0-17-11.5-28.5T560-640q-17 0-28.5 11.5T520-600v280q0 17 11.5 28.5T560-280q17 0 28.5-11.5ZM280-720v520-520Z' />
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>
@@ -203,7 +215,7 @@ const CustomerManager: React.FC = () => {
                     setFormData({
                       ...formData,
                       identificationNumber: e.target.value,
-                      identificationType: (e.target.value).length > 10 ? 'ruc' : 'cedula'
+                      identificationType: e.target.value.length > 10 ? 'ruc' : 'cedula'
                     })
                   }
                 />
@@ -218,7 +230,7 @@ const CustomerManager: React.FC = () => {
 
           <Form.Group className='mb-2'>
             <Form.Label>Correo</Form.Label>
-            <Form.Control type='email' value={formData.email || ''} onChange={e => setFormData({ ...formData, email: (e.target.value).toLowerCase() })} />
+            <Form.Control type='email' value={formData.email || ''} onChange={e => setFormData({ ...formData, email: e.target.value.toLowerCase() })} />
           </Form.Group>
 
           <Form.Group className='mb-2'>

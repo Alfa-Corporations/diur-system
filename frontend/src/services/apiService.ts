@@ -156,7 +156,7 @@ class ApiService {
   }
 
   // Métodos de facturas
-  async getInvoices(params?: { limit?: number; offset?: number; status?: string }): Promise<{ invoices: Invoice[]; totalCount: number }> {
+  async getInvoices(params?: { limit?: number; offset?: number; status?: string; customerId?: number }): Promise<{ invoices: Invoice[]; totalCount: number }> {
     const response = await this.api.get('/invoices', { params });
     return {
       invoices: response.data.invoices,
@@ -231,7 +231,7 @@ class ApiService {
   }
 
   // Métodos de pedidos
-  async getOrders(params?: { status?: string; type?: string }): Promise<{ orders: Order[]; totalCount: number }> {
+  async getOrders(params?: { status?: string; type?: string; customerId?: number }): Promise<{ orders: Order[]; totalCount: number }> {
     const response = await this.api.get('/orders', { params });
     return {
       orders: response.data.orders,

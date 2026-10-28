@@ -164,9 +164,17 @@ class InvoiceController {
    */
   async getInvoices(req, res) {
     try {
-      const { status, userId, limit = 10, offset = 0 } = req.query;
+      const { status, userId, customerId, limit = 10, offset = 0 } = req.query;
       const filters = {};
       const requestedStatus = typeof status === 'string' ? status : undefined;
+
+      if (customerId !== undefined) {
+        const parsedCustomerId = Number(customerId);
+        if (!Number.isInteger(parsedCustomerId) || parsedCustomerId <= 0) {
+          return res.status(400).json({ message: 'customerId must be a positive integer' });
+        }
+        filters.customerId = parsedCustomerId;
+      }
 
       // Si no es admin, filtrar solo por sus propias facturas
       if (req.user.role !== 'admin') {

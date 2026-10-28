@@ -739,7 +739,7 @@ const InvoicesPage: React.FC = () => {
         </div>
         <div className='page-actions'>
           <button className='btn btn-goback' onClick={() => navigate(-1)}>
-            <svg xmlns='http://www.w3.org/2000/svg' height='24px' viewBox='0 -960 960 960' width='24px' fill='#000000'>
+            <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#000000'>
               <path d='m142-480 294 294q15 15 14.5 35T435-116q-15 15-35 15t-35-15L57-423q-12-12-18-27t-6-30q0-15 6-30t18-27l308-308q15-15 35.5-14.5T436-844q15 15 15 35t-15 35L142-480Z' />
             </svg>
           </button>
@@ -818,6 +818,7 @@ const InvoicesPage: React.FC = () => {
                   <div className='invoice-mobile-card__header'>
                     <div>
                       <div className='invoice-mobile-card__number'>{invoice.invoiceNumber || `#${invoice.id}`}</div>
+                      <div className='invoice-mobile-card__number'>N° {invoice.invoiceNumberExternal || `#${invoice.id}`}</div>
                       <small className='text-muted'>{new Date(invoice.createdAt).toLocaleString()}</small>
                     </div>
                     <span className={`badge ${getInvoiceStatusClass(invoice.status)}`}>{getInvoiceStatusLabel(invoice.status)}</span>
@@ -851,25 +852,39 @@ const InvoicesPage: React.FC = () => {
                   {canPayInvoices && (
                     <div className='invoice-action-grid'>
                       {invoice.status === 'pending' && (
-                        <button className='btn btn-sm btn-outline-success' onClick={() => openPaymentModal(invoice)}>
-                          💳 Pagar
+                        <button className='btn btn-sm' onClick={() => openPaymentModal(invoice)}>
+                          <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#1f1f1f'>
+                            <path d='M880-720v480q0 33-23.5 56.5T800-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720Zm-720 80h640v-80H160v80Zm0 160v240h640v-240H160Zm0 240v-480 480Z' />
+                          </svg>
                         </button>
                       )}
-                      <button className='btn btn-sm btn-outline-secondary' onClick={() => handlePrintInvoice(invoice)}>
-                        🖨️ Imprimir
+                      <button className='btn btn-sm' onClick={() => handlePrintInvoice(invoice)}>
+                        <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#1f1f1f'>
+                          <path d='M320-120q-33 0-56.5-23.5T240-200v-80h-80q-33 0-56.5-23.5T80-360v-160q0-51 35-85.5t85-34.5h560q51 0 85.5 34.5T880-520v160q0 33-23.5 56.5T800-280h-80v80q0 33-23.5 56.5T640-120H320ZM160-360h80q0-33 23.5-56.5T320-440h320q33 0 56.5 23.5T720-360h80v-160q0-17-11.5-28.5T760-560H200q-17 0-28.5 11.5T160-520v160Zm480-280v-120H320v120h-80v-120q0-33 23.5-56.5T320-840h320q33 0 56.5 23.5T720-760v120h-80Zm80 180q17 0 28.5-11.5T760-500q0-17-11.5-28.5T720-540q-17 0-28.5 11.5T680-500q0 17 11.5 28.5T720-460Zm-80 260v-160H320v160h320ZM160-560h640-640Z' />
+                        </svg>
                       </button>
                       {invoice.status !== 'cancelled' && (
-                        <button className='btn btn-sm btn-outline-dark' onClick={() => void handleSendInvoiceEmail(invoice)} disabled={sendingEmailId === invoice.id}>
-                          {sendingEmailId === invoice.id ? 'Enviando...' : '✉️ Correo'}
+                        <button className='btn btn-sm' onClick={() => void handleSendInvoiceEmail(invoice)} disabled={sendingEmailId === invoice.id}>
+                          {sendingEmailId === invoice.id ? (
+                            'Enviando...'
+                          ) : (
+                            <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#1f1f1f'>
+                              <path d='M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160Zm640-480L501-453q-5 3-10.5 4.5T480-447q-5 0-10.5-1.5T459-453L160-640v400h640v-400ZM480-520l320-200H160l320 200ZM160-640v10-59 1-32 32-.5 58.5-10 400-400Z' />
+                            </svg>
+                          )}
                         </button>
                       )}
                       {canEditInvoices && invoice.status !== 'cancelled' && (
                         <>
-                          <button disabled={invoice.status === 'paid'} className='btn btn-sm btn-outline-primary' onClick={() => handleEdit(invoice)}>
-                            ✏️ Editar
+                          <button disabled={invoice.status === 'paid'} className='btn btn-sm' onClick={() => handleEdit(invoice)}>
+                            <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#314D1C'>
+                              <path d='M200-200h57l391-391-57-57-391 391v57Zm-40 80q-17 0-28.5-11.5T120-160v-97q0-16 6-30.5t17-25.5l505-504q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L313-143q-11 11-25.5 17t-30.5 6h-97Zm600-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z' />
+                            </svg>
                           </button>
-                          <button className='btn btn-sm btn-outline-danger' onClick={() => handleDelete(invoice)}>
-                            🗑️ Eliminar
+                          <button className='btn btn-sm' onClick={() => handleDelete(invoice)}>
+                            <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#5D0E07'>
+                              <path d='M280-120q-33 0-56.5-23.5T200-200v-520q-17 0-28.5-11.5T160-760q0-17 11.5-28.5T200-800h160q0-17 11.5-28.5T400-840h160q17 0 28.5 11.5T600-800h160q17 0 28.5 11.5T800-760q0 17-11.5 28.5T760-720v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM428.5-291.5Q440-303 440-320v-280q0-17-11.5-28.5T400-640q-17 0-28.5 11.5T360-600v280q0 17 11.5 28.5T400-280q17 0 28.5-11.5Zm160 0Q600-303 600-320v-280q0-17-11.5-28.5T560-640q-17 0-28.5 11.5T520-600v280q0 17 11.5 28.5T560-280q17 0 28.5-11.5ZM280-720v520-520Z' />
+                            </svg>
                           </button>
                         </>
                       )}
@@ -914,24 +929,26 @@ const InvoicesPage: React.FC = () => {
                         <td>
                           <div className='d-flex flex-wrap gap-2'>
                             {invoice.status === 'pending' && (
-                              <button className='btn btn-sm btn-outline-success' onClick={() => openPaymentModal(invoice)}>
+                              <button className='btn btn-sm' onClick={() => openPaymentModal(invoice)}>
                                 💳 Pagar
                               </button>
                             )}
-                            <button className='btn btn-sm btn-outline-secondary' onClick={() => handlePrintInvoice(invoice)}>
+                            <button className='btn btn-sm' onClick={() => handlePrintInvoice(invoice)}>
                               🖨️ Imprimir
                             </button>
                             {invoice.status !== 'cancelled' && (
-                              <button className='btn btn-sm btn-outline-dark' onClick={() => void handleSendInvoiceEmail(invoice)} disabled={sendingEmailId === invoice.id}>
+                              <button className='btn btn-sm' onClick={() => void handleSendInvoiceEmail(invoice)} disabled={sendingEmailId === invoice.id}>
                                 {sendingEmailId === invoice.id ? 'Enviando...' : '✉️ Correo'}
                               </button>
                             )}
                             {canEditInvoices && invoice.status !== 'cancelled' && (
                               <>
-                                <button className='btn btn-sm btn-outline-primary' onClick={() => handleEdit(invoice)}>
-                                  ✏️ Editar
+                                <button className='btn btn-sm' onClick={() => handleEdit(invoice)}>
+                                  <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#314D1C'>
+                                    <path d='M200-200h57l391-391-57-57-391 391v57Zm-40 80q-17 0-28.5-11.5T120-160v-97q0-16 6-30.5t17-25.5l505-504q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L313-143q-11 11-25.5 17t-30.5 6h-97Zm600-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z' />
+                                  </svg>
                                 </button>
-                                <button className='btn btn-sm btn-outline-danger' onClick={() => handleDelete(invoice)}>
+                                <button className='btn btn-sm' onClick={() => handleDelete(invoice)}>
                                   🗑️ Eliminar
                                 </button>
                               </>

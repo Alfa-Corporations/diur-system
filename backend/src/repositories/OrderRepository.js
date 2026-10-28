@@ -47,6 +47,7 @@ class OrderRepository {
     if (filters.type) where.type = filters.type;
     if (filters.status) where.status = filters.status;
     if (filters.userId) where.userId = filters.userId;
+    if (filters.customerId) where.customerId = filters.customerId;
 
     return await Order.findAll({
       where,

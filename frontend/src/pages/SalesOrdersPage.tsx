@@ -275,7 +275,7 @@ const WholesaleSalesPage: React.FC = () => {
     setInvoiceLoading(true);
     try {
       const invoice = await apiService.createInvoice(invoicePayload as any);
-      alert(`Factura creada: ${invoice.invoiceNumber || invoice.id}`);
+      alert(`Factura creada: ${invoice.invoiceNumber || invoice.id}\n N° Externo: 001-011-${String(invoiceNumber).padStart(10, '0')}`);
 
       const refreshedOrders = await loadOrders();
       const updated = refreshedOrders.find(order => order.id === orderId) || null;
@@ -290,6 +290,7 @@ const WholesaleSalesPage: React.FC = () => {
 
   const handleBulkInvoice = async (orderId: number) => {
     if (!selectedOrder) return;
+    if (invoiceNumber === 0) return;
 
     const itemsToInvoice =
       selectedOrder.items?.filter(item => {
@@ -325,7 +326,7 @@ const WholesaleSalesPage: React.FC = () => {
         identificationNumber: selectedOrder.customer.identificationNumber,
         address: selectedOrder.customer.address
       },
-      invoiceNumberExternal: invoiceNumber,
+      invoiceNumberExternal: `001-011-${String(invoiceNumber).padStart(10, '0')}`,
       items: invoiceItems
     };
 

@@ -58,11 +58,18 @@ class OrderController {
    */
   async getOrders(req, res) {
     try {
-      const { type, status, userId } = req.query;
+      const { type, status, userId, customerId } = req.query;
       const filters = {};
       if (type) filters.type = type;
       if (status) filters.status = status;
       if (userId) filters.userId = parseInt(userId);
+      if (customerId !== undefined) {
+        const parsedCustomerId = Number(customerId);
+        if (!Number.isInteger(parsedCustomerId) || parsedCustomerId <= 0) {
+          return res.status(400).json({ message: 'customerId must be a positive integer' });
+        }
+        filters.customerId = parsedCustomerId;
+      }
 
       const orders = await OrderService.getOrders(filters);
       res.json({ orders });
