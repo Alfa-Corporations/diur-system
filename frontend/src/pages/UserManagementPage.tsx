@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
 //import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../hooks/redux';
+import { usePermissions } from '../hooks/permissions';
 import apiService from '../services/apiService';
 import type { User, Permission } from '../../../shared/types';
+import { groupPermissions, permissionLabels, roleLabels, rolePermissionReferences } from '../utils/permissionCatalog';
 
 const UserManagementPage: React.FC = () => {
   //const navigate = useNavigate();
   const { user } = useAppSelector(state => state.auth);
   const { isOnline } = useAppSelector(state => state.sync);
+  const { hasPermission } = usePermissions();
 
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
@@ -21,9 +24,14 @@ const UserManagementPage: React.FC = () => {
   const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>([]);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [permissionLoading, setPermissionLoading] = useState(false);
+  const [permissionSearch, setPermissionSearch] = useState('');
+  const [referenceRole, setReferenceRole] = useState<User['role']>('vendedor');
 
-  const currentUserRole = user?.role;
-  const isAdmin = currentUserRole === 'admin';
+  const isAdmin = user?.role === 'admin';
+  const canCreateUsers = isAdmin || hasPermission('crear_usuario') || hasPermission('gestionar_usuarios') || hasPermission('crud_users');
+  const canUpdateUsers = isAdmin || hasPermission('actualizar_usuario') || hasPermission('gestionar_usuarios') || hasPermission('crud_users');
+  const canDeleteUsers = isAdmin || hasPermission('eliminar_usuario') || hasPermission('gestionar_usuarios') || hasPermission('crud_users');
+  const canManagePermissions = isAdmin || hasPermission('gestionar_permisos');
 
   const loadUsers = async () => {
     setLoading(true);
@@ -50,16 +58,18 @@ const UserManagementPage: React.FC = () => {
 
   useEffect(() => {
     const loadPermissions = async () => {
+      if (!canManagePermissions) return;
       try {
         const allPermissions = await apiService.getPermissions();
         setPermissions(allPermissions);
       } catch (err: unknown) {
-        console.error('Error cargando permisos:', err);
+        const message = err instanceof Error ? err.message : 'Error cargando el catálogo de permisos.';
+        setPermissionError(message);
       }
     };
 
     void loadPermissions();
-  }, []);
+  }, [canManagePermissions]);
 
   const resetForm = () => {
     setEditingUser(null);
@@ -74,8 +84,8 @@ const UserManagementPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!isAdmin) {
-      setError('Solo administradores pueden gestionar usuarios.');
+    if (editingUser ? !canUpdateUsers : !canCreateUsers) {
+      setError('No tienes permiso para realizar esta acción sobre usuarios.');
       return;
     }
 
@@ -108,8 +118,8 @@ const UserManagementPage: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (!isAdmin) {
-      setError('Solo administradores pueden eliminar usuarios.');
+    if (!canDeleteUsers) {
+      setError('No tienes permiso para eliminar usuarios.');
       return;
     }
 
@@ -125,13 +135,15 @@ const UserManagementPage: React.FC = () => {
   };
 
   const startPermissionSession = async (targetUser: User) => {
-    if (!isAdmin) {
-      setPermissionError('Solo administradores pueden gestionar permisos.');
+    if (!canManagePermissions) {
+      setPermissionError('No tienes permiso para gestionar accesos.');
       return;
     }
 
     setPermissionLoading(true);
     setPermissionError(null);
+    setPermissionSearch('');
+    setReferenceRole(targetUser.role);
     setSelectedPermissionUser(targetUser);
 
     try {
@@ -149,10 +161,23 @@ const UserManagementPage: React.FC = () => {
     setSelectedPermissionIds(prev => (prev.includes(permissionId) ? prev.filter(id => id !== permissionId) : [...prev, permissionId]));
   };
 
+  const applyRoleReference = () => {
+    const suggestedNames = new Set(rolePermissionReferences[referenceRole]);
+    setSelectedPermissionIds(permissions.filter(permission => suggestedNames.has(permission.name)).map(permission => permission.id));
+  };
+
+  const filteredPermissionGroups = groupPermissions(permissions).map(group => ({
+    ...group,
+    permissions: group.permissions.filter(permission => {
+      const search = permissionSearch.trim().toLocaleLowerCase();
+      return !search || `${permission.name} ${permission.description || ''} ${permissionLabels[permission.name] || ''}`.toLocaleLowerCase().includes(search);
+    })
+  })).filter(group => group.permissions.length > 0);
+
   const savePermissions = async () => {
     if (!selectedPermissionUser) return;
-    if (!isAdmin) {
-      setPermissionError('Solo administradores pueden guardar permisos.');
+    if (!canManagePermissions) {
+      setPermissionError('No tienes permiso para gestionar accesos.');
       return;
     }
 
@@ -185,7 +210,7 @@ const UserManagementPage: React.FC = () => {
         <div>
           <span className='eyebrow mb-2'>Usuarios</span>
           <h2 className='mb-1'>Gestión de Usuarios</h2>
-          <p className='mb-0'>Crea, edita y elimina cuentas (solo admin).</p>
+          <p className='mb-0'>Administra las cuentas y, si tienes autorización, sus permisos de acceso.</p>
         </div>
         <div className='page-actions'>
           {/*<button className='btn btn-outline-dark' onClick={() => navigate(-1)}>
@@ -196,7 +221,7 @@ const UserManagementPage: React.FC = () => {
           <button className='btn btn-outline-secondary' onClick={() => void loadUsers()}>
             Actualizar
           </button>
-          {isAdmin && (
+          {canCreateUsers && (
             <button
               className='btn btn-primary'
               onClick={() => {
@@ -250,39 +275,100 @@ const UserManagementPage: React.FC = () => {
       </div>
 
       {selectedPermissionUser && (
-        <div className='section-card mb-3'>
-          <div className='d-flex justify-content-between align-items-center mb-2'>
-            <h4>Asignar permisos a {selectedPermissionUser.username}</h4>
+        <div className='section-card permission-manager mb-3'>
+          <div className='permission-manager-header'>
+            <div>
+              <span className='eyebrow mb-2'>Accesos individuales</span>
+              <h4 className='mb-1'>Permisos de {selectedPermissionUser.username}</h4>
+              <p className='mb-0'>Rol actual: <strong>{roleLabels[selectedPermissionUser.role]}</strong>. La referencia por rol solo propone un punto de partida; cada permiso se puede cambiar de forma independiente.</p>
+            </div>
             <button className='btn btn-sm btn-outline-secondary' onClick={cancelPermissionSession}>
-              Cancelar
+              Cerrar
             </button>
           </div>
 
           {permissionError && <div className='alert alert-danger'>{permissionError}</div>}
 
           {permissionLoading ? (
-            <div>Cargando permisos del usuario...</div>
+            <div className='permission-loading'>Cargando permisos del usuario...</div>
           ) : (
-            <div className='row g-2'>
-              {permissions.map(permission => (
-                <div key={permission.id} className='col-6 col-md-4'>
-                  <div className='form-check'>
-                    <input id={`perm-${permission.id}`} type='checkbox' className='form-check-input' checked={selectedPermissionIds.includes(permission.id)} onChange={() => togglePermission(permission.id)} />
-                    <label htmlFor={`perm-${permission.id}`} className='form-check-label'>
-                      {permission.name}
-                    </label>
-                  </div>
+            <>
+              <div className='permission-reference-panel'>
+                <div>
+                  <label htmlFor='permission-reference-role' className='form-label mb-1'>Referencia de permisos por rol</label>
+                  <select id='permission-reference-role' className='form-select' value={referenceRole} onChange={event => setReferenceRole(event.target.value as User['role'])}>
+                    {Object.entries(roleLabels).map(([role, label]) => <option key={role} value={role}>{label}</option>)}
+                  </select>
                 </div>
-              ))}
-            </div>
+                <button type='button' className='btn btn-outline-primary' onClick={applyRoleReference}>
+                  Aplicar referencia
+                </button>
+                <small>Al aplicarla reemplaza la selección temporal. Puedes editarla antes de guardar.</small>
+              </div>
+
+              <div className='permission-toolbar'>
+                <div className='permission-selection-count'>{selectedPermissionIds.length} permisos seleccionados de {permissions.length}</div>
+                <div className='permission-toolbar-actions'>
+                  <input
+                    className='form-control'
+                    type='search'
+                    placeholder='Buscar permiso o módulo...'
+                    aria-label='Buscar permisos'
+                    value={permissionSearch}
+                    onChange={event => setPermissionSearch(event.target.value)}
+                  />
+                  <button type='button' className='btn btn-sm btn-outline-secondary' onClick={() => setSelectedPermissionIds(permissions.map(permission => permission.id))}>Seleccionar todos</button>
+                  <button type='button' className='btn btn-sm btn-outline-secondary' onClick={() => setSelectedPermissionIds([])}>Limpiar</button>
+                </div>
+              </div>
+
+              {filteredPermissionGroups.length === 0 ? (
+                <div className='permission-empty'>No se encontraron permisos para esta búsqueda.</div>
+              ) : (
+                <div className='permission-groups'>
+                  {filteredPermissionGroups.map(group => (
+                    <section className='permission-group' key={group.id}>
+                      <header>
+                        <h5>{group.title}</h5>
+                        <p>{group.description}</p>
+                      </header>
+                      <div className='permission-options'>
+                        {group.permissions.map(permission => {
+                          const suggestedFor = (Object.keys(rolePermissionReferences) as User['role'][]).filter(role => rolePermissionReferences[role].includes(permission.name));
+                          return (
+                            <label className={`permission-option${selectedPermissionIds.includes(permission.id) ? ' is-selected' : ''}`} key={permission.id} htmlFor={`perm-${permission.id}`}>
+                              <input
+                                id={`perm-${permission.id}`}
+                                type='checkbox'
+                                checked={selectedPermissionIds.includes(permission.id)}
+                                onChange={() => togglePermission(permission.id)}
+                              />
+                              <span className='permission-option-copy'>
+                                <strong>{permissionLabels[permission.name] || permission.name.replaceAll('_', ' ')}</strong>
+                                {permission.description && <small>{permission.description}</small>}
+                                {suggestedFor.length > 0 && (
+                                  <span className='permission-role-tags'>
+                                    Referencia: {suggestedFor.map(role => roleLabels[role]).join(', ')}
+                                  </span>
+                                )}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
-          <div className='mt-3'>
-            <button className='btn btn-success me-2' disabled={permissionLoading} onClick={savePermissions}>
+          <div className='permission-footer'>
+            <button className='btn btn-success' disabled={permissionLoading || permissions.length === 0} onClick={savePermissions}>
               Guardar permisos
             </button>
             <button className='btn btn-outline-secondary' onClick={cancelPermissionSession}>
-              Cerrar
+              Cancelar cambios
             </button>
           </div>
         </div>
@@ -321,15 +407,21 @@ const UserManagementPage: React.FC = () => {
                     <td>{u.role}</td>
                     <td>{u.isActive ? 'Activo' : 'Inactivo'}</td>
                     <td>
-                      <button className='btn btn-sm btn-outline-primary me-2' onClick={() => startPermissionSession(u)}>
-                        Permisos
-                      </button>
-                      <button className='btn btn-sm btn-outline-secondary me-2' onClick={() => handleUserClick(u)}>
-                        Editar
-                      </button>
-                      <button className='btn btn-sm btn-outline-danger' onClick={() => handleDelete(u.id)}>
-                        Eliminar
-                      </button>
+                      {canManagePermissions && (
+                        <button className='btn btn-sm btn-outline-primary me-2 mb-1' onClick={() => startPermissionSession(u)}>
+                          Permisos
+                        </button>
+                      )}
+                      {canUpdateUsers && (
+                        <button className='btn btn-sm btn-outline-secondary me-2 mb-1' onClick={() => handleUserClick(u)}>
+                          Editar
+                        </button>
+                      )}
+                      {canDeleteUsers && (
+                        <button className='btn btn-sm btn-outline-danger mb-1' onClick={() => handleDelete(u.id)}>
+                          Eliminar
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

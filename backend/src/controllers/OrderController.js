@@ -86,24 +86,29 @@ class OrderController {
     try {
       const { orderId, productId } = req.params;
       const { quantityProcessed } = req.body;
+      const parsedOrderId = Number(orderId);
+      const parsedProductId = Number(productId);
 
-      // 🚨 Validación obligatoria
+      if (!Number.isSafeInteger(parsedOrderId) || parsedOrderId <= 0 || !Number.isSafeInteger(parsedProductId) || parsedProductId <= 0) {
+        return res.status(400).json({ message: 'orderId y productId deben ser enteros positivos' });
+      }
+
       if (quantityProcessed === undefined) {
         return res.status(400).json({
           message: 'quantityProcessed es requerido'
         });
       }
 
-      if (quantityProcessed <= 0) {
+      if (!Number.isSafeInteger(quantityProcessed) || quantityProcessed <= 0) {
         return res.status(400).json({
-          message: 'quantityProcessed debe ser mayor a 0'
+          message: 'quantityProcessed debe ser un entero mayor a 0'
         });
       }
 
       const updatedItem = await OrderService.updateOrderItemStatus(
-        parseInt(orderId),
-        parseInt(productId),
-        { quantityProcessed } // 🔥 SOLO esto
+        parsedOrderId,
+        parsedProductId,
+        { quantityProcessed }
       );
 
       res.json({

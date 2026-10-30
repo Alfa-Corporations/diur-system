@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../services/apiService';
+import { useAppSelector } from '../hooks/redux';
+import { usePermissions } from '../hooks/permissions';
 //import localDBService from '../services/localDBService';
 
 const toNumber = (v: unknown) => {
@@ -12,6 +14,10 @@ const formatCurrency = (v: unknown) => `$${toNumber(v).toFixed(2)}`;
 
 const AccountsReceivablePage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAppSelector(state => state.auth);
+  const { hasPermission } = usePermissions();
+  const canPay = user?.role === 'admin' || hasPermission('actualizar_factura');
+  const canViewTotals = user?.role === 'admin' || hasPermission('ver_totales');
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [payingId, setPayingId] = useState<number | null>(null);
@@ -56,6 +62,11 @@ const AccountsReceivablePage: React.FC = () => {
 
   const handleSubmitPayment = async () => {
     if (!selectedAccount) return;
+    if (!canPay) {
+      alert('No tienes permiso para registrar abonos.');
+      return;
+    }
+
     const amt = toNumber(payAmount);
     if (amt <= 0) return alert('Ingresa un monto válido');
 
@@ -157,19 +168,19 @@ const AccountsReceivablePage: React.FC = () => {
                       <p className='mb-1'>
                         <strong>Identificación:</strong> {acc.customer?.identificationNumber || acc.customerIdentification || '—'}
                       </p>
-                      <p className='mb-1'>
+                      {canViewTotals && <p className='mb-1'>
                         <strong>Total:</strong> {formatCurrency(acc.totalAmount)}
-                      </p>
-                      <p className='mb-1'>
+                      </p>}
+                      {canViewTotals && <p className='mb-1'>
                         <strong>Pendiente:</strong> {formatCurrency(acc.pendingAmount)}
-                      </p>
+                      </p>}
                       <p className='mb-0 text-muted'>
                         <strong>Creado:</strong> {new Date(acc.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                     <div className='mt-auto d-flex flex-wrap gap-2'>
                       <button className='btn btn-sm btn-primary' onClick={() => openAccount(acc)}>
-                        Ver / Abonar
+                        {canPay ? 'Ver / Abonar' : 'Ver cuenta'}
                       </button>
                       <button className='btn btn-sm btn-outline-secondary' onClick={() => navigate('/invoices')}>
                         Ver facturas
@@ -198,12 +209,12 @@ const AccountsReceivablePage: React.FC = () => {
                   <div>
                     <strong>Factura:</strong> {selectedAccount.invoice?.invoiceNumber || `#${selectedAccount.invoiceId}`}
                   </div>
-                  <div>
+                  {canViewTotals && <div>
                     <strong>Total:</strong> {formatCurrency(selectedAccount.totalAmount)}
-                  </div>
-                  <div>
+                  </div>}
+                  {canViewTotals && <div>
                     <strong>Pendiente:</strong> {formatCurrency(selectedAccount.pendingAmount)}
-                  </div>
+                  </div>}
                   <div>
                     <strong>Estado:</strong> {selectedAccount.status}
                   </div>
@@ -244,15 +255,15 @@ const AccountsReceivablePage: React.FC = () => {
                           <div className='d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2'>
                             <div>
                               <div>
-                                <strong>{formatCurrency(p.amount)}</strong> — {new Date(p.createdAt).toLocaleString()}
+                                {canViewTotals && <strong>{formatCurrency(p.amount)} — </strong>}{new Date(p.createdAt).toLocaleString()}
                               </div>
                               <div className='small text-muted'>
                                 Método: {p.paymentMethod || '—'} — Ref: {p.paymentReference || '—'}
                               </div>
                             </div>
-                            <button className='btn btn-sm btn-outline-secondary' onClick={() => handlePrintPaymentReceipt(p, selectedAccount)}>
+                            {canViewTotals && <button className='btn btn-sm btn-outline-secondary' onClick={() => handlePrintPaymentReceipt(p, selectedAccount)}>
                               Imprimir
-                            </button>
+                            </button>}
                           </div>
                         </li>
                       ))}

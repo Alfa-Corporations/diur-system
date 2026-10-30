@@ -4,7 +4,7 @@ const morgan = require('morgan');
 const cors = require('cors');
 const db = require('./utils/database');
 const initModels = require('./models/initModels');
-const seedDatabase = require('./seeders/seedDatabase');
+const PermissionService = require('./services/PermissionService');
 const routes = require('./routes');
 const swaggerDocs = require('../swagger');
 const hendleError = require('./middlewares/error.middleware');
@@ -21,9 +21,11 @@ db.authenticate()
     .catch(error => console.log('Database authentication failed:', error));
 
 db.sync({ force: false, alter: process.env.NODE_ENV !== 'production' })
-    .then(() => {
+    .then(async () => {
         console.log('Database synchronized');
         initModels(); // Inicializar asociaciones después de sincronizar
+        await PermissionService.initializeDefaultPermissions();
+        console.log('Default permissions synchronized');
         // Ejecutar seeding en desarrollo
         // if (process.env.NODE_ENV !== 'production') {
         //     seedDatabase();

@@ -24,6 +24,7 @@ import POSPage from './pages/POSPage';
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
 import SalesOrdersPage from './pages/SalesOrdersPage';
 import LocalSalesOrdersPage from './pages/LocalSalesOrdersPage';
+import PendingDeliveriesPage from './pages/PendingDeliveriesPage';
 import FileImporter from './components/FileImporter';
 import CustomerManager from './pages/CustomerManager';
 import HistoryClient from './pages/HistoryClient';
@@ -39,6 +40,12 @@ const AppContent: React.FC = () => {
   const dispatch = useAppDispatch();
   const { isAuthenticated, user } = useAppSelector(state => state.auth);
   const { hasPermission } = usePermissions();
+  const canAccess = (permissionNames: string[]) => user?.role === 'admin' || permissionNames.some(hasPermission);
+  const canAccessAll = (permissionNames: string[]) => user?.role === 'admin' || permissionNames.every(hasPermission);
+  const permissionRoute = (permissionNames: string[], element: React.ReactElement) =>
+    isAuthenticated ? canAccess(permissionNames) ? element : <Navigate to='/dashboard' replace /> : <Navigate to='/login' replace />;
+  const permissionRouteAll = (permissionNames: string[], element: React.ReactElement) =>
+    isAuthenticated ? canAccessAll(permissionNames) ? element : <Navigate to='/dashboard' replace /> : <Navigate to='/login' replace />;
   const { isOnline } = useAppSelector(state => state.sync);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isSyncingPending, setIsSyncingPending] = useState(false);
@@ -153,19 +160,20 @@ const AppContent: React.FC = () => {
         <Routes>
           <Route path='/login' element={isAuthenticated ? <Navigate to='/dashboard' /> : <Login />} />
           <Route path='/dashboard' element={isAuthenticated ? <Dashboard /> : <Navigate to='/login' />} />
-          <Route path='/products' element={isAuthenticated ? <ProductsPage /> : <Navigate to='/login' />} />
-          <Route path='/products/importer' element={isAuthenticated ? <FileImporter /> : <Navigate to='/login' />} />
-          <Route path='/invoices' element={isAuthenticated ? <InvoicesPage /> : <Navigate to='/login' />} />
-          <Route path='/accounts-receivable' element={isAuthenticated ? <AccountsReceivablePage /> : <Navigate to='/login' />} />
-          <Route path='/users' element={isAuthenticated ? <UserManagementPage /> : <Navigate to='/login' />} />
-          <Route path='/customer' element={isAuthenticated ? <CustomerManager /> : <Navigate to='/login' />} />
-          <Route path='/customer/history/:customerId' element={isAuthenticated ? <HistoryClient /> : <Navigate to='/login' />} />
-          <Route path='/orders/dashboard' element={isAuthenticated ? <OrdersDashboardPage /> : <Navigate to='/login' />} />
-          <Route path='/orders/purchase' element={isAuthenticated ? <PurchaseOrdersPage /> : <Navigate to='/login' />} />
-          <Route path='/orders/sale' element={isAuthenticated ? <SalesOrdersPage /> : <Navigate to='/login' />} />
-          <Route path='/orders/local' element={isAuthenticated ? hasPermission('leer_orden') || user?.role === 'admin' ? <LocalSalesOrdersPage /> : <Navigate to='/dashboard' /> : <Navigate to='/login' />} />
-          <Route path='/sales' element={isAuthenticated ? <Sales /> : <Navigate to='/login' />} />
-          <Route path='/pos' element={isAuthenticated ? <POSPage /> : <Navigate to='/login' />} />
+          <Route path='/products' element={permissionRoute(['leer_producto', 'gestionar_productos'], <ProductsPage />)} />
+          <Route path='/products/importer' element={permissionRoute(['crear_producto', 'gestionar_productos'], <FileImporter />)} />
+          <Route path='/invoices' element={permissionRoute(['leer_factura'], <InvoicesPage />)} />
+          <Route path='/accounts-receivable' element={permissionRoute(['leer_factura'], <AccountsReceivablePage />)} />
+          <Route path='/users' element={permissionRoute(['leer_usuario', 'gestionar_usuarios', 'crud_users'], <UserManagementPage />)} />
+          <Route path='/customer' element={permissionRoute(['leer_clientes'], <CustomerManager />)} />
+          <Route path='/customer/history/:customerId' element={permissionRouteAll(['leer_clientes', 'leer_factura', 'leer_orden'], <HistoryClient />)} />
+          <Route path='/orders/dashboard' element={permissionRoute(['leer_orden'], <OrdersDashboardPage />)} />
+          <Route path='/orders/dispatch' element={permissionRoute(['leer_orden'], <PendingDeliveriesPage />)} />
+          <Route path='/orders/purchase' element={permissionRoute(['leer_orden'], <PurchaseOrdersPage />)} />
+          <Route path='/orders/sale' element={permissionRoute(['leer_orden'], <SalesOrdersPage />)} />
+          <Route path='/orders/local' element={permissionRoute(['leer_orden'], <LocalSalesOrdersPage />)} />
+          <Route path='/sales' element={permissionRoute(['acceso_pos'], <Sales />)} />
+          <Route path='/pos' element={permissionRoute(['acceso_pos'], <POSPage />)} />
           <Route path='/' element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
         </Routes>
       </div>

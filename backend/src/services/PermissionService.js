@@ -1,4 +1,5 @@
 const PermissionRepository = require('../repositories/PermissionRepository');
+const { Permission, User } = require('../models');
 
 /**
  * Servicio de Permisos
@@ -15,7 +16,7 @@ class PermissionService {
       throw new Error('Permission name is required');
     }
 
-    const existing = await PermissionRepository.findById(permissionData.name);
+    const existing = await PermissionRepository.findByName(permissionData.name);
     if (existing) {
       throw new Error('Permission already exists');
     }
@@ -38,7 +39,19 @@ class PermissionService {
    * @returns {Promise<Array<Object>>} Asignaciones creadas
    */
   async assignPermissionsToUser(userId, permissionIds) {
-    return await PermissionRepository.assignPermissionsToUser(userId, permissionIds);
+    const user = await User.findByPk(userId);
+    if (!user) throw new Error('User not found');
+
+    const uniquePermissionIds = [...new Set(permissionIds)];
+    const existingPermissions = await Permission.findAll({
+      where: { id: uniquePermissionIds },
+      attributes: ['id']
+    });
+    if (existingPermissions.length !== uniquePermissionIds.length) {
+      throw new Error('One or more permissions do not exist');
+    }
+
+    return await PermissionRepository.assignPermissionsToUser(userId, uniquePermissionIds);
   }
 
   /**
@@ -65,21 +78,9 @@ class PermissionService {
    * @returns {Promise<void>}
    */
   async initializeDefaultPermissions() {
-    const defaultPermissions = [
-      { name: 'crear_orden', description: 'Crear pedidos' },
-      { name: 'cancelar_orden', description: 'Cancelar pedidos' },
-      { name: 'invoice_order', description: 'Facturar pedidos' },
-      { name: 'crud_products', description: 'CRUD productos' },
-      { name: 'close_day', description: 'Cierre de día' },
-      { name: 'crud_users', description: 'CRUD usuarios' },
-    ];
-
-    for (const perm of defaultPermissions) {
-      try {
-        await this.createPermission(perm);
-      } catch (error) {
-        // Ignorar si ya existe
-      }
+    const defaultPermissions = require('../utils/permissionCatalog');
+    for (const permission of defaultPermissions) {
+      await PermissionRepository.findOrCreateByName(permission);
     }
   }
 }

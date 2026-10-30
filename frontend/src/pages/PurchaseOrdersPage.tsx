@@ -2,6 +2,7 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
+import { usePermissions } from '../hooks/permissions';
 import { Button, Badge, Modal, Form, Alert, Spinner } from 'react-bootstrap';
 import type { RootState } from '../redux/store';
 import { fetchOrdersStart, fetchOrdersSuccess, fetchOrdersFailure, createOrderStart, createOrderSuccess, createOrderFailure, updateOrderItemStatusSuccess, cancelOrderSuccess } from '../redux/slices/orderSlice';
@@ -16,6 +17,10 @@ const compraOrdersPage: React.FC = () => {
   const { orders, loading, error } = useAppSelector((state: RootState) => state.orders);
   const { products } = useAppSelector((state: RootState) => state.products);
   const { user } = useAppSelector((state: RootState) => state.auth);
+  const { hasPermission } = usePermissions();
+  const canCreateOrder = user?.role === 'admin' || hasPermission('crear_orden');
+  const canUpdateOrder = user?.role === 'admin' || hasPermission('actualizar_orden') || hasPermission('gestionar_items_orden');
+  const canCancelOrder = user?.role === 'admin' || hasPermission('cancelar_orden');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -227,7 +232,7 @@ const compraOrdersPage: React.FC = () => {
       };
 
       if (isOnline) {
-        await apiService.updateOrderItemStatus(orderId, productId, payload);
+        await apiService.updateOrderItemStatus(orderId, productId, { quantityProcessed: payload.quantityProcessed });
 
         socketService.emit('order_updated', {
           orderId,
@@ -249,7 +254,7 @@ const compraOrdersPage: React.FC = () => {
       dispatch(
         updateOrderItemStatusSuccess({
           orderId,
-          item: { ...item, quantityProcessed: newProcessed }
+          item: { ...item, quantityProcessed: newProcessed, status: payload.status }
         })
       );
 
@@ -291,8 +296,8 @@ const compraOrdersPage: React.FC = () => {
   const getStatusBadge = (status: Order['status']) => {
     const variants: Record<Order['status'], string> = {
       pendiente: 'warning',
-      en_transito: 'info',
-      facturado: 'success',
+      parcial: 'info',
+      completado: 'success',
       cancelado: 'danger'
     };
     return <Badge bg={variants[status]}>{status}</Badge>;
@@ -319,9 +324,7 @@ const compraOrdersPage: React.FC = () => {
           <Button variant='outline-secondary' className='me-2' onClick={() => window.history.back()}>
             ← Volver
           </Button>
-          <Button variant='primary' onClick={() => setShowCreateModal(true)} disabled={!isOnline && loading}>
-            Nuevo Pedido
-          </Button>
+          {canCreateOrder && <Button variant='primary' onClick={() => setShowCreateModal(true)} disabled={!isOnline && loading}>Nuevo Pedido</Button>}
         </div>
       </div>
 
@@ -372,7 +375,7 @@ const compraOrdersPage: React.FC = () => {
                   Ver
                 </Button>
 
-                {order.status !== 'cancelado' && (
+                {canCancelOrder && order.status !== 'cancelado' && (
                   <Button variant='outline-danger' size='sm' onClick={() => handleCancelOrder(order.id)}>
                     Cancelar
                   </Button>
@@ -511,9 +514,11 @@ const compraOrdersPage: React.FC = () => {
             Cancelar
           </Button>
 
-          <Button variant='primary' onClick={handleCreateOrder} disabled={orderItems.length === 0 || !selectedSupplierId}>
-            Crear Pedido
-          </Button>
+          {canCreateOrder && (
+            <Button variant='primary' onClick={handleCreateOrder} disabled={orderItems.length === 0 || !selectedSupplierId}>
+              Crear Pedido
+            </Button>
+          )}
         </Modal.Footer>
       </Modal>
 
@@ -589,7 +594,7 @@ const compraOrdersPage: React.FC = () => {
                     </div>
 
                     {/* 🔹 INPUT CANTIDAD */}
-                    <div className='d-flex gap-2 mt-3 align-items-center'>
+                    {canUpdateOrder && <div className='d-flex gap-2 mt-3 align-items-center'>
                       <Form.Control
                         type='number'
                         min={1}
@@ -613,10 +618,10 @@ const compraOrdersPage: React.FC = () => {
                       >
                         📦 Ingresar
                       </Button>
-                    </div>
+                    </div>}
 
                     {/* 🔹 BOTÓN RÁPIDO COMPLETAR */}
-                    {item.quantityProcessed < item.quantityRequested && (
+                    {canUpdateOrder && item.quantityProcessed < item.quantityRequested && (
                       <Button variant='outline-primary' size='sm' className='w-100 mt-2' onClick={() => handleUpdateItemStatus(selectedOrder.id, item.productId, item.quantityRequested - item.quantityProcessed)}>
                         ⚡ Completar todo
                       </Button>

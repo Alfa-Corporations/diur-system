@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
+import { usePermissions } from '../hooks/permissions';
 import { fetchProductsStart, fetchProductsSuccess, createProductSuccess, updateProductSuccess, deleteProductSuccess } from '../redux/slices/productSlice';
 import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
@@ -47,6 +48,11 @@ const ProductsPage: React.FC = () => {
   const { products } = useAppSelector(state => state.products);
   const { isOnline } = useAppSelector(state => state.sync);
   const { user } = useAppSelector(state => state.auth);
+  const { hasPermission } = usePermissions();
+  const canCreateProduct = user?.role === 'admin' || hasPermission('crear_producto') || hasPermission('gestionar_productos');
+  const canUpdateProduct = user?.role === 'admin' || hasPermission('actualizar_producto') || hasPermission('gestionar_productos');
+  const canDeleteProduct = user?.role === 'admin' || hasPermission('eliminar_producto') || hasPermission('gestionar_productos');
+  const canManage = canCreateProduct || canUpdateProduct || canDeleteProduct;
 
   const [showModal, setShowModal] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -411,7 +417,6 @@ const ProductsPage: React.FC = () => {
     }
   };
 
-  const canManage = user?.permissions?.some(p => ['crear_producto', 'actualizar_producto', 'eliminar_producto'].includes(p.name));
 
   const handleOpenModal = () => {
     resetForm();
@@ -539,7 +544,7 @@ const ProductsPage: React.FC = () => {
 
         {/* BOTONES */}
         <div className='d-flex justify-content-center align-items-center gap-2'>
-          {canManage && (
+          {canCreateProduct && (
             <button className='btn d-flex align-items-center gap-2 px-3 shadow-sm' onClick={handleOpenModal}>
               <span>
                 <svg width='24px' height='24px' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>
@@ -583,7 +588,7 @@ const ProductsPage: React.FC = () => {
             </span>
           </button>
 
-          <button className='btn border d-flex align-items-center gap-2 px-3 shadow-sm' onClick={() => navigate('/products/importer')}>
+          {canCreateProduct && <button className='btn border d-flex align-items-center gap-2 px-3 shadow-sm' onClick={() => navigate('/products/importer')}>
             <span>
               <svg width='24px' height='24px' viewBox='0 0 24 24' version='1.1' xmlns='http://www.w3.org/2000/svg'>
                 <g id='1' stroke='none' stroke-width='1' fill='none' fill-rule='evenodd'>
@@ -604,7 +609,7 @@ const ProductsPage: React.FC = () => {
                 </g>
               </svg>
             </span>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -690,14 +695,18 @@ const ProductsPage: React.FC = () => {
                       </button>
                     </div>
 
-                    {canManage && (
+                    {(canUpdateProduct || canDeleteProduct) && (
                       <div className='d-flex gap-2 mt-3'>
-                        <button className='btn btn-sm btn-warning flex-grow-1' onClick={() => handleEditClick(p)}>
-                          ✏️
-                        </button>
-                        <button className='btn btn-sm btn-danger flex-grow-1' onClick={() => handleDelete(p.id)}>
-                          🗑️
-                        </button>
+                        {canUpdateProduct && (
+                          <button className='btn btn-sm btn-warning flex-grow-1' onClick={() => handleEditClick(p)}>
+                            ✏️
+                          </button>
+                        )}
+                        {canDeleteProduct && (
+                          <button className='btn btn-sm btn-danger flex-grow-1' onClick={() => handleDelete(p.id)}>
+                            🗑️
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

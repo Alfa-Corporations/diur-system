@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { Button, Table, Badge, Alert, Row, Col, Card } from 'react-bootstrap';
 import type { RootState } from '../redux/store';
@@ -19,8 +19,25 @@ const OrdersDashboardPage: React.FC = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [filterType, setFilterType] = useState<'all' | 'compra' | 'venta'>('all');
 
+  const loadOrders = useCallback(async () => {
+    dispatch(fetchOrdersStart());
+    try {
+      let ordersData;
+      if (isOnline) {
+        const response = await apiService.getOrders();
+        ordersData = response.orders;
+        localDBService.saveOrders(ordersData);
+      } else {
+        ordersData = await localDBService.getOrders();
+      }
+      dispatch(fetchOrdersSuccess({ orders: ordersData, totalCount: ordersData.length }));
+    } catch {
+      dispatch(fetchOrdersFailure('Error al cargar pedidos'));
+    }
+  }, [dispatch, isOnline]);
+
   useEffect(() => {
-    loadOrders();
+    void loadOrders();
 
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -37,24 +54,7 @@ const OrdersDashboardPage: React.FC = () => {
       socketService.off('pedido_creado', loadOrders);
       socketService.off('pedido_actualizado', loadOrders);
     };
-  }, []);
-
-  const loadOrders = async () => {
-    dispatch(fetchOrdersStart());
-    try {
-      let ordersData;
-      if (isOnline) {
-        const response = await apiService.getOrders();
-        ordersData = response.orders;
-        localDBService.saveOrders(ordersData);
-      } else {
-        ordersData = await localDBService.getOrders();
-      }
-      dispatch(fetchOrdersSuccess({ orders: ordersData, totalCount: ordersData.length }));
-    } catch (error) {
-      dispatch(fetchOrdersFailure('Error al cargar pedidos'));
-    }
-  };
+  }, [loadOrders]);
 
   const filteredOrders = orders.filter(order => {
     if (filterType === 'all') return true;
@@ -64,11 +64,11 @@ const OrdersDashboardPage: React.FC = () => {
   const getStatusBadge = (status: Order['status']) => {
     const variants: Record<Order['status'], string> = {
       pendiente: 'warning',
-      en_transito: 'info',
-      facturado: 'success',
+      parcial: 'info',
+      completado: 'success',
       cancelado: 'danger'
     };
-    return <Badge bg={variants[status]}>{status}</Badge>;
+    return <Badge bg={variants[status]}>{status.replace('_', ' ')}</Badge>;
   };
 
   const getItemStatusBadge = (status: OrderItem['status']) => {
@@ -90,8 +90,8 @@ const OrdersDashboardPage: React.FC = () => {
   const stats = {
     total: orders.length,
     pending: orders.filter(o => o.status === 'pendiente').length,
-    partial: orders.filter(o => o.status === 'en_transito').length,
-    completed: orders.filter(o => o.status === 'cancelado').length,
+    partial: orders.filter(o => o.status === 'parcial').length,
+    completed: orders.filter(o => o.status === 'completado').length,
     compra: orders.filter(o => o.type === 'compra').length,
     venta: orders.filter(o => o.type === 'venta').length
   };

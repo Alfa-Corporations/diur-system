@@ -22,10 +22,10 @@ router.use(authenticate); // Todas las rutas siguientes requieren autenticación
 
 router.get('/auth/profile', AuthController.getProfile);
 router.post('/auth/logout', AuthController.logout);
-router.post('/users', authorize('crud_users'), AuthController.register);
-router.get('/users', authorize('crud_users'), AuthController.listUsers);
-router.put('/users/:id', authorize('crud_users'), AuthController.updateUser);
-router.delete('/users/:id', authorize('crud_users'), AuthController.deleteUser);
+router.post('/users', authorize('crear_usuario', 'gestionar_usuarios', 'crud_users'), AuthController.register);
+router.get('/users', authorize('leer_usuario', 'gestionar_usuarios', 'crud_users'), AuthController.listUsers);
+router.put('/users/:id', authorize('actualizar_usuario', 'gestionar_usuarios', 'crud_users'), AuthController.updateUser);
+router.delete('/users/:id', authorize('eliminar_usuario', 'gestionar_usuarios', 'crud_users'), AuthController.deleteUser);
 
 
 // 🔵 CRUD CUSTOMERS
@@ -42,43 +42,43 @@ router.put('/suppliers/:id', authorize('crud_users'), SupplierController.updateS
 router.delete('/suppliers/:id', authorize('crud_users'), SupplierController.deleteSupplier);
 
 // Rutas de productos
-router.post('/products', authorize('crear_producto'), validateProductData, ProductController.createProduct);
-router.post('/products/bulk', authorize('crear_producto'), ProductController.createProducts);
-router.get('/products', authorize('leer_producto'), ProductController.getProducts);
-router.get('/products/:id', authorize('leer_producto'), ProductController.getProduct);
-router.put('/products/:id', authorize('actualizar_producto'), ProductController.updateProduct);
-router.patch('/products/:id/stock', authorize('actualizar_producto'), ProductController.updateStock);
-router.delete('/products/:id', authorize('eliminar_producto'), ProductController.deleteProduct);
+router.post('/products', authorize('crear_producto', 'gestionar_productos'), validateProductData, ProductController.createProduct);
+router.post('/products/bulk', authorize('crear_producto', 'gestionar_productos'), ProductController.createProducts);
+router.get('/products', authorize('leer_producto', 'gestionar_productos'), ProductController.getProducts);
+router.get('/products/:id', authorize('leer_producto', 'gestionar_productos'), ProductController.getProduct);
+router.put('/products/:id', authorize('actualizar_producto', 'gestionar_productos'), ProductController.updateProduct);
+router.patch('/products/:id/stock', authorize('actualizar_producto', 'gestionar_productos'), ProductController.updateStock);
+router.delete('/products/:id', authorize('eliminar_producto', 'gestionar_productos'), ProductController.deleteProduct);
 
 // Rutas de facturas
 router.post('/invoices', authorize('crear_factura'), InvoiceController.createInvoice);
-router.get('/invoices', InvoiceController.getInvoices);
-router.get('/invoices/:id', InvoiceController.getInvoice);
-router.patch('/invoices/:id/status', InvoiceController.updateInvoiceStatus);
-router.delete('/invoices/:id', InvoiceController.cancelInvoice);
-router.post('/invoices/:id/send-email', InvoiceController.sendInvoiceEmail);
-router.post('/invoices/:id/cancel', InvoiceController.cancelInvoice);
-router.post('/invoices/:id/create-ar', InvoiceController.createAccountsReceivable);
+router.get('/invoices', authorize('leer_factura'), InvoiceController.getInvoices);
+router.get('/invoices/:id', authorize('leer_factura'), InvoiceController.getInvoice);
+router.patch('/invoices/:id/status', authorize('actualizar_factura'), InvoiceController.updateInvoiceStatus);
+router.delete('/invoices/:id', authorize('cancelar_factura'), InvoiceController.cancelInvoice);
+router.post('/invoices/:id/send-email', authorize('leer_factura'), InvoiceController.sendInvoiceEmail);
+router.post('/invoices/:id/cancel', authorize('cancelar_factura'), InvoiceController.cancelInvoice);
+router.post('/invoices/:id/create-ar', authorize('actualizar_factura'), InvoiceController.createAccountsReceivable);
 
 // Rutas de cuentas por cobrar
 const AccountsReceivableController = require('../controllers/AccountsReceivableController');
-router.get('/accounts-receivable', AccountsReceivableController.listPending);
-router.get('/accounts-receivable/:id', AccountsReceivableController.get);
-router.post('/accounts-receivable/:id/pay', AccountsReceivableController.pay);
+router.get('/accounts-receivable', authorize('leer_factura'), AccountsReceivableController.listPending);
+router.get('/accounts-receivable/:id', authorize('leer_factura'), AccountsReceivableController.get);
+router.post('/accounts-receivable/:id/pay', authorize('actualizar_factura'), AccountsReceivableController.pay);
 
 // Rutas de pedidos
 router.post('/orders', authorize('crear_orden'), OrderController.createOrder);
 router.get('/orders', authorize('leer_orden'), OrderController.getOrders);
-router.patch('/orders/:orderId/items/:productId/status', authorize('actualizar_orden'), OrderController.updateOrderItemStatus);
+router.patch('/orders/:orderId/items/:productId/status', authorize('actualizar_orden', 'gestionar_items_orden'), OrderController.updateOrderItemStatus);
 router.put('/orders/:id/status', authorize('cancelar_orden'), OrderController.cancelOrder);
-router.get('/orders/:id', OrderController.getOrder);
+router.get('/orders/:id', authorize('leer_orden'), OrderController.getOrder);
 
 // Rutas de permisos
-router.get('/permissions', PermissionController.getPermissions);
-router.post('/permissions/assign', PermissionController.assignPermissions);
-router.get('/permissions/user/:userId', PermissionController.getUserPermissions);
-router.get('/permissions/check/:userId/:permissionName', PermissionController.checkPermission);
-router.post('/permissions/init', PermissionController.initializePermissions);
+router.get('/permissions', authorize('gestionar_permisos'), PermissionController.getPermissions);
+router.post('/permissions/assign', authorize('gestionar_permisos'), PermissionController.assignPermissions);
+router.get('/permissions/user/:userId', authorize('gestionar_permisos'), PermissionController.getUserPermissions);
+router.get('/permissions/check/:userId/:permissionName', authorize('gestionar_permisos'), PermissionController.checkPermission);
+router.post('/permissions/init', authorize('gestionar_permisos'), PermissionController.initializePermissions);
 
 // Rutas de sincronización
 router.get('/sync/pending', (req, res) => {

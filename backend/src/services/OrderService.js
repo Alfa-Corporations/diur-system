@@ -137,19 +137,17 @@ class OrderService {
    */
   async checkOrderCompletion(orderId) {
     const order = await OrderRepository.findById(orderId);
-    if (!order) return;
+    if (!order || order.status === 'cancelado') return;
 
-    const items = order.items;
-
-    const allCompleted = items.every(item => item.status === 'en_bodega');
-
-    const someCompleted = items.some(item => item.status === 'en_bodega');
+    const items = order.items || [];
+    const allCompleted = items.length > 0 && items.every(item => Number(item.quantityProcessed) >= Number(item.quantityRequested));
+    const someProcessed = items.some(item => Number(item.quantityProcessed) > 0);
 
     let newStatus = 'pendiente';
 
     if (allCompleted) {
       newStatus = 'completado';
-    } else if (someCompleted) {
+    } else if (someProcessed) {
       newStatus = 'parcial';
     }
 

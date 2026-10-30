@@ -25,8 +25,9 @@ class PermissionController {
   async assignPermissions(req, res) {
     try {
       const { userId, permissionIds } = req.body;
-      if (!userId || !permissionIds || !Array.isArray(permissionIds)) {
-        return res.status(400).json({ message: 'userId and permissionIds array are required' });
+      if (!Number.isSafeInteger(userId) || userId <= 0 || !Array.isArray(permissionIds) ||
+        permissionIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+        return res.status(400).json({ message: 'userId and permissionIds must be positive integers' });
       }
 
       const assignments = await PermissionService.assignPermissionsToUser(userId, permissionIds);
@@ -46,7 +47,11 @@ class PermissionController {
   async getUserPermissions(req, res) {
     try {
       const { userId } = req.params;
-      const permissions = await PermissionService.getUserPermissions(parseInt(userId));
+      const parsedUserId = Number(userId);
+      if (!Number.isSafeInteger(parsedUserId) || parsedUserId <= 0) {
+        return res.status(400).json({ message: 'userId must be a positive integer' });
+      }
+      const permissions = await PermissionService.getUserPermissions(parsedUserId);
       res.json({ permissions });
     } catch (error) {
       res.status(500).json({ message: error.message });

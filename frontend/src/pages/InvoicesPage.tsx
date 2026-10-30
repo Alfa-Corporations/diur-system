@@ -42,6 +42,11 @@ const InvoicesPage: React.FC = () => {
   const { user } = useAppSelector(state => state.auth);
   const { hasPermission } = usePermissions();
   const isAdmin = user?.role === 'admin';
+  const canCreateInvoices = isAdmin || hasPermission('crear_factura');
+  const canPayInvoices = isAdmin || hasPermission('actualizar_factura');
+  const canEditInvoices = isAdmin || hasPermission('actualizar_factura');
+  const canCancelInvoices = isAdmin || hasPermission('cancelar_factura');
+  const canViewTotals = isAdmin || hasPermission('ver_totales');
 
   const [showModal, setShowModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -284,11 +289,20 @@ const InvoicesPage: React.FC = () => {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    if (editingInvoice ? !canEditInvoices : !canCreateInvoices) {
+      alert('No tienes permiso para guardar esta factura.');
+      return;
+    }
+
     if (invoiceItems.length === 0 || !user) {
       return;
     }
 
     const targetStatus = invoiceStatusSelection === 'paid' ? 'paid' : 'pending';
+    if (targetStatus === 'paid' && !canPayInvoices) {
+      alert('No tienes permiso para registrar pagos.');
+      return;
+    }
     const invoiceTotal = calculateTotal(invoiceItems);
     // Para crédito permitimos ingresar un monto en efectivo (parte pagada ahora) y el resto queda a crédito.
     let receivedAmount: number | undefined;
@@ -484,6 +498,10 @@ const InvoicesPage: React.FC = () => {
   };
 
   const handleDelete = async (invoice: Invoice) => {
+    if (!canCancelInvoices) {
+      alert('No tienes permiso para cancelar facturas.');
+      return;
+    }
     const confirmed = window.confirm('¿Está seguro de marcar esta factura como eliminada?');
     if (!confirmed) return;
 
@@ -701,9 +719,6 @@ const InvoicesPage: React.FC = () => {
     }, 250);
   };
 
-  const canCreateInvoices = user?.role === 'admin';
-  const canPayInvoices = Boolean(user);
-  const canEditInvoices = user?.role === 'admin' || user?.role === 'caja';
   const isDeletedView = isAdmin && invoiceViewMode === 'deleted';
   const visibleInvoices = isDeletedView ? invoices.filter(invoice => invoice.status === 'cancelled') : invoices.filter(invoice => invoice.status !== 'cancelled');
   const createdInvoices = visibleInvoices.filter(invoice => invoice.status === 'pending').length;
@@ -774,7 +789,7 @@ const InvoicesPage: React.FC = () => {
           </div>
         </div>
         <div className='col-12 col-md-4'>
-          {hasPermission('ver_totales') && (
+          {canViewTotals && (
             <div className='stat-card'>
               <div className='metric-label'>Monto total</div>
               <div className='metric-value'>{formatCurrency(totalBilled)}</div>
@@ -824,7 +839,7 @@ const InvoicesPage: React.FC = () => {
                     <span className={`badge ${getInvoiceStatusClass(invoice.status)}`}>{getInvoiceStatusLabel(invoice.status)}</span>
                   </div>
 
-                  {hasPermission('ver_totales') && <div className='invoice-mobile-card__amount'>{formatCurrency(invoice.total)}</div>}
+                  {canViewTotals && <div className='invoice-mobile-card__amount'>{formatCurrency(invoice.total)}</div>}
 
                   <div className='invoice-mobile-meta'>
                     <div className='invoice-mobile-meta__item'>
@@ -881,11 +896,11 @@ const InvoicesPage: React.FC = () => {
                               <path d='M200-200h57l391-391-57-57-391 391v57Zm-40 80q-17 0-28.5-11.5T120-160v-97q0-16 6-30.5t17-25.5l505-504q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L313-143q-11 11-25.5 17t-30.5 6h-97Zm600-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z' />
                             </svg>
                           </button>
-                          <button className='btn btn-sm' onClick={() => handleDelete(invoice)}>
+                          {canCancelInvoices && <button className='btn btn-sm' onClick={() => handleDelete(invoice)}>
                             <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#5D0E07'>
                               <path d='M280-120q-33 0-56.5-23.5T200-200v-520q-17 0-28.5-11.5T160-760q0-17 11.5-28.5T200-800h160q0-17 11.5-28.5T400-840h160q17 0 28.5 11.5T600-800h160q17 0 28.5 11.5T800-760q0 17-11.5 28.5T760-720v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM428.5-291.5Q440-303 440-320v-280q0-17-11.5-28.5T400-640q-17 0-28.5 11.5T360-600v280q0 17 11.5 28.5T400-280q17 0 28.5-11.5Zm160 0Q600-303 600-320v-280q0-17-11.5-28.5T560-640q-17 0-28.5 11.5T520-600v280q0 17 11.5 28.5T560-280q17 0 28.5-11.5ZM280-720v520-520Z' />
                             </svg>
-                          </button>
+                          </button>}
                         </>
                       )}
                     </div>
@@ -948,9 +963,9 @@ const InvoicesPage: React.FC = () => {
                                     <path d='M200-200h57l391-391-57-57-391 391v57Zm-40 80q-17 0-28.5-11.5T120-160v-97q0-16 6-30.5t17-25.5l505-504q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L313-143q-11 11-25.5 17t-30.5 6h-97Zm600-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z' />
                                   </svg>
                                 </button>
-                                <button className='btn btn-sm' onClick={() => handleDelete(invoice)}>
+                                {canCancelInvoices && <button className='btn btn-sm' onClick={() => handleDelete(invoice)}>
                                   🗑️ Eliminar
-                                </button>
+                                </button>}
                               </>
                             )}
                           </div>

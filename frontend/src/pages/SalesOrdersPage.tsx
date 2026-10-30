@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
+import { usePermissions } from '../hooks/permissions';
 import { Button, Badge, Modal, Form, Alert, Spinner } from 'react-bootstrap';
 import type { RootState } from '../redux/store';
 
@@ -22,6 +23,10 @@ const WholesaleSalesPage: React.FC = () => {
   const { products } = useAppSelector((state: RootState) => state.products);
   const { customers } = useAppSelector((state: RootState) => state.customers);
   const { user } = useAppSelector((state: RootState) => state.auth);
+  const { hasPermission } = usePermissions();
+  const canCreateOrder = user?.role === 'admin' || hasPermission('crear_orden');
+  const canCancelOrder = user?.role === 'admin' || hasPermission('cancelar_orden');
+  const canCreateInvoice = user?.role === 'admin' || hasPermission('crear_factura');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -361,8 +366,8 @@ const WholesaleSalesPage: React.FC = () => {
   const getStatusBadge = (status: Order['status']) => {
     const variants: Record<Order['status'], string> = {
       pendiente: 'warning',
-      en_transito: 'info',
-      facturado: 'success',
+      parcial: 'info',
+      completado: 'success',
       cancelado: 'danger'
     };
     return <Badge bg={variants[status]}>{status}</Badge>;
@@ -387,9 +392,11 @@ const WholesaleSalesPage: React.FC = () => {
 
       {!isOnline && <Alert variant='warning'>Modo offline - Los cambios se sincronizarán cuando se restablezca la conexión</Alert>}
 
-      <Button variant='primary' className='sales-orders-fab' onClick={() => setShowCreateModal(true)} disabled={!isOnline && loading} style={{ display: showCreateModal || !!selectedOrder ? 'none' : 'flex' }}>
-        +
-      </Button>
+      {canCreateOrder && (
+        <Button variant='primary' className='sales-orders-fab' onClick={() => setShowCreateModal(true)} disabled={!isOnline && loading} style={{ display: showCreateModal || !!selectedOrder ? 'none' : 'flex' }}>
+          +
+        </Button>
+      )}
 
       {error && <Alert variant='danger'>{error}</Alert>}
 
@@ -450,7 +457,7 @@ const WholesaleSalesPage: React.FC = () => {
                   Ver
                 </Button>
 
-                {order.status !== 'cancelado' && (
+                {canCancelOrder && order.status !== 'cancelado' && (
                   <Button variant='outline-danger' size='sm' onClick={() => handleCancelOrder(order.id)}>
                     Cancelar
                   </Button>
@@ -618,9 +625,11 @@ const WholesaleSalesPage: React.FC = () => {
             Cancelar
           </Button>
 
-          <Button variant='primary' onClick={handleCreateOrder} disabled={orderItems.length === 0 || !selectedCustomerId}>
-            Crear Pedido
-          </Button>
+          {canCreateOrder && (
+            <Button variant='primary' onClick={handleCreateOrder} disabled={orderItems.length === 0 || !selectedCustomerId}>
+              Crear Pedido
+            </Button>
+          )}
         </Modal.Footer>
       </Modal>
 
@@ -656,18 +665,20 @@ const WholesaleSalesPage: React.FC = () => {
                 <div className='mt-2 text-muted' style={{ fontSize: '0.85rem' }}>
                   {new Date(selectedOrder.createdAt).toLocaleString()}
                 </div>
-                <Form.Control type='number' required placeholder='REFERENCIA' className='mt-2' onChange={e => setInvoiceNumber(Number(e.target.value))}></Form.Control>
+                {canCreateInvoice && <Form.Control type='number' required placeholder='REFERENCIA' className='mt-2' onChange={e => setInvoiceNumber(Number(e.target.value))}></Form.Control>}
               </div>
 
               {/* 🛒 PRODUCTOS */}
               <h6 className='mb-3'>Productos</h6>
 
               {/* BOTÓN FACTURAR SELECCIONADOS */}
-              <div className='mb-3'>
-                <Button variant='success' onClick={() => handleBulkInvoice(selectedOrder.id)} disabled={invoiceLoading || selectedOrder.status === 'cancelado' || !Object.values(invoiceQuantities).some(q => q > 0)}>
-                  {invoiceLoading ? 'Facturando...' : '📄 Facturar Seleccionados'}
-                </Button>
-              </div>
+              {canCreateInvoice && (
+                <div className='mb-3'>
+                  <Button variant='success' onClick={() => handleBulkInvoice(selectedOrder.id)} disabled={invoiceLoading || selectedOrder.status === 'cancelado' || !Object.values(invoiceQuantities).some(q => q > 0)}>
+                    {invoiceLoading ? 'Facturando...' : '📄 Facturar Seleccionados'}
+                  </Button>
+                </div>
+              )}
 
               {selectedOrder.items?.map(item => {
                 const progress = (item.quantityProcessed / item.quantityRequested) * 100;
@@ -717,17 +728,19 @@ const WholesaleSalesPage: React.FC = () => {
                         <small className='text-muted'>Restante</small>
                         <div>{item.quantityRequested - item.quantityProcessed}</div>
                       </div>
-                      <div>
+                      {canCreateInvoice && <div>
                         <small className='text-muted'>Precio</small>
                         <Form.Select size='sm' value={invoicePriceTier[item.productId] || 1} onChange={e => setInvoicePriceTier({ ...invoicePriceTier, [item.productId]: Number(e.target.value) as 1 | 2 | 3 })}>
                           <option value={1}>Precio 1 - ${(Number((item.product as any)?.price) || 0).toFixed(2)}</option>
                           <option value={2}>Precio 2 - ${(Number((item.product as any)?.pricecaja) || Number((item.product as any)?.price) || 0).toFixed(2)}</option>
                           <option value={3}>Precio 3 - ${(Number((item.product as any)?.priceb) || Number((item.product as any)?.price) || 0).toFixed(2)}</option>
                         </Form.Select>
-                      </div>
+                      </div>}
                     </div>
 
                     {/* 🔹 INPUT CANTIDAD FACTURAR */}
+                    {canCreateInvoice && (
+                    <>
                     <div className='d-flex gap-2 mt-3 align-items-center'>
                       <Form.Control
                         type='number'
@@ -771,6 +784,8 @@ const WholesaleSalesPage: React.FC = () => {
                       >
                         ⚡ Usar restante
                       </Button>
+                    )}
+                    </>
                     )}
                   </div>
                 );

@@ -1,4 +1,4 @@
-const { Permission, UserPermission } = require('../models');
+const { Permission, UserPermission, User } = require('../models');
 
 /**
  * Repositorio para operaciones de Permiso
@@ -23,12 +23,27 @@ class PermissionRepository {
     return await Permission.findByPk(id);
   }
 
+  async findByName(name) {
+    return await Permission.findOne({ where: { name } });
+  }
+
+  async findOrCreateByName(permissionData) {
+    const [permission, created] = await Permission.findOrCreate({
+      where: { name: permissionData.name },
+      defaults: permissionData
+    });
+    if (!created && permission.description !== permissionData.description) {
+      await permission.update({ description: permissionData.description });
+    }
+    return permission;
+  }
+
   /**
    * Lista todos los permisos
    * @returns {Promise<Array<Permission>>} Lista de permisos
    */
   async findAll() {
-    return await Permission.findAll();
+    return await Permission.findAll({ order: [['name', 'ASC']] });
   }
 
   /**
@@ -38,14 +53,13 @@ class PermissionRepository {
    * @returns {Promise<Array<UserPermission>>} Asignaciones creadas
    */
   async assignPermissionsToUser(userId, permissionIds) {
-    // Primero eliminar permisos existentes
-    await UserPermission.destroy({ where: { userId } });
-    // Crear nuevas asignaciones
-    const assignments = permissionIds.map(permissionId => ({
-      userId,
-      permissionId
-    }));
-    return await UserPermission.bulkCreate(assignments);
+    return await UserPermission.sequelize.transaction(async transaction => {
+      await UserPermission.destroy({ where: { userId }, transaction });
+      if (permissionIds.length === 0) return [];
+
+      const assignments = permissionIds.map(permissionId => ({ userId, permissionId }));
+      return await UserPermission.bulkCreate(assignments, { transaction });
+    });
   }
 
   /**

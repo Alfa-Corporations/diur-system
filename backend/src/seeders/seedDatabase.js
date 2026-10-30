@@ -4,6 +4,7 @@ const db = require('../utils/database');
 const initModels = require('../models/initModels');
 const { User, Product, Permission, UserPermission } = require('../models');
 const Supplier = require('../models/Suppliers');
+const permissionsData = require('../utils/permissionCatalog');
 
 //initModels(); // Inicializa relaciones entre modelos
 
@@ -14,35 +15,6 @@ const seedDatabase = async () => {
     console.log('✅ Base de datos sincronizada.');
 
     // --- PERMISOS ---
-    const permissionsData = [
-      { name: 'gestionar_productos', description: 'Gestionar productos' },
-      { name: 'crear_producto', description: 'Crear productos' },
-      { name: 'leer_producto', description: 'Ver productos' },
-      { name: 'actualizar_producto', description: 'Actualizar productos' },
-      { name: 'eliminar_producto', description: 'Eliminar productos' },
-      { name: 'crear_factura', description: 'Crear facturas' },
-      { name: 'leer_factura', description: 'Ver facturas' },
-      { name: 'actualizar_factura', description: 'Actualizar facturas' },
-      { name: 'cancelar_factura', description: 'Cancelar facturas' },
-      { name: 'crear_orden', description: 'Crear órdenes' },
-      { name: 'leer_orden', description: 'Ver órdenes' },
-      { name: 'actualizar_orden', description: 'Actualizar órdenes' },
-      { name: 'cancelar_orden', description: 'Cancelar órdenes' },
-      { name: 'gestionar_items_orden', description: 'Gestionar items de órdenes' },
-      { name: 'crear_usuario', description: 'Crear usuarios' },
-      { name: 'leer_usuario', description: 'Ver usuarios' },
-      { name: 'actualizar_usuario', description: 'Actualizar usuarios' },
-      { name: 'eliminar_usuario', description: 'Eliminar usuarios' },
-      { name: 'gestionar_usuarios', description: 'Gestionar usuarios' },
-      { name: 'gestionar_permisos', description: 'Gestionar permisos' },
-      { name: 'ver_dashboard', description: 'Ver dashboard' },
-      { name: 'ver_reportes', description: 'Ver reportes' },
-      { name: 'acceso_pos', description: 'Acceso a POS' },
-      { name: 'acceso_administrativo', description: 'Acceso administrativo completo' },
-      { name: 'leer_clientes', description: 'Ver los cliente' },
-      { name: 'ver_totales', description: 'Ver los totales' },
-    ];
-
     const permissions = [];
     for (const permData of permissionsData) {
       const [permission] = await Permission.findOrCreate({

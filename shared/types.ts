@@ -105,7 +105,7 @@ export interface Order {
   id: number;
   userId: number;
   type: 'compra' | 'venta' | 'venta al mayor';
-  status: 'pendiente' | 'en_transito' | 'facturado' | 'cancelado';
+  status: 'pendiente' | 'parcial' | 'completado' | 'cancelado';
   total: number;
   supplier?: number;
   customerName?: string;

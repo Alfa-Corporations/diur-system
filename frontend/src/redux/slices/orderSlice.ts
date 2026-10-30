@@ -17,6 +17,17 @@ interface OrderState {
   };
 }
 
+const getFulfillmentStatus = (order: Order): Order['status'] => {
+  if (order.status === 'cancelado') return 'cancelado';
+
+  const items = order.items || [];
+  if (items.length > 0 && items.every(item => item.quantityProcessed >= item.quantityRequested)) {
+    return 'completado';
+  }
+  if (items.some(item => item.quantityProcessed > 0)) return 'parcial';
+  return 'pendiente';
+};
+
 const initialState: OrderState = {
   orders: [],
   currentOrder: null,
@@ -69,12 +80,14 @@ const orderSlice = createSlice({
         const itemIndex = order.items?.findIndex(i => i.id === item.id);
         if (itemIndex !== undefined && order.items) {
           order.items[itemIndex] = item;
+          order.status = getFulfillmentStatus(order);
         }
       }
       if (state.currentOrder?.id === orderId && state.currentOrder.items) {
         const itemIndex = state.currentOrder.items.findIndex(i => i.id === item.id);
         if (itemIndex !== -1) {
           state.currentOrder.items[itemIndex] = item;
+          state.currentOrder.status = getFulfillmentStatus(state.currentOrder);
         }
       }
     },
