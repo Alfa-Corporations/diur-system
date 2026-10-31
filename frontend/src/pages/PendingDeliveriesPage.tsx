@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { isAxiosError } from 'axios';
 import { Alert, Badge, Button, Form, Spinner } from 'react-bootstrap';
 import type { Order, OrderItem } from '../../../shared/types';
 import { useAppSelector } from '../hooks/redux';
 import { usePermissions } from '../hooks/permissions';
 import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
-import socketService from '../services/socketService';
 
 type PendingDelivery = {
   order: Order;
@@ -13,22 +13,47 @@ type PendingDelivery = {
   remaining: number;
 };
 
-const getFulfillmentStatus = (items: OrderItem[]): Order['status'] => {
-  if (items.length > 0 && items.every(item => item.quantityProcessed >= item.quantityRequested)) return 'completado';
-  if (items.some(item => item.quantityProcessed > 0)) return 'parcial';
-  return 'pendiente';
+type DraftInvoiceItem = {
+  order: Order;
+  orderItem: OrderItem;
+  quantity: number;
+  price: number;
+};
+
+const normalizeCustomerValue = (value?: string | null) => value?.trim().toLocaleLowerCase() || '';
+
+const isSameCustomer = (firstOrder: Order, secondOrder: Order) => {
+  const firstCustomerId = firstOrder.customer?.id;
+  const secondCustomerId = secondOrder.customer?.id;
+  if (firstCustomerId != null && secondCustomerId != null) {
+    return String(firstCustomerId) === String(secondCustomerId);
+  }
+
+  const firstIdentification = normalizeCustomerValue(firstOrder.customer?.identificationNumber);
+  const secondIdentification = normalizeCustomerValue(secondOrder.customer?.identificationNumber);
+  if (firstIdentification && secondIdentification) {
+    return firstIdentification === secondIdentification;
+  }
+
+  const firstName = normalizeCustomerValue(firstOrder.customer?.name || firstOrder.customerName);
+  const secondName = normalizeCustomerValue(secondOrder.customer?.name || secondOrder.customerName);
+  return Boolean(firstName && secondName && firstName === secondName);
 };
 
 const PendingDeliveriesPage: React.FC = () => {
   const { hasPermission } = usePermissions();
   const { user } = useAppSelector(state => state.auth);
   const canDispatch = hasPermission('actualizar_orden') || hasPermission('gestionar_items_orden') || user?.role === 'admin';
+  const canCreateInvoice = hasPermission('crear_factura') || user?.role === 'admin';
   const [orders, setOrders] = useState<Order[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [loading, setLoading] = useState(true);
-  const [pendingItemId, setPendingItemId] = useState<number | null>(null);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [quantities, setQuantities] = useState<Record<number, string>>({});
+  const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
+  const [invoiceItems, setInvoiceItems] = useState<DraftInvoiceItem[]>([]);
+  const [invoiceNumberExternal, setInvoiceNumberExternal] = useState('');
   const [expandedItems, setExpandedItems] = useState<Set<number>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -109,8 +134,8 @@ const PendingDeliveriesPage: React.FC = () => {
     });
   };
 
-  const handleDispatch = async (delivery: PendingDelivery) => {
-    if (!isOnline || !canDispatch || pendingItemId !== null) return;
+  const handleAddToInvoice = (delivery: PendingDelivery) => {
+    if (!isOnline || !canDispatch || !canCreateInvoice || invoiceLoading) return;
 
     const quantity = Number(quantities[delivery.item.id] || delivery.remaining);
     if (!Number.isInteger(quantity) || quantity <= 0 || quantity > delivery.remaining) {
@@ -119,30 +144,91 @@ const PendingDeliveriesPage: React.FC = () => {
       return;
     }
 
-    setPendingItemId(delivery.item.id);
+    if (invoiceOrder && !isSameCustomer(invoiceOrder, delivery.order)) {
+      setError('La pre-factura solo puede incluir productos del mismo cliente.');
+      setSuccess(null);
+      return;
+    }
+
+    if (invoiceItems.some(item => item.orderItem.id === delivery.item.id)) {
+      setError('Este producto ya está agregado a la pre-factura.');
+      setSuccess(null);
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+    setInvoiceOrder(delivery.order);
+    setInvoiceItems(current => [
+      ...current,
+      {
+        order: delivery.order,
+        orderItem: delivery.item,
+        quantity,
+        price: Number(delivery.item.unitPrice || delivery.item.product?.price || 0)
+      }
+    ]);
+    setQuantities(current => ({ ...current, [delivery.item.id]: '' }));
+  };
+
+  const handleRemoveInvoiceItem = (orderItemId: number) => {
+    const remainingItems = invoiceItems.filter(item => item.orderItem.id !== orderItemId);
+    setInvoiceItems(remainingItems);
+    if (remainingItems.length === 0) setInvoiceOrder(null);
+  };
+
+  const handleCreateInvoice = async () => {
+    if (!isOnline || !canDispatch || !canCreateInvoice || !invoiceOrder || invoiceItems.length === 0 || invoiceLoading) return;
+
+    const externalNumber = invoiceNumberExternal.trim();
+    if (!externalNumber) {
+      setError('Ingresa el número de referencia de la factura.');
+      setSuccess(null);
+      return;
+    }
+
+    setInvoiceLoading(true);
     setError(null);
     setSuccess(null);
     try {
-      const updatedItem = await apiService.updateOrderItemStatus(delivery.order.id, delivery.item.productId, { quantityProcessed: quantity });
-      socketService.emit('order_updated', {
-        orderId: delivery.order.id,
-        productId: delivery.item.productId,
-        quantityProcessed: updatedItem.quantityProcessed,
-        status: updatedItem.status
+      const customerOrder = invoiceItems.find(item => item.order.customer)?.order || invoiceOrder;
+      const customer = customerOrder.customer;
+      const invoice = await apiService.createInvoice({
+        invoiceNumberExternal: `001-011-${String(externalNumber).padStart(10, '0')}`,
+        documentType: customer?.name || customerOrder.customerName ? 'sales_note' : 'consumer_final',
+        customer: {
+          name: customer?.name || customerOrder.customerName || 'Cliente ocasional',
+          email: customer?.email || undefined,
+          phone: customer?.phone || undefined,
+          identificationType: customer?.identificationType || 'none',
+          identificationNumber: customer?.identificationNumber || undefined,
+          address: customer?.address || customerOrder.customerAddress || undefined
+        },
+        items: invoiceItems.map(({ orderItem, quantity, price }) => ({
+          productId: orderItem.productId,
+          quantity,
+          price,
+          orderItemId: orderItem.id
+        }))
       });
-      setOrders(current =>
-        current.map(order => {
-          if (order.id !== delivery.order.id) return order;
-          const items = (order.items || []).map(item => (item.id === updatedItem.id ? { ...item, ...updatedItem, product: item.product } : item));
-          return { ...order, items, status: getFulfillmentStatus(items) };
-        })
+
+      const affectedOrderIds = Array.from(new Set(invoiceItems.map(item => item.order.id)));
+      setSuccess(`Factura ${invoice.invoiceNumber || `#${invoice.id}`} creada con referencia ${externalNumber}. Se actualizaron el inventario y las órdenes ${affectedOrderIds.map(id => `#${id}`).join(', ')}.`);
+      setInvoiceOrder(null);
+      setInvoiceItems([]);
+      setInvoiceNumberExternal('');
+      setQuantities({});
+      setRefreshKey(current => current + 1);
+    } catch (invoiceError) {
+      setError(
+        isAxiosError<{ message?: string }>(invoiceError)
+          ? invoiceError.response?.data?.message || invoiceError.message
+          : invoiceError instanceof Error
+            ? invoiceError.message
+            : 'No se pudo crear la factura.'
       );
-      setQuantities(current => ({ ...current, [delivery.item.id]: '' }));
-      setSuccess(`${quantity} unidad(es) despachada(s) de ${delivery.item.product?.name || 'el producto'} — orden #${delivery.order.id}.`);
-    } catch (dispatchError) {
-      setError(dispatchError instanceof Error ? dispatchError.message : 'No se pudo despachar el producto.');
     } finally {
-      setPendingItemId(null);
+      setInvoiceLoading(false);
     }
   };
 
@@ -171,8 +257,69 @@ const PendingDeliveriesPage: React.FC = () => {
 
       {!isOnline && <Alert variant='warning'>Modo sin conexión: puedes consultar los datos guardados, pero no despachar.</Alert>}
       {!canDispatch && <Alert variant='info'>Tu usuario puede consultar los pendientes, pero no tiene permiso para despachar.</Alert>}
+      {canDispatch && !canCreateInvoice && <Alert variant='info'>Para despachar productos desde este módulo también necesitas permiso para crear facturas.</Alert>}
       {error && <Alert variant='danger' dismissible onClose={() => setError(null)}>{error}</Alert>}
       {success && <Alert variant='success' dismissible onClose={() => setSuccess(null)}>{success}</Alert>}
+
+      {invoiceOrder && invoiceItems.length > 0 && (
+        <section className='border rounded bg-white p-3 mb-4' aria-label='Pre-factura'>
+          <div className='d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3'>
+            <div>
+              <span className='pending-section-label'>Pre-factura</span>
+              <h2 className='h5 mb-1'>{invoiceOrder.customer?.name || invoiceOrder.customerName || 'Cliente sin nombre'}</h2>
+              <small className='text-muted'>
+                Órdenes incluidas: {Array.from(new Set(invoiceItems.map(item => item.order.id))).map(id => `#${id}`).join(', ')}
+              </small>
+            </div>
+            <strong>
+              Total: ${invoiceItems.reduce((total, item) => total + item.quantity * item.price, 0).toFixed(2)}
+            </strong>
+          </div>
+          <div className='table-responsive'>
+            <table className='table table-sm align-middle'>
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Orden</th>
+                  <th>Cantidad</th>
+                  <th>Precio unitario</th>
+                  <th>Subtotal</th>
+                  <th><span className='visually-hidden'>Acciones</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoiceItems.map(({ order, orderItem, quantity, price }) => (
+                  <tr key={orderItem.id}>
+                    <td>{orderItem.product?.name || `Producto #${orderItem.productId}`}</td>
+                    <td>#{order.id}</td>
+                    <td>{quantity}</td>
+                    <td>${price.toFixed(2)}</td>
+                    <td>${(quantity * price).toFixed(2)}</td>
+                    <td>
+                      <Button variant='outline-danger' size='sm' onClick={() => handleRemoveInvoiceItem(orderItem.id)} disabled={invoiceLoading}>
+                        Retirar
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Form.Group className='mb-3' controlId='invoiceNumberExternal'>
+            <Form.Label>Número de referencia de la factura</Form.Label>
+            <Form.Control
+              value={invoiceNumberExternal}
+              onChange={event => setInvoiceNumberExternal(event.target.value)}
+              placeholder='123'
+              required
+              disabled={invoiceLoading}
+            />
+          </Form.Group>
+          <Button variant='success' onClick={() => void handleCreateInvoice()} disabled={!isOnline || invoiceLoading || !invoiceNumberExternal.trim()}>
+            {invoiceLoading ? <><Spinner animation='border' size='sm' className='me-2' />Creando factura...</> : 'Crear factura y confirmar despacho'}
+          </Button>
+        </section>
+      )}
 
       <section className='pending-deliveries-stats' aria-label='Resumen de despachos'>
         <div className='pending-stat-card'>
@@ -212,7 +359,6 @@ const PendingDeliveriesPage: React.FC = () => {
               <div className='pending-delivery-list'>
                 {customer.deliveries.map(delivery => {
                   const expanded = expandedItems.has(delivery.item.id);
-                  const dispatching = pendingItemId === delivery.item.id;
                   return (
                     <div className='pending-delivery-row' key={delivery.item.id}>
                       <div className='pending-delivery-main'>
@@ -237,14 +383,14 @@ const PendingDeliveriesPage: React.FC = () => {
                             aria-label={`Cantidad a despachar de ${delivery.item.product?.name || 'producto'}`}
                             value={quantities[delivery.item.id] ?? delivery.remaining}
                             onChange={event => updateQuantity(delivery.item.id, event.target.value)}
-                            disabled={!isOnline || !canDispatch || pendingItemId !== null}
+                            disabled={!isOnline || !canDispatch || !canCreateInvoice || invoiceLoading}
                           />
                           <Button
                             variant='primary'
-                            onClick={() => void handleDispatch(delivery)}
-                            disabled={!isOnline || !canDispatch || pendingItemId !== null}
+                            onClick={() => handleAddToInvoice(delivery)}
+                            disabled={!isOnline || !canDispatch || !canCreateInvoice || invoiceLoading}
                           >
-                            {dispatching ? <Spinner animation='border' size='sm' /> : 'Despachar'}
+                            Agregar a pre-factura
                           </Button>
                         </div>
                       </div>

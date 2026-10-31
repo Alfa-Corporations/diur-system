@@ -29,15 +29,15 @@ const Dashboard: React.FC = () => {
   };
 
   const menuItems = [
-    { label: 'Pedidos de venta', path: '/orders/sale', icon: '📤', helper: 'Consultar y gestionar órdenes', permissions: ['leer_orden'] },
+    { label: 'Ordenes', path: '/orders/sale', icon: '📤', helper: 'Consultar y gestionar órdenes', permissions: ['leer_orden'] },
     { label: 'Despachos pendientes', path: '/orders/dispatch', icon: '🚚', helper: 'Pendientes por cliente y orden', permissions: ['leer_orden'] },
-    { label: 'Compras', path: '/orders/purchase', icon: '📥', helper: 'Órdenes de compra y recepción', permissions: ['leer_orden'] },
+    //{ label: 'Compras', path: '/orders/purchase', icon: '📥', helper: 'Órdenes de compra y recepción', permissions: ['leer_orden'] },
     { label: 'Dashboard de pedidos', path: '/orders/dashboard', icon: '📊', helper: 'Vista global de órdenes', permissions: ['leer_orden'] },
     { label: 'Facturas', path: '/invoices', icon: '🧾', helper: 'Consultar ventas y cobros', permissions: ['leer_factura'] },
     { label: 'Cuentas por cobrar', path: '/accounts-receivable', icon: '💳', helper: 'Gestionar saldos pendientes', permissions: ['leer_factura'] },
     { label: 'Clientes', path: '/customer', icon: '👥', helper: 'Administración de clientes', permissions: ['leer_clientes'] },
     { label: 'Productos', path: '/products', icon: '📦', helper: 'Inventario y stock', permissions: ['leer_producto', 'gestionar_productos'] },
-    { label: 'Ventas en el local', path: '/pos', icon: '🛒', helper: 'Punto de venta', permissions: ['acceso_pos'] },
+    //{ label: 'Ventas en el local', path: '/pos', icon: '🛒', helper: 'Punto de venta', permissions: ['acceso_pos'] },
     { label: 'Usuarios', path: '/users', icon: '🔐', helper: 'Administración de accesos', permissions: ['leer_usuario', 'gestionar_usuarios', 'crud_users'] }
   ];
 
@@ -112,12 +112,11 @@ const Dashboard: React.FC = () => {
           <aside className='col-12 col-xl-3'>
             <div className='side-panel h-100'>
               <p className='section-label mb-3'>Navegación</p>
-              <div className='d-grid gap-2'>
+              <div className='d-grid gap-2' style={{ gridTemplateColumns: '1fr 1fr' }}>
                 {availableMenuItems.map(item => (
-                  <button key={item.path} className='nav-action' onClick={() => navigate(item.path)}>
-                    <span className='fw-semibold'>
-                      {item.icon} {item.label}
-                    </span>
+                  <button key={item.path} className='nav-action text-center' onClick={() => navigate(item.path)}>
+                    <span>{item.icon}</span>
+                    <span className='fw-semibold'>{item.label}</span>
                     <small>{item.helper}</small>
                   </button>
                 ))}
@@ -136,7 +135,7 @@ const Dashboard: React.FC = () => {
               <div className='col-12 col-md-4'>
                 <div className='stat-card'>
                   <div className='d-flex justify-content-between align-items-start'>
-                    <div>
+                    <div >
                       <div className='metric-label'>Estado del sistema</div>
                       <div className='metric-value'>{socketService.isConnected() ? 'Online' : 'Offline'}</div>
                     </div>
@@ -144,31 +143,35 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
-              {(user.role === 'admin' || hasPermission('leer_factura')) && <div className='col-12 col-md-4'>
-                <div className='stat-card clickable' onClick={() => navigate('/accounts-receivable')} style={{ cursor: 'pointer' }}>
-                  <div className='d-flex justify-content-between align-items-start'>
-                    <div>
-                      <div className='metric-label'>Cuentas por Cobrar</div>
-                      <div className='metric-value'>{pendingAccounts === null ? '—' : pendingAccounts}</div>
+              {(user.role === 'admin' || hasPermission('leer_factura')) && (
+                <div className='col-12 col-md-4'>
+                  <div className='stat-card clickable' onClick={() => navigate('/accounts-receivable')} style={{ cursor: 'pointer' }}>
+                    <div className='d-flex justify-content-between align-items-start'>
+                      <div>
+                        <div className='metric-label'>Cuentas por Cobrar</div>
+                        <div className='metric-value'>{pendingAccounts === null ? '—' : pendingAccounts}</div>
+                      </div>
+                      <span className='metric-icon'>💳</span>
                     </div>
-                    <span className='metric-icon'>💳</span>
+                    <div className='small text-muted mt-2'>Ver y registrar pagos pendientes</div>
                   </div>
-                  <div className='small text-muted mt-2'>Ver y registrar pagos pendientes</div>
                 </div>
-              </div>}
-              {(user.role === 'admin' || hasPermission('leer_orden')) && <div className='col-12 col-md-4'>
-                <div className='stat-card clickable' onClick={() => navigate('/orders/dispatch')} style={{ cursor: 'pointer' }}>
-                  <div className='d-flex justify-content-between align-items-start'>
-                    <div>
-                      <div className='metric-label'>Unidades por despachar</div>
-                      <div className='metric-value'>{pendingDeliveryUnits === null ? '—' : pendingDeliveryUnits}</div>
+              )}
+              {(user.role === 'admin' || hasPermission('leer_orden')) && (
+                <div className='col-12 col-md-4'>
+                  <div className='stat-card clickable' onClick={() => navigate('/orders/dispatch')} style={{ cursor: 'pointer' }}>
+                    <div className='d-flex justify-content-between align-items-start'>
+                      <div>
+                        <div className='metric-label'>Unidades por despachar</div>
+                        <div className='metric-value'>{pendingDeliveryUnits === null ? '—' : pendingDeliveryUnits}</div>
+                      </div>
+                      <span className='metric-icon'>🚚</span>
                     </div>
-                    <span className='metric-icon'>🚚</span>
+                    <div className='small text-muted mt-2'>Ver pendientes agrupados por cliente</div>
                   </div>
-                  <div className='small text-muted mt-2'>Ver pendientes agrupados por cliente</div>
                 </div>
-              </div>}
-              <div className='col-12 col-md-4'>
+              )}
+              {/* <div className='col-12 col-md-4'>
                 <div className='stat-card'>
                   <div className='d-flex justify-content-between align-items-start'>
                     <div>
@@ -178,7 +181,7 @@ const Dashboard: React.FC = () => {
                     <span className='metric-icon'>🔐</span>
                   </div>
                 </div>
-              </div>
+              </div> */}
               <div className='col-12 col-md-4'>
                 <div className='stat-card'>
                   <div className='d-flex justify-content-between align-items-start'>

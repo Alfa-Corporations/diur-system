@@ -122,20 +122,10 @@ const AccountsReceivablePage: React.FC = () => {
       <div className='d-flex justify-content-between align-items-center mb-3'>
         <h2>Cuentas por Cobrar</h2>
         <div>
-          <button className='btn btn-outline-secondary me-2' onClick={() => navigate(-1)}>
-            ← Volver
-          </button>
           <button className='btn btn-primary' onClick={() => void load()}>
             Actualizar
           </button>
         </div>
-      </div>
-
-      <div className='mb-3 d-flex gap-2'>
-        <input className='form-control' placeholder='Buscar por cliente o identificación' value={search} onChange={e => setSearch(e.target.value)} />
-        <button className='btn btn-outline-secondary' onClick={() => void load()}>
-          Recargar
-        </button>
       </div>
 
       {loading ? (
@@ -168,12 +158,16 @@ const AccountsReceivablePage: React.FC = () => {
                       <p className='mb-1'>
                         <strong>Identificación:</strong> {acc.customer?.identificationNumber || acc.customerIdentification || '—'}
                       </p>
-                      {canViewTotals && <p className='mb-1'>
-                        <strong>Total:</strong> {formatCurrency(acc.totalAmount)}
-                      </p>}
-                      {canViewTotals && <p className='mb-1'>
-                        <strong>Pendiente:</strong> {formatCurrency(acc.pendingAmount)}
-                      </p>}
+                      {canViewTotals && (
+                        <p className='mb-1'>
+                          <strong>Total:</strong> {formatCurrency(acc.totalAmount)}
+                        </p>
+                      )}
+                      {canViewTotals && (
+                        <p className='mb-1'>
+                          <strong>Pendiente:</strong> {formatCurrency(acc.pendingAmount)}
+                        </p>
+                      )}
                       <p className='mb-0 text-muted'>
                         <strong>Creado:</strong> {new Date(acc.createdAt).toLocaleDateString()}
                       </p>
@@ -209,12 +203,16 @@ const AccountsReceivablePage: React.FC = () => {
                   <div>
                     <strong>Factura:</strong> {selectedAccount.invoice?.invoiceNumber || `#${selectedAccount.invoiceId}`}
                   </div>
-                  {canViewTotals && <div>
-                    <strong>Total:</strong> {formatCurrency(selectedAccount.totalAmount)}
-                  </div>}
-                  {canViewTotals && <div>
-                    <strong>Pendiente:</strong> {formatCurrency(selectedAccount.pendingAmount)}
-                  </div>}
+                  {canViewTotals && (
+                    <div>
+                      <strong>Total:</strong> {formatCurrency(selectedAccount.totalAmount)}
+                    </div>
+                  )}
+                  {canViewTotals && (
+                    <div>
+                      <strong>Pendiente:</strong> {formatCurrency(selectedAccount.pendingAmount)}
+                    </div>
+                  )}
                   <div>
                     <strong>Estado:</strong> {selectedAccount.status}
                   </div>
@@ -255,15 +253,18 @@ const AccountsReceivablePage: React.FC = () => {
                           <div className='d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2'>
                             <div>
                               <div>
-                                {canViewTotals && <strong>{formatCurrency(p.amount)} — </strong>}{new Date(p.createdAt).toLocaleString()}
+                                {canViewTotals && <strong>{formatCurrency(p.amount)} — </strong>}
+                                {new Date(p.createdAt).toLocaleString()}
                               </div>
                               <div className='small text-muted'>
                                 Método: {p.paymentMethod || '—'} — Ref: {p.paymentReference || '—'}
                               </div>
                             </div>
-                            {canViewTotals && <button className='btn btn-sm btn-outline-secondary' onClick={() => handlePrintPaymentReceipt(p, selectedAccount)}>
-                              Imprimir
-                            </button>}
+                            {canViewTotals && (
+                              <button className='btn btn-sm btn-outline-secondary' onClick={() => handlePrintPaymentReceipt(p, selectedAccount)}>
+                                Imprimir
+                              </button>
+                            )}
                           </div>
                         </li>
                       ))}

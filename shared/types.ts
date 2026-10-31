@@ -202,6 +202,7 @@ export interface CreateInvoiceRequest {
     price?: number;
     orderItemId?: number;
   }>;
+  invoiceNumberExternal?: string;
   documentType?: InvoiceDocumentType;
   customer?: {
     name?: string;

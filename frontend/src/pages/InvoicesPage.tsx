@@ -7,6 +7,7 @@ import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure } from '
 import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
 import type { Invoice, InvoiceItem } from '../../../shared/types';
+import { Accordion } from 'react-bootstrap';
 
 const PAYMENT_OPTIONS = [
   { value: 'credit', label: 'Crédito' },
@@ -69,7 +70,6 @@ const InvoicesPage: React.FC = () => {
   const [customerIdentification, setCustomerIdentification] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
   const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
-  const [invoiceViewMode, setInvoiceViewMode] = useState<'active' | 'deleted'>('active');
 
   const adjustLocalProductStock = async (items: InvoiceItem[], multiplier: 1 | -1) => {
     const currentProducts = await localDBService.getProducts();
@@ -101,7 +101,7 @@ const InvoicesPage: React.FC = () => {
   const formatCurrency = (value: unknown) => `$${toNumber(value).toFixed(2)}`;
 
   const loadInvoices = useCallback(
-    async (statusFilter?: Invoice['status']) => {
+    async (includeDeleted = false) => {
       dispatch(fetchInvoicesStart());
 
       try {
@@ -109,15 +109,16 @@ const InvoicesPage: React.FC = () => {
         const shouldPreferLocal = !isOnline || pendingEvents.length > 0;
 
         if (!shouldPreferLocal) {
-          const params = statusFilter ? { status: statusFilter } : undefined;
-          const { invoices: apiInvoices } = await apiService.getInvoices(params);
+          const { invoices: activeInvoices } = await apiService.getInvoices({ limit: 1000 });
+          const { invoices: deletedInvoices = [] } = includeDeleted ? await apiService.getInvoices({ status: 'cancelled', limit: 1000 }) : { invoices: [] };
+          const apiInvoices = [...activeInvoices, ...deletedInvoices];
           await localDBService.saveInvoices(apiInvoices);
           dispatch(fetchInvoicesSuccess({ invoices: apiInvoices, totalCount: apiInvoices.length }));
           return;
         }
 
         const localInvoices = await localDBService.getInvoices();
-        const filteredInvoices = statusFilter ? localInvoices.filter(invoice => invoice.status === statusFilter) : localInvoices.filter(invoice => invoice.status !== 'cancelled');
+        const filteredInvoices = includeDeleted ? localInvoices : localInvoices.filter(invoice => invoice.status !== 'cancelled');
         dispatch(fetchInvoicesSuccess({ invoices: filteredInvoices, totalCount: filteredInvoices.length }));
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Error al cargar facturas';
@@ -125,7 +126,7 @@ const InvoicesPage: React.FC = () => {
 
         try {
           const localInvoices = await localDBService.getInvoices();
-          const filteredInvoices = statusFilter ? localInvoices.filter(invoice => invoice.status === statusFilter) : localInvoices.filter(invoice => invoice.status !== 'cancelled');
+          const filteredInvoices = includeDeleted ? localInvoices : localInvoices.filter(invoice => invoice.status !== 'cancelled');
           dispatch(fetchInvoicesSuccess({ invoices: filteredInvoices, totalCount: filteredInvoices.length }));
         } catch {
           dispatch(fetchInvoicesFailure(message));
@@ -165,9 +166,8 @@ const InvoicesPage: React.FC = () => {
   }, [dispatch, isOnline]);
 
   useEffect(() => {
-    const requestedStatus = isAdmin && invoiceViewMode === 'deleted' ? 'cancelled' : undefined;
-    void Promise.all([loadInvoices(requestedStatus), loadProducts()]);
-  }, [invoiceViewMode, isAdmin, loadInvoices, loadProducts]);
+    void Promise.all([loadInvoices(isAdmin), loadProducts()]);
+  }, [isAdmin, loadInvoices, loadProducts]);
 
   const calculateTotal = (items: InvoiceItem[]) => items.reduce((sum, item) => sum + (toNumber(item.total) || toNumber(item.price) * toNumber(item.quantity)), 0);
 
@@ -472,7 +472,7 @@ const InvoicesPage: React.FC = () => {
 
       setShowModal(false);
       resetForm();
-      await loadInvoices(isAdmin && invoiceViewMode === 'deleted' ? 'cancelled' : undefined);
+      await loadInvoices(isAdmin);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error al guardar la factura';
       alert(message);
@@ -528,7 +528,7 @@ const InvoicesPage: React.FC = () => {
 
       await persistInvoiceLocally(deletedInvoice);
       dispatch(cancelInvoiceSuccess(deletedInvoice));
-      await loadInvoices(isAdmin && invoiceViewMode === 'deleted' ? 'cancelled' : undefined);
+      await loadInvoices(isAdmin);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error al eliminar la factura';
       alert(message);
@@ -605,7 +605,7 @@ const InvoicesPage: React.FC = () => {
       }
 
       resetPaymentState();
-      await loadInvoices(isAdmin && invoiceViewMode === 'deleted' ? 'cancelled' : undefined);
+      await loadInvoices(isAdmin);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo pagar la factura';
       alert(message);
@@ -625,7 +625,7 @@ const InvoicesPage: React.FC = () => {
       await persistInvoiceLocally(updatedInvoice);
       dispatch(updateInvoiceSuccess(updatedInvoice));
       alert(`Nota de venta enviada correctamente a ${recipient}.`);
-      await loadInvoices(isAdmin && invoiceViewMode === 'deleted' ? 'cancelled' : undefined);
+      await loadInvoices(isAdmin);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo enviar el correo';
       alert(message);
@@ -719,12 +719,11 @@ const InvoicesPage: React.FC = () => {
     }, 250);
   };
 
-  const isDeletedView = isAdmin && invoiceViewMode === 'deleted';
-  const visibleInvoices = isDeletedView ? invoices.filter(invoice => invoice.status === 'cancelled') : invoices.filter(invoice => invoice.status !== 'cancelled');
-  const createdInvoices = visibleInvoices.filter(invoice => invoice.status === 'pending').length;
-  const paidInvoices = visibleInvoices.filter(invoice => invoice.status === 'paid').length;
-  const deletedInvoices = visibleInvoices.filter(invoice => invoice.status === 'cancelled').length;
-  const totalBilled = visibleInvoices.reduce((sum, invoice) => sum + toNumber(invoice.total), 0);
+  const pendingInvoices = invoices.filter(invoice => invoice.status === 'pending');
+  const paidInvoices = invoices.filter(invoice => invoice.status === 'paid');
+  const deletedInvoices = isAdmin ? invoices.filter(invoice => invoice.status === 'cancelled') : [];
+  const visibleInvoices = [...pendingInvoices, ...paidInvoices, ...deletedInvoices];
+  const totalBilled = [...pendingInvoices, ...paidInvoices].reduce((sum, invoice) => sum + toNumber(invoice.total), 0);
   const draftTotal = calculateTotal(invoiceItems);
   const paymentPreviewTotal = invoiceToPay ? toNumber(invoiceToPay.total) : draftTotal;
   const receivedPreview = amountReceived === '' ? 0 : toNumber(amountReceived);
@@ -732,7 +731,7 @@ const InvoicesPage: React.FC = () => {
 
   const getInvoiceStatusLabel = (status: Invoice['status']) => {
     if (status === 'paid') return 'Pagada';
-    if (status === 'pending') return 'Creada';
+    if (status === 'pending') return 'Pendiente';
     return 'Eliminada';
   };
 
@@ -740,6 +739,18 @@ const InvoicesPage: React.FC = () => {
     if (status === 'paid') return 'bg-success';
     if (status === 'pending') return 'bg-warning';
     return 'bg-danger';
+  };
+
+  const getInvoiceGroupLabel = (status: Invoice['status']) => {
+    if (status === 'pending') return 'Pendientes';
+    if (status === 'paid') return 'Pagadas';
+    return 'Eliminadas';
+  };
+
+  const getInvoiceGroupCount = (status: Invoice['status']) => {
+    if (status === 'pending') return pendingInvoices.length;
+    if (status === 'paid') return paidInvoices.length;
+    return deletedInvoices.length;
   };
 
   const getDocumentLabel = (invoice: Invoice) => (invoice.documentType === 'sales_note' ? 'Nota de venta' : 'Consumidor final');
@@ -750,15 +761,10 @@ const InvoicesPage: React.FC = () => {
         <div>
           <span className='eyebrow mb-2'>Facturación</span>
           <h2 className='mb-1'>Gestión de Facturas</h2>
-          <p className='mb-0'>Las facturas creadas y pagadas están visibles para admin y caja; las eliminadas solo aparecen en la vista administrativa.</p>
+          <p className='mb-0'>Las facturas se agrupan por estado: pendientes, pagadas y, para administración, eliminadas.</p>
         </div>
-        <div className='page-actions'>
-          <button className='btn btn-goback' onClick={() => navigate(-1)}>
-            <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#000000'>
-              <path d='m142-480 294 294q15 15 14.5 35T435-116q-15 15-35 15t-35-15L57-423q-12-12-18-27t-6-30q0-15 6-30t18-27l308-308q15-15 35.5-14.5T436-844q15 15 15 35t-15 35L142-480Z' />
-            </svg>
-          </button>
-          <button className='btn btn-outline-secondary' onClick={() => void Promise.all([loadInvoices(isDeletedView ? 'cancelled' : undefined), loadProducts()])}>
+        <div className='page-actions d-grid' style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <button className='btn btn-outline-secondary' onClick={() => void Promise.all([loadInvoices(isAdmin), loadProducts()])}>
             Actualizar
           </button>
           {canCreateInvoices && (
@@ -775,137 +781,142 @@ const InvoicesPage: React.FC = () => {
         </div>
       </div>
 
-      <div className='row g-3 mb-4'>
-        <div className='col-12 col-md-4'>
+      <div className='row g-3 mb-4' style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+        <div className='col-12 col-md-3'>
           <div className='stat-card'>
-            <div className='metric-label'>{isDeletedView ? 'Facturas eliminadas' : 'Facturas creadas'}</div>
-            <div className='metric-value'>{isDeletedView ? deletedInvoices : createdInvoices}</div>
+            <div className='metric-label'>Facturas pendientes</div>
+            <div className='metric-value'>{pendingInvoices.length}</div>
           </div>
         </div>
-        <div className='col-12 col-md-4'>
+        <div className='col-12 col-md-3'>
           <div className='stat-card'>
-            <div className='metric-label'>{isDeletedView ? 'Facturas pagadas en vista actual' : 'Facturas pagadas'}</div>
-            <div className='metric-value'>{paidInvoices}</div>
+            <div className='metric-label'>Facturas pagadas</div>
+            <div className='metric-value'>{paidInvoices.length}</div>
           </div>
         </div>
-        <div className='col-12 col-md-4'>
-          {canViewTotals && (
+        {isAdmin && (
+          <div className='col-12 col-md-3'>
+            <div className='stat-card'>
+              <div className='metric-label'>Facturas eliminadas</div>
+              <div className='metric-value'>{deletedInvoices.length}</div>
+            </div>
+          </div>
+        )}
+        {canViewTotals && (
+          <div className='col-12 col-md-3'>
             <div className='stat-card'>
               <div className='metric-label'>Monto total</div>
               <div className='metric-value'>{formatCurrency(totalBilled)}</div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {!isOnline && <div className='alert offline-banner'>⚠️ Modo offline activo. Los cambios se sincronizarán luego.</div>}
       {error && <div className='alert alert-danger'>{error}</div>}
 
-      {isAdmin && (
-        <div className='section-card mb-4'>
-          <div className='d-flex flex-wrap gap-2 align-items-center justify-content-between'>
-            <div>
-              <h6 className='mb-1'>Vista administrativa de facturas</h6>
-              <p className='mb-0 text-muted'>Solo el administrador puede entrar a la sección de eliminadas.</p>
-            </div>
-            <div className='btn-group'>
-              <button type='button' className={`btn ${!isDeletedView ? 'btn-dark' : 'btn-outline-dark'}`} onClick={() => setInvoiceViewMode('active')}>
-                Creadas y pagadas
-              </button>
-              <button type='button' className={`btn ${isDeletedView ? 'btn-danger' : 'btn-outline-danger'}`} onClick={() => setInvoiceViewMode('deleted')}>
-                Eliminadas
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className='section-card'>
         {loading ? (
           <div className='text-center py-4'>Cargando facturas...</div>
         ) : visibleInvoices.length === 0 ? (
-          <div className='text-center py-4 text-muted'>{isDeletedView ? 'No hay facturas eliminadas registradas.' : 'No hay facturas creadas o pagadas todavía.'}</div>
+          <div className='text-center py-4 text-muted'>No hay facturas registradas todavía.</div>
         ) : (
           <>
             <div className='invoice-mobile-list d-grid gap-3 d-lg-none'>
-              {visibleInvoices.map(invoice => (
-                <article key={invoice.id} className='invoice-mobile-card'>
-                  <div className='invoice-mobile-card__header'>
-                    <div>
-                      <div className='invoice-mobile-card__number'>{invoice.invoiceNumber || `#${invoice.id}`}</div>
-                      <div className='invoice-mobile-card__number'>N° {invoice.invoiceNumberExternal || `#${invoice.id}`}</div>
-                      <small className='text-muted'>{new Date(invoice.createdAt).toLocaleString()}</small>
+              {visibleInvoices.map((invoice, index) => (
+                <React.Fragment key={invoice.id}>
+                  {(index === 0 || visibleInvoices[index - 1].status !== invoice.status) && (
+                    <h3 className='h6 text-uppercase text-muted mt-3 mb-0'>
+                      {getInvoiceGroupLabel(invoice.status)} ({getInvoiceGroupCount(invoice.status)})
+                    </h3>
+                  )}
+                  <article className='invoice-mobile-card'>
+                    <div className='invoice-mobile-card__header'>
+                      <div>
+                        <div className='invoice-mobile-card__number'>{invoice.invoiceNumber || `#${invoice.id}`}</div>
+                        <div className='invoice-mobile-card__number'>N° {invoice.invoiceNumberExternal || `#${invoice.id}`}</div>
+                        <small className='text-muted'>{new Date(invoice.createdAt).toLocaleString()}</small>
+                      </div>
+                      <span>{invoice.customerName}</span>
+                      <span className={`badge ${getInvoiceStatusClass(invoice.status)}`}>{getInvoiceStatusLabel(invoice.status)}</span>
                     </div>
-                    <span className={`badge ${getInvoiceStatusClass(invoice.status)}`}>{getInvoiceStatusLabel(invoice.status)}</span>
-                  </div>
 
-                  {canViewTotals && <div className='invoice-mobile-card__amount'>{formatCurrency(invoice.total)}</div>}
+                    {canViewTotals && <div className='invoice-mobile-card__amount'>{formatCurrency(invoice.total)}</div>}
+                    <Accordion>
+                      <Accordion.Item eventKey='0'>
+                        <Accordion.Header>Detalle</Accordion.Header>
+                        <Accordion.Body>
+                          <div className='invoice-mobile-meta'>
+                            <div className='invoice-mobile-meta__item'>
+                              <span className='invoice-mobile-meta__label'>Cliente</span>
+                              <strong>{invoice.customerName || 'Consumidor Final'}</strong>
+                              <small>{invoice.customerIdentification || '9999999999999'}</small>
+                            </div>
+                            <div className='invoice-mobile-meta__item'>
+                              <span className='invoice-mobile-meta__label'>Documento</span>
+                              <strong>{getDocumentLabel(invoice)}</strong>
+                              <small>{invoice.paymentMethod || 'Sin método'}</small>
+                            </div>
+                            <div className='invoice-mobile-meta__item'>
+                              <span className='invoice-mobile-meta__label'>Items</span>
+                              <strong>{invoice.items?.length ?? 0}</strong>
+                              <small>{invoice.customerEmail || 'Sin correo registrado'}</small>
+                            </div>
+                            <div className='invoice-mobile-meta__item'>
+                              <span className='invoice-mobile-meta__label'>Pago</span>
+                              <strong>{invoice.paymentReference || 'Sin referencia'}</strong>
+                              <small>Vuelto: {formatCurrency(invoice.changeAmount)}</small>
+                            </div>
+                          </div>
+                        </Accordion.Body>
+                      </Accordion.Item>
+                    </Accordion>
 
-                  <div className='invoice-mobile-meta'>
-                    <div className='invoice-mobile-meta__item'>
-                      <span className='invoice-mobile-meta__label'>Cliente</span>
-                      <strong>{invoice.customerName || 'Consumidor Final'}</strong>
-                      <small>{invoice.customerIdentification || '9999999999999'}</small>
-                    </div>
-                    <div className='invoice-mobile-meta__item'>
-                      <span className='invoice-mobile-meta__label'>Documento</span>
-                      <strong>{getDocumentLabel(invoice)}</strong>
-                      <small>{invoice.paymentMethod || 'Sin método'}</small>
-                    </div>
-                    <div className='invoice-mobile-meta__item'>
-                      <span className='invoice-mobile-meta__label'>Items</span>
-                      <strong>{invoice.items?.length ?? 0}</strong>
-                      <small>{invoice.customerEmail || 'Sin correo registrado'}</small>
-                    </div>
-                    <div className='invoice-mobile-meta__item'>
-                      <span className='invoice-mobile-meta__label'>Pago</span>
-                      <strong>{invoice.paymentReference || 'Sin referencia'}</strong>
-                      <small>Vuelto: {formatCurrency(invoice.changeAmount)}</small>
-                    </div>
-                  </div>
-
-                  {canPayInvoices && (
-                    <div className='invoice-action-grid'>
-                      {invoice.status === 'pending' && (
-                        <button className='btn btn-sm' onClick={() => openPaymentModal(invoice)}>
-                          <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#1f1f1f'>
-                            <path d='M880-720v480q0 33-23.5 56.5T800-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720Zm-720 80h640v-80H160v80Zm0 160v240h640v-240H160Zm0 240v-480 480Z' />
-                          </svg>
-                        </button>
-                      )}
-                      <button className='btn btn-sm' onClick={() => handlePrintInvoice(invoice)}>
-                        <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#1f1f1f'>
-                          <path d='M320-120q-33 0-56.5-23.5T240-200v-80h-80q-33 0-56.5-23.5T80-360v-160q0-51 35-85.5t85-34.5h560q51 0 85.5 34.5T880-520v160q0 33-23.5 56.5T800-280h-80v80q0 33-23.5 56.5T640-120H320ZM160-360h80q0-33 23.5-56.5T320-440h320q33 0 56.5 23.5T720-360h80v-160q0-17-11.5-28.5T760-560H200q-17 0-28.5 11.5T160-520v160Zm480-280v-120H320v120h-80v-120q0-33 23.5-56.5T320-840h320q33 0 56.5 23.5T720-760v120h-80Zm80 180q17 0 28.5-11.5T760-500q0-17-11.5-28.5T720-540q-17 0-28.5 11.5T680-500q0 17 11.5 28.5T720-460Zm-80 260v-160H320v160h320ZM160-560h640-640Z' />
-                        </svg>
-                      </button>
-                      {invoice.status !== 'cancelled' && (
-                        <button className='btn btn-sm' onClick={() => void handleSendInvoiceEmail(invoice)} disabled={sendingEmailId === invoice.id}>
-                          {sendingEmailId === invoice.id ? (
-                            'Enviando...'
-                          ) : (
-                            <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#1f1f1f'>
-                              <path d='M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160Zm640-480L501-453q-5 3-10.5 4.5T480-447q-5 0-10.5-1.5T459-453L160-640v400h640v-400ZM480-520l320-200H160l320 200ZM160-640v10-59 1-32 32-.5 58.5-10 400-400Z' />
-                            </svg>
-                          )}
-                        </button>
-                      )}
-                      {canEditInvoices && invoice.status !== 'cancelled' && (
-                        <>
-                          <button disabled={invoice.status === 'paid'} className='btn btn-sm' onClick={() => handleEdit(invoice)}>
-                            <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#314D1C'>
-                              <path d='M200-200h57l391-391-57-57-391 391v57Zm-40 80q-17 0-28.5-11.5T120-160v-97q0-16 6-30.5t17-25.5l505-504q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L313-143q-11 11-25.5 17t-30.5 6h-97Zm600-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z' />
+                    {canPayInvoices && (
+                      <div className='invoice-action-grid d-flex'>
+                        {invoice.status === 'pending' && (
+                          <button className='btn btn-sm' onClick={() => openPaymentModal(invoice)}>
+                            <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#bebb00'>
+                              <path d='M880-720v480q0 33-23.5 56.5T800-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720Zm-720 80h640v-80H160v80Zm0 160v240h640v-240H160Zm0 240v-480 480Z' />
                             </svg>
                           </button>
-                          {canCancelInvoices && <button className='btn btn-sm' onClick={() => handleDelete(invoice)}>
-                            <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#5D0E07'>
-                              <path d='M280-120q-33 0-56.5-23.5T200-200v-520q-17 0-28.5-11.5T160-760q0-17 11.5-28.5T200-800h160q0-17 11.5-28.5T400-840h160q17 0 28.5 11.5T600-800h160q17 0 28.5 11.5T800-760q0 17-11.5 28.5T760-720v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM428.5-291.5Q440-303 440-320v-280q0-17-11.5-28.5T400-640q-17 0-28.5 11.5T360-600v280q0 17 11.5 28.5T400-280q17 0 28.5-11.5Zm160 0Q600-303 600-320v-280q0-17-11.5-28.5T560-640q-17 0-28.5 11.5T520-600v280q0 17 11.5 28.5T560-280q17 0 28.5-11.5ZM280-720v520-520Z' />
-                            </svg>
-                          </button>}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </article>
+                        )}
+                        <button className='btn btn-sm' onClick={() => handlePrintInvoice(invoice)}>
+                          <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#1f1f1f'>
+                            <path d='M320-120q-33 0-56.5-23.5T240-200v-80h-80q-33 0-56.5-23.5T80-360v-160q0-51 35-85.5t85-34.5h560q51 0 85.5 34.5T880-520v160q0 33-23.5 56.5T800-280h-80v80q0 33-23.5 56.5T640-120H320ZM160-360h80q0-33 23.5-56.5T320-440h320q33 0 56.5 23.5T720-360h80v-160q0-17-11.5-28.5T760-560H200q-17 0-28.5 11.5T160-520v160Zm480-280v-120H320v120h-80v-120q0-33 23.5-56.5T320-840h320q33 0 56.5 23.5T720-760v120h-80Zm80 180q17 0 28.5-11.5T760-500q0-17-11.5-28.5T720-540q-17 0-28.5 11.5T680-500q0 17 11.5 28.5T720-460Zm-80 260v-160H320v160h320ZM160-560h640-640Z' />
+                          </svg>
+                        </button>
+                        {invoice.status !== 'cancelled' && (
+                          <button className='btn btn-sm' onClick={() => void handleSendInvoiceEmail(invoice)} disabled={sendingEmailId === invoice.id}>
+                            {sendingEmailId === invoice.id ? (
+                              'Enviando...'
+                            ) : (
+                              <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#1f1f1f'>
+                                <path d='M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160Zm640-480L501-453q-5 3-10.5 4.5T480-447q-5 0-10.5-1.5T459-453L160-640v400h640v-400ZM480-520l320-200H160l320 200ZM160-640v10-59 1-32 32-.5 58.5-10 400-400Z' />
+                              </svg>
+                            )}
+                          </button>
+                        )}
+                        {canEditInvoices && invoice.status !== 'cancelled' && (
+                          <>
+                            <button disabled={invoice.status === 'paid'} className='btn btn-sm' onClick={() => handleEdit(invoice)}>
+                              <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#314D1C'>
+                                <path d='M200-200h57l391-391-57-57-391 391v57Zm-40 80q-17 0-28.5-11.5T120-160v-97q0-16 6-30.5t17-25.5l505-504q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L313-143q-11 11-25.5 17t-30.5 6h-97Zm600-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z' />
+                              </svg>
+                            </button>
+                            {canCancelInvoices && (
+                              <button className='btn btn-sm' onClick={() => handleDelete(invoice)}>
+                                <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#5D0E07'>
+                                  <path d='M280-120q-33 0-56.5-23.5T200-200v-520q-17 0-28.5-11.5T160-760q0-17 11.5-28.5T200-800h160q0-17 11.5-28.5T400-840h160q17 0 28.5 11.5T600-800h160q17 0 28.5 11.5T800-760q0 17-11.5 28.5T760-720v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM428.5-291.5Q440-303 440-320v-280q0-17-11.5-28.5T400-640q-17 0-28.5 11.5T360-600v280q0 17 11.5 28.5T400-280q17 0 28.5-11.5Zm160 0Q600-303 600-320v-280q0-17-11.5-28.5T560-640q-17 0-28.5 11.5T520-600v280q0 17 11.5 28.5T560-280q17 0 28.5-11.5ZM280-720v520-520Z' />
+                                </svg>
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                </React.Fragment>
               ))}
             </div>
 
@@ -925,53 +936,64 @@ const InvoicesPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleInvoices.map(invoice => (
-                    <tr key={invoice.id}>
-                      <td className='fw-semibold'>{invoice.invoiceNumber || `#${invoice.id}`}</td>
-                      <td>{new Date(invoice.createdAt).toLocaleDateString()}</td>
-                      <td>
-                        <div className='fw-semibold'>{invoice.customerName || 'Consumidor Final'}</div>
-                        <small className='text-muted'>{invoice.customerIdentification || '9999999999999'}</small>
-                      </td>
-                      <td>{getDocumentLabel(invoice)}</td>
-                      <td>{formatCurrency(invoice.total)}</td>
-                      <td>
-                        <span className={`badge ${getInvoiceStatusClass(invoice.status)}`}>{getInvoiceStatusLabel(invoice.status)}</span>
-                      </td>
-                      <td>{invoice.paymentMethod || '—'}</td>
-                      <td>{invoice.items?.length ?? 0}</td>
-                      {canPayInvoices && (
-                        <td>
-                          <div className='d-flex flex-wrap gap-2'>
-                            {invoice.status === 'pending' && (
-                              <button className='btn btn-sm' onClick={() => openPaymentModal(invoice)}>
-                                💳 Pagar
-                              </button>
-                            )}
-                            <button className='btn btn-sm' onClick={() => handlePrintInvoice(invoice)}>
-                              🖨️ Imprimir
-                            </button>
-                            {invoice.status !== 'cancelled' && (
-                              <button className='btn btn-sm' onClick={() => void handleSendInvoiceEmail(invoice)} disabled={sendingEmailId === invoice.id}>
-                                {sendingEmailId === invoice.id ? 'Enviando...' : '✉️ Correo'}
-                              </button>
-                            )}
-                            {canEditInvoices && invoice.status !== 'cancelled' && (
-                              <>
-                                <button className='btn btn-sm' onClick={() => handleEdit(invoice)}>
-                                  <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#314D1C'>
-                                    <path d='M200-200h57l391-391-57-57-391 391v57Zm-40 80q-17 0-28.5-11.5T120-160v-97q0-16 6-30.5t17-25.5l505-504q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L313-143q-11 11-25.5 17t-30.5 6h-97Zm600-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z' />
-                                  </svg>
-                                </button>
-                                {canCancelInvoices && <button className='btn btn-sm' onClick={() => handleDelete(invoice)}>
-                                  🗑️ Eliminar
-                                </button>}
-                              </>
-                            )}
-                          </div>
-                        </td>
+                  {visibleInvoices.map((invoice, index) => (
+                    <React.Fragment key={invoice.id}>
+                      {(index === 0 || visibleInvoices[index - 1].status !== invoice.status) && (
+                        <tr className='table-light'>
+                          <th colSpan={canPayInvoices ? 9 : 8}>
+                            {getInvoiceGroupLabel(invoice.status)} ({getInvoiceGroupCount(invoice.status)})
+                          </th>
+                        </tr>
                       )}
-                    </tr>
+                      <tr>
+                        <td className='fw-semibold'>{invoice.invoiceNumber || `#${invoice.id}`}</td>
+                        <td>{new Date(invoice.createdAt).toLocaleDateString()}</td>
+                        <td>
+                          <div className='fw-semibold'>{invoice.customerName || 'Consumidor Final'}</div>
+                          <small className='text-muted'>{invoice.customerIdentification || '9999999999999'}</small>
+                        </td>
+                        <td>{getDocumentLabel(invoice)}</td>
+                        <td>{formatCurrency(invoice.total)}</td>
+                        <td>
+                          <span className={`badge ${getInvoiceStatusClass(invoice.status)}`}>{getInvoiceStatusLabel(invoice.status)}</span>
+                        </td>
+                        <td>{invoice.paymentMethod || '—'}</td>
+                        <td>{invoice.items?.length ?? 0}</td>
+                        {canPayInvoices && (
+                          <td>
+                            <div className='d-flex flex-wrap gap-2'>
+                              {invoice.status === 'pending' && (
+                                <button className='btn btn-sm' onClick={() => openPaymentModal(invoice)}>
+                                  💳 Pagar
+                                </button>
+                              )}
+                              <button className='btn btn-sm' onClick={() => handlePrintInvoice(invoice)}>
+                                🖨️ Imprimir
+                              </button>
+                              {invoice.status !== 'cancelled' && (
+                                <button className='btn btn-sm' onClick={() => void handleSendInvoiceEmail(invoice)} disabled={sendingEmailId === invoice.id}>
+                                  {sendingEmailId === invoice.id ? 'Enviando...' : '✉️ Correo'}
+                                </button>
+                              )}
+                              {canEditInvoices && invoice.status !== 'cancelled' && (
+                                <>
+                                  <button className='btn btn-sm' onClick={() => handleEdit(invoice)}>
+                                    <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#314D1C'>
+                                      <path d='M200-200h57l391-391-57-57-391 391v57Zm-40 80q-17 0-28.5-11.5T120-160v-97q0-16 6-30.5t17-25.5l505-504q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L313-143q-11 11-25.5 17t-30.5 6h-97Zm600-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z' />
+                                    </svg>
+                                  </button>
+                                  {canCancelInvoices && (
+                                    <button className='btn btn-sm' onClick={() => handleDelete(invoice)}>
+                                      🗑️ Eliminar
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
