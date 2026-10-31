@@ -128,6 +128,17 @@ const AccountsReceivablePage: React.FC = () => {
         </div>
       </div>
 
+      <div className='mb-3'>
+        <input
+          className='form-control'
+          type='search'
+          placeholder='Buscar por cliente, identificación o factura...'
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          aria-label='Buscar cuentas por cobrar'
+        />
+      </div>
+
       {loading ? (
         <div className='text-center'>Cargando...</div>
       ) : accounts.length === 0 ? (

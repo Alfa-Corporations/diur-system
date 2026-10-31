@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+//import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { usePermissions } from '../hooks/permissions';
 import { fetchInvoicesStart, fetchInvoicesSuccess, fetchInvoicesFailure, createInvoiceSuccess, updateInvoiceSuccess, cancelInvoiceSuccess } from '../redux/slices/invoiceSlice';
@@ -35,7 +35,7 @@ type InvoiceDocumentType = Extract<NonNullable<Invoice['documentType']>, 'consum
 type CustomerIdentificationType = NonNullable<Invoice['customerIdentificationType']>;
 
 const InvoicesPage: React.FC = () => {
-  const navigate = useNavigate();
+  //const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { invoices, loading, error } = useAppSelector(state => state.invoices);
   const { products } = useAppSelector(state => state.products);
