@@ -6,7 +6,7 @@ import { fetchInvoicesStart, fetchInvoicesSuccess, fetchInvoicesFailure, createI
 import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure } from '../redux/slices/productSlice';
 import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
-import type { Invoice, InvoiceItem } from '../../../shared/types';
+import type { CreateInvoiceRequest, Invoice, InvoiceItem } from '../../../shared/types';
 import { Accordion } from 'react-bootstrap';
 
 const PAYMENT_OPTIONS = [
@@ -328,7 +328,7 @@ const InvoicesPage: React.FC = () => {
       return;
     }
 
-    const invoiceData: any = {
+    const invoiceData: CreateInvoiceRequest = {
       documentType,
       customer: customerPayload,
       customerName: customerPayload.name,
@@ -380,8 +380,12 @@ const InvoicesPage: React.FC = () => {
             type: 'actualizar_factura',
             data: { id: editingInvoice.id, ...invoiceData, status: targetStatus, paymentMethod: invoiceData.paymentMethod, paymentReference, amountReceived: invoiceData.amountReceived, changeAmount: invoiceData.changeAmount },
             timestamp: eventTimestampIso,
-            synced: false
+            synced: false,
+            status: 'pending',
+            baseUpdatedAt: editingInvoice.updatedAt
           });
+          await adjustLocalProductStock(editingInvoice.items || [], 1);
+          await adjustLocalProductStock(invoiceItems, -1);
         }
       } else {
         savedInvoice = isOnline
@@ -451,10 +455,10 @@ const InvoicesPage: React.FC = () => {
         customerIdentificationType: savedInvoice.customerIdentificationType || customerPayload.identificationType,
         customerIdentification: savedInvoice.customerIdentification || customerPayload.identificationNumber,
         customerAddress: savedInvoice.customerAddress || customerPayload.address,
-        paymentMethod: (invoiceData as any).paymentMethod ?? savedInvoice.paymentMethod,
+        paymentMethod: invoiceData.paymentMethod ?? savedInvoice.paymentMethod,
         paymentReference: targetStatus === 'paid' ? paymentReference : savedInvoice.paymentReference,
-        amountReceived: (invoiceData as any).amountReceived ?? savedInvoice.amountReceived,
-        changeAmount: (invoiceData as any).changeAmount ?? savedInvoice.changeAmount,
+        amountReceived: invoiceData.amountReceived ?? savedInvoice.amountReceived,
+        changeAmount: invoiceData.changeAmount ?? savedInvoice.changeAmount,
         paidAt: targetStatus === 'paid' ? savedInvoice.paidAt || eventTimestampIso : savedInvoice.paidAt
       };
 
@@ -522,8 +526,11 @@ const InvoicesPage: React.FC = () => {
           type: 'delete_invoice',
           data: { id: invoice.id, status: 'cancelled' },
           timestamp: deletedAtIso,
-          synced: false
+          synced: false,
+          status: 'pending',
+          baseUpdatedAt: invoice.updatedAt
         });
+        await adjustLocalProductStock(invoice.items || [], 1);
       }
 
       await persistInvoiceLocally(deletedInvoice);
@@ -593,7 +600,9 @@ const InvoicesPage: React.FC = () => {
           type: 'actualizar_factura',
           data: { id: invoiceToPay.id, status: 'paid', paymentMethod, paymentReference, amountReceived: receivedAmount, changeAmount: computedChange },
           timestamp: paymentTimestampIso,
-          synced: false
+          synced: false,
+          status: 'pending',
+          baseUpdatedAt: invoiceToPay.updatedAt
         });
       }
 

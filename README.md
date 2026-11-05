@@ -113,6 +113,14 @@ VAPID_SUBJECT=mailto:admin@tu-dominio.com
 
 No compartas ni subas la clave privada al repositorio. Los pedidos nuevos y el inicio o finalización de visitas tienen mensajes específicos; los demás cambios muestran el módulo afectado y el usuario que realizó la operación.
 
+### Instalar la aplicación y trabajar sin conexión
+
+La aplicación es una PWA: en Android y escritorio, usa **Instalar app** o la opción de instalación del navegador. En iPhone/iPad, abre el sitio en Safari, toca **Compartir** y selecciona **Añadir a pantalla de inicio**. La instalación y la carga inicial necesitan HTTPS y una conexión.
+
+Después de iniciar sesión conectado, el dispositivo guarda en IndexedDB los datos que permiten los permisos del usuario y conserva la interfaz para abrirla sin conexión. Los cambios offline compatibles se encolan localmente y se envían al recuperar la conexión; el indicador de sincronización muestra pendientes y permite revisar conflictos eligiendo la versión del servidor o volviendo a aplicar el cambio. Inicia sesión en línea al menos una vez y carga los datos necesarios antes de desconectarte. Los datos no descargados previamente no estarán disponibles offline, y operaciones que requieren servicios externos (por ejemplo, enviar correo o notificaciones push) necesitan conexión.
+
+El almacenamiento local está separado por cuenta en cada navegador/dispositivo. Borrar los datos del navegador elimina la copia local y los cambios aún no sincronizados; vuelve a conectarte y sincroniza antes de borrar esos datos o cambiar de dispositivo.
+
 ### 3. Instalar dependencias del backend
 
 ```bash

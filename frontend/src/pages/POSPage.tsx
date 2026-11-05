@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Button, Card, Alert, Badge, Table, Modal, ModalHeader, ModalBody, ModalTitle } from 'react-bootstrap';
 import type { RootState, AppDispatch } from '../redux/store';
 import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure } from '../redux/slices/productSlice';
-import type { Product, CreateOrderDTO } from '../../../shared/types';
+import type { Product, CreateOrderDTO, CreateInvoiceRequest } from '../../../shared/types';
 import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -31,8 +31,25 @@ const POSPage: React.FC = () => {
   const barcodeRef = useRef<HTMLInputElement>(null);
   const itemsPerPage = 12;
 
+  const loadProducts = useCallback(async () => {
+    dispatch(fetchProductsStart());
+    try {
+      let data;
+      if (isOnline) {
+        const res = await apiService.getProducts();
+        data = res.products;
+        await localDBService.saveProducts(data);
+      } else {
+        data = await localDBService.getProducts();
+      }
+      dispatch(fetchProductsSuccess({ products: data, totalCount: data.length }));
+    } catch {
+      dispatch(fetchProductsFailure('Error al cargar productos'));
+    }
+  }, [dispatch, isOnline]);
+
   useEffect(() => {
-    loadProducts();
+    void loadProducts();
 
     const onOnline = () => setIsOnline(true);
     const onOffline = () => setIsOnline(false);
@@ -46,7 +63,7 @@ const POSPage: React.FC = () => {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-  }, []);
+  }, [loadProducts]);
 
   // =========================
   // SCANNER
@@ -104,23 +121,6 @@ const POSPage: React.FC = () => {
     };
   }, [showScanner]);
 
-  const loadProducts = async () => {
-    dispatch(fetchProductsStart());
-    try {
-      let data;
-      if (isOnline) {
-        const res = await apiService.getProducts();
-        data = res.products;
-        await localDBService.saveProducts(data);
-      } else {
-        data = await localDBService.getProducts();
-      }
-      dispatch(fetchProductsSuccess({ products: data, totalCount: data.length }));
-    } catch {
-      dispatch(fetchProductsFailure('Error al cargar productos'));
-    }
-  };
-
   // 🔍 Normalizar texto para búsqueda flexible
   const filteredProducts = products.filter(p => {
     const s = filters.search.toLowerCase();
@@ -161,7 +161,7 @@ const POSPage: React.FC = () => {
     const items = cart.map(i => ({ productId: i.product.id, quantity: i.quantity, price: i.price }));
     const paidNow = Number(receiveNow && receivedAmount ? receivedAmount : paymentMethod === 'credit' ? 0 : total) || 0;
 
-    const invoicePayload: any = {
+    const invoicePayload: CreateInvoiceRequest = {
       items,
       paymentMethod: paymentMethod === 'credit' ? 'credit' : paymentMethod,
       amountReceived: paidNow,
@@ -172,23 +172,14 @@ const POSPage: React.FC = () => {
       invoicePayload.paymentReference = receivedMethod;
     }
 
-    if (isOnline) {
-      try {
-        const invoice = await apiService.createInvoice(invoicePayload);
-        alert(`Factura creada: ${invoice.invoiceNumber || invoice.id}`);
-      } catch (err: any) {
-        console.error(err);
-        alert(err?.message || 'Error al crear factura');
-      }
-    } else {
-      await localDBService.addPendingEvent({
-        id: `invoice_${Date.now()}`,
-        type: 'crear_factura',
-        data: invoicePayload,
-        timestamp: new Date().toISOString(),
-        synced: false
-      });
-      alert('Factura guardada offline');
+    try {
+      const invoice = await apiService.createInvoice(invoicePayload);
+      alert(isOnline
+        ? `Factura creada: ${invoice.invoiceNumber || invoice.id}`
+        : 'Factura guardada en este dispositivo y pendiente de sincronización.');
+    } catch (err: unknown) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'Error al crear factura');
     }
 
     setCart([]);
@@ -208,19 +199,14 @@ const POSPage: React.FC = () => {
       items: cart.map(item => ({ productId: item.product.id, quantityRequested: item.quantity }))
     };
 
-    if (isOnline) {
-      try {
-        const created = await apiService.createOrder(order);
-        const id = created?.id || null;
-        alert(id ? `Orden creada: #${id}` : 'Orden creada');
-      } catch (err: any) {
-        console.error(err);
-        alert(err?.message || 'Error al crear orden');
-      }
-    } else {
-      const tempId = Date.now();
-      await localDBService.addPendingEvent({ id: `sale_${tempId}`, type: 'crear_orden', data: order, timestamp: new Date().toISOString(), synced: false });
-      alert(`Orden guardada offline (id provisional: ${tempId})`);
+    try {
+      const created = await apiService.createOrder(order);
+      alert(isOnline
+        ? `Orden creada: #${created.id}`
+        : `Orden guardada en este dispositivo. Se sincronizará al recuperar conexión (id provisional: ${Math.abs(created.id)}).`);
+    } catch (err: unknown) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'Error al crear orden');
     }
 
     setCart([]);
@@ -398,7 +384,7 @@ const POSPage: React.FC = () => {
             <div className='d-flex flex-column gap-2'>
               <div>
                 <label className='form-label'>Método de pago</label>
-                <select className='form-select' value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as any)}>
+                <select className='form-select' value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as 'cash' | 'card' | 'transfer' | 'credit' | 'other')}>
                   <option value='cash'>Efectivo</option>
                   <option value='card'>Tarjeta</option>
                   <option value='transfer'>Transferencia</option>
@@ -418,8 +404,8 @@ const POSPage: React.FC = () => {
 
                   {receiveNow && (
                     <div className='d-flex gap-2 align-items-center'>
-                      <input type='number' className='form-control' placeholder='Monto recibido' value={receivedAmount as any} onChange={e => setReceivedAmount(e.target.value === '' ? '' : Number(e.target.value))} />
-                      <select className='form-select' value={receivedMethod} onChange={e => setReceivedMethod(e.target.value as any)}>
+                      <input type='number' className='form-control' placeholder='Monto recibido' value={receivedAmount} onChange={e => setReceivedAmount(e.target.value === '' ? '' : Number(e.target.value))} />
+                      <select className='form-select' value={receivedMethod} onChange={e => setReceivedMethod(e.target.value as 'cash' | 'transfer' | 'other')}>
                         <option value='cash'>Efectivo</option>
                         <option value='transfer'>Transferencia</option>
                         <option value='other'>Otro</option>

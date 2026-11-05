@@ -9,10 +9,14 @@ const isIosDevice = (): boolean =>
   /iPad|iPhone|iPod/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
+const isAppInstalled = (): boolean =>
+  window.matchMedia('(display-mode: standalone)').matches ||
+  Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+
 const InstallAppButton: React.FC = () => {
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [showIosHelp, setShowIosHelp] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(isAppInstalled);
 
   useEffect(() => {
     const handleInstallPrompt = (event: Event) => {
@@ -24,8 +28,6 @@ const InstallAppButton: React.FC = () => {
       setInstallPrompt(null);
     };
 
-    setIsInstalled(window.matchMedia('(display-mode: standalone)').matches ||
-      Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
     window.addEventListener('beforeinstallprompt', handleInstallPrompt);
     window.addEventListener('appinstalled', handleInstalled);
 

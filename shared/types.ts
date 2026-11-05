@@ -125,6 +125,7 @@ export interface Invoice {
 // Pedido
 export interface Order {
   customer?: any;
+  customerId?: number;
   id: number;
   userId: number;
   type: 'compra' | 'venta' | 'venta al mayor';

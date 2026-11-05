@@ -113,45 +113,11 @@ const compraOrdersPage: React.FC = () => {
         }))
       };
 
-      if (isOnline) {
-        const createdOrder = await apiService.createOrder(orderData);
-        dispatch(createOrderSuccess(createdOrder));
-
-        // Alerta con número de orden
-        alert(`Orden creada: #${createdOrder.id}`);
-
-      } else {
-        await localDBService.addPendingEvent({
-          id: `sync_${Date.now()}`,
-          type: 'crear_orden',
-          data: orderData,
-          timestamp: new Date().toISOString(),
-          synced: false
-        });
-
-        dispatch(
-          createOrderSuccess({
-            id: Date.now(),
-            ...orderData,
-            userId: user?.id || 0,
-            status: 'pendiente',
-            total: 0,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            items: orderData.items.map(i => ({
-              id: Date.now(),
-              orderId: 0,
-              productId: i.productId,
-              quantityRequested: i.quantityRequested,
-              quantityProcessed: 0,
-              status: 'pendiente',
-              unitPrice: 0,
-              createdAt: '',
-              updatedAt: ''
-            }))
-          })
-        );
-      }
+      const createdOrder = await apiService.createOrder(orderData);
+      dispatch(createOrderSuccess(createdOrder));
+      alert(isOnline
+        ? `Orden creada: #${createdOrder.id}`
+        : `Orden guardada en este dispositivo. Se sincronizará al recuperar conexión (id provisional: ${Math.abs(createdOrder.id)}).`);
 
       setShowCreateModal(false);
       setOrderItems([]);
@@ -181,18 +147,7 @@ const compraOrdersPage: React.FC = () => {
         quantityProcessed: quantityToAdd
       };
 
-      if (isOnline) {
-        await apiService.updateOrderItemStatus(orderId, productId, { quantityProcessed: payload.quantityProcessed });
-
-      } else {
-        await localDBService.addPendingEvent({
-          id: `sync_${Date.now()}`,
-          type: 'actualizar_orden',
-          data: { orderId, productId, ...payload },
-          timestamp: new Date().toISOString(),
-          synced: false
-        });
-      }
+      await apiService.updateOrderItemStatus(orderId, productId, { quantityProcessed: payload.quantityProcessed });
 
       dispatch(
         updateOrderItemStatusSuccess({
@@ -209,24 +164,8 @@ const compraOrdersPage: React.FC = () => {
 
   const handleCancelOrder = async (orderId: number) => {
     try {
-      if (isOnline) {
-        const updatedOrder = await apiService.updateOrderStatus(orderId, 'cancelado');
-        dispatch(cancelOrderSuccess(updatedOrder));
-
-      } else {
-        await localDBService.addPendingEvent({
-          id: `sync_${Date.now()}`,
-          type: 'actualizar_orden',
-          data: { orderId, status: 'cancelado' },
-          timestamp: new Date().toISOString(),
-          synced: false
-        });
-
-        const order = orders.find(o => o.id === orderId);
-        if (order) {
-          dispatch(cancelOrderSuccess({ ...order, status: 'cancelado' }));
-        }
-      }
+      const updatedOrder = await apiService.updateOrderStatus(orderId, 'cancelado');
+      dispatch(cancelOrderSuccess(updatedOrder));
     } catch (error) {
       console.error(error);
     }

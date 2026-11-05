@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './redux/store';
@@ -34,6 +34,8 @@ import { useLocation } from 'react-router-dom';
 import DashboardVisitor from './pages/DashboardVisitor';
 import VisitHistoryPage from './pages/VisitHistoryPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
+import OfflineSyncStatus from './components/OfflineSyncStatus';
+import localDBService from './services/localDBService';
 
 /**
  * Componente principal de la aplicación
@@ -51,7 +53,7 @@ const AppContent: React.FC = () => {
     isAuthenticated ? canAccessAll(permissionNames) ? element : <Navigate to='/dashboard' replace /> : <Navigate to='/login' replace />;
   const { isOnline } = useAppSelector(state => state.sync);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
-  const [isSyncingPending, setIsSyncingPending] = useState(false);
+  const isSyncingPending = useRef(false);
 
   useEffect(() => {
     const handleOnline = () => dispatch(setOnline(true));
@@ -118,25 +120,29 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     const syncPendingChanges = async () => {
-      if (!isAuthenticated || !user || !isOnline || isSyncingPending) {
+      if (!isAuthenticated || !user || !isOnline || isSyncingPending.current) {
         return;
       }
 
-      setIsSyncingPending(true);
+      isSyncingPending.current = true;
       dispatch(startSync());
 
       try {
+        await localDBService.ensureOwner(user.id);
         const { syncedEventIds, failedEvents } = await offlineSyncService.syncPendingChanges();
+        const snapshotErrors = await offlineSyncService.refreshLocalSnapshots(user);
         dispatch(syncSuccess({ syncedEvents: syncedEventIds, lastSync: new Date().toISOString() }));
 
         if (failedEvents.length > 0) {
           dispatch(syncFailure(`No se pudieron sincronizar ${failedEvents.length} cambio(s) pendientes.`));
+        } else if (snapshotErrors.length > 0) {
+          dispatch(syncFailure(`Algunos datos no pudieron actualizarse: ${snapshotErrors.join('; ')}`));
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'No se pudo completar la sincronización pendiente.';
         dispatch(syncFailure(message));
       } finally {
-        setIsSyncingPending(false);
+        isSyncingPending.current = false;
       }
     };
 
@@ -159,6 +165,7 @@ const AppContent: React.FC = () => {
       <div className='App'>
         {/* Botón de retroceso minimalista: oculto en la pantalla principal y login */}
         <BackButtonWrapper />
+        {isAuthenticated && !user?.mustChangePassword && <OfflineSyncStatus />}
         <PasswordChangeGuard>
           <Routes>
             <Route path='/login' element={isAuthenticated ? <Navigate to={user?.mustChangePassword ? '/change-password' : user?.role === 'vendedor' ? '/dashboard/visitor' : '/dashboard'} replace /> : <Login />} />
