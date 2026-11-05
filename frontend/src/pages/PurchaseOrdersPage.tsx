@@ -1,13 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/rules-of-hooks */
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { usePermissions } from '../hooks/permissions';
 import { Button, Badge, Modal, Form, Alert, Spinner } from 'react-bootstrap';
 import type { RootState } from '../redux/store';
 import { fetchOrdersStart, fetchOrdersSuccess, fetchOrdersFailure, createOrderStart, createOrderSuccess, createOrderFailure, updateOrderItemStatusSuccess, cancelOrderSuccess } from '../redux/slices/orderSlice';
 import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure } from '../redux/slices/productSlice';
-import type { Order, OrderItem } from '../../../shared/types';
+import type { Order, OrderItem, RealtimeNotification } from '../../../shared/types';
 import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
 import socketService from '../services/socketService';
@@ -40,78 +39,11 @@ const compraOrdersPage: React.FC = () => {
     return Array.from(map.values());
   }, [products]);
 
-  // 🔥 REF para evitar problemas con sockets
-  const ordersRef = React.useRef(orders);
-  useEffect(() => {
-    ordersRef.current = orders;
-  }, [orders]);
-
-  useEffect(() => {
-    loadOrders();
-    loadProducts();
-
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // 🔥 ESCUCHAR SOLO "notification" (BACK)
-    socketService.on('notification', handleSocketNotification);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      socketService.off('notification', handleSocketNotification);
-    };
-  }, []);
-
-  // 🔥 MANEJADOR CENTRAL
-  const handleSocketNotification = (payload: any) => {
-    const { type, data } = payload;
-
-    switch (type) {
-      case 'order_created':
-        if (data.userId !== user?.id) {
-          dispatch(createOrderSuccess(data.order));
-        }
-        break;
-
-      case 'order_updated': {
-        const order = ordersRef.current.find(o => o.id === data.orderId);
-        if (!order) return;
-
-        const item = order.items?.find(i => i.productId === data.productId);
-        if (!item) return;
-
-        dispatch(
-          updateOrderItemStatusSuccess({
-            orderId: data.orderId,
-            item: {
-              ...item,
-              quantityProcessed: data.quantityProcessed,
-              status: data.status
-            }
-          })
-        );
-        break;
-      }
-
-      case 'order_cancelled': {
-        const order = ordersRef.current.find(o => o.id === data.orderId);
-        if (!order) return;
-
-        dispatch(cancelOrderSuccess({ ...order, status: 'cancelado' }));
-        break;
-      }
-    }
-  };
-
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     dispatch(fetchOrdersStart());
     try {
       let ordersData;
-      if (isOnline) {
+      if (navigator.onLine) {
         const response = await apiService.getOrders({ type: 'compra' });
         ordersData = response.orders;
         await localDBService.saveOrders(ordersData);
@@ -122,9 +54,9 @@ const compraOrdersPage: React.FC = () => {
     } catch {
       dispatch(fetchOrdersFailure('Error al cargar pedidos'));
     }
-  };
+  }, [dispatch]);
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     dispatch(fetchProductsStart());
     try {
       let productsData;
@@ -139,7 +71,29 @@ const compraOrdersPage: React.FC = () => {
     } catch {
       dispatch(fetchProductsFailure('Error al cargar productos'));
     }
-  };
+  }, [dispatch, isOnline]);
+
+  const handleSocketNotification = useCallback((notification: RealtimeNotification) => {
+    const data = notification.data as { resource?: string } | null;
+    if (data?.resource === 'orders') void loadOrders();
+  }, [loadOrders]);
+
+  useEffect(() => {
+    void loadOrders();
+    void loadProducts();
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    socketService.on('notification', handleSocketNotification);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      socketService.off('notification', handleSocketNotification);
+    };
+  }, [handleSocketNotification, loadOrders, loadProducts]);
 
   const handleCreateOrder = async () => {
     if (orderItems.length === 0) return;
@@ -166,10 +120,6 @@ const compraOrdersPage: React.FC = () => {
         // Alerta con número de orden
         alert(`Orden creada: #${createdOrder.id}`);
 
-        socketService.emit('order_created', {
-          order: createdOrder,
-          userId: user?.id
-        });
       } else {
         await localDBService.addPendingEvent({
           id: `sync_${Date.now()}`,
@@ -234,13 +184,6 @@ const compraOrdersPage: React.FC = () => {
       if (isOnline) {
         await apiService.updateOrderItemStatus(orderId, productId, { quantityProcessed: payload.quantityProcessed });
 
-        socketService.emit('order_updated', {
-          orderId,
-          productId,
-          quantityProcessed: newProcessed,
-          status: payload.status,
-          userId: user?.id
-        });
       } else {
         await localDBService.addPendingEvent({
           id: `sync_${Date.now()}`,
@@ -270,10 +213,6 @@ const compraOrdersPage: React.FC = () => {
         const updatedOrder = await apiService.updateOrderStatus(orderId, 'cancelado');
         dispatch(cancelOrderSuccess(updatedOrder));
 
-        socketService.emit('order_cancelled', {
-          orderId,
-          userId: user?.id
-        });
       } else {
         await localDBService.addPendingEvent({
           id: `sync_${Date.now()}`,

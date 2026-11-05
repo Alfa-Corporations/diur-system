@@ -11,6 +11,8 @@ const UserPermission = require('./UserPermission');
 const Supplier = require('./Suppliers');
 const AccountsReceivable = require('./AccountsReceivable');
 const AccountsReceivablePayment = require('./AccountsReceivablePayment');
+const Visit = require('./Visit');
+const PushSubscription = require('./PushSubscription');
 
 const initModels = () => {
 
@@ -32,6 +34,12 @@ const initModels = () => {
 
   // Asociaciones de Cliente
   Customer.hasMany(Invoice, { foreignKey: 'customerId', as: 'invoices' });
+  Customer.hasMany(Visit, { foreignKey: 'customerId', as: 'visits' });
+  Visit.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
+  User.hasMany(Visit, { foreignKey: 'userId', as: 'visits' });
+  Visit.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+  User.hasMany(PushSubscription, { foreignKey: 'userId', as: 'pushSubscriptions' });
+  PushSubscription.belongsTo(User, { foreignKey: 'userId', as: 'user' });
   // 🔵 Asociaciones de Cliente con Pedido
   Customer.hasMany(Order, { foreignKey: 'customerId', as: 'orders' });
   Order.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });

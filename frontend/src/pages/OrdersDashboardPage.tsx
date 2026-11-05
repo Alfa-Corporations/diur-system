@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { Button, Table, Badge, Alert, Row, Col, Card } from 'react-bootstrap';
 import type { RootState } from '../redux/store';
 import { fetchOrdersStart, fetchOrdersSuccess, fetchOrdersFailure } from '../redux/slices/orderSlice';
-import type { Order, OrderItem } from '../../../shared/types';
+import type { Order, OrderItem, RealtimeNotification } from '../../../shared/types';
 import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
 import socketService from '../services/socketService';
@@ -41,18 +41,20 @@ const OrdersDashboardPage: React.FC = () => {
 
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
+    const handleNotification = (notification: RealtimeNotification) => {
+      const data = notification.data as { resource?: string } | null;
+      if (data?.resource === 'orders') void loadOrders();
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    socketService.on('pedido_creado', loadOrders);
-    socketService.on('pedido_actualizado', loadOrders);
+    socketService.on('notification', handleNotification);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      socketService.off('pedido_creado', loadOrders);
-      socketService.off('pedido_actualizado', loadOrders);
+      socketService.off('notification', handleNotification);
     };
   }, [loadOrders]);
 

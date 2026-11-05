@@ -16,13 +16,22 @@ app.use(morgan('dev'));
 app.use(cors());
 swaggerDocs(app);
 
-db.authenticate()
-    .then(() => console.log('Database authentication successful'))
-    .catch(error => console.log('Database authentication failed:', error));
-
 db.sync({ force: false, alter: process.env.NODE_ENV !== 'production' })
     .then(async () => {
         console.log('Database synchronized');
+        if (process.env.NODE_ENV === 'production') {
+            await db.query('ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE');
+            await db.query(`
+                CREATE TABLE IF NOT EXISTS "push_subscriptions" (
+                    "id" SERIAL PRIMARY KEY,
+                    "userId" INTEGER NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+                    "endpoint" TEXT NOT NULL UNIQUE,
+                    "subscription" JSONB NOT NULL,
+                    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+        }
         initModels(); // Inicializar asociaciones después de sincronizar
         await PermissionService.initializeDefaultPermissions();
         console.log('Default permissions synchronized');

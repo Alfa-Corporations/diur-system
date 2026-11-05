@@ -1,5 +1,13 @@
 const InvoiceService = require('../services/InvoiceService');
-const transporter = require('../utils/mailer');
+const mailer = require('../utils/mailer');
+
+const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+}[character]));
 
 const emitNotification = (io, target, notification) => {
   if (!io) return;
@@ -34,7 +42,7 @@ const buildInvoiceEmailHtml = invoice => {
   const rows = (invoice.items || [])
     .map(item => `
       <tr>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.product?.name || `Producto #${item.productId}`}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(item.product?.name || `Producto #${item.productId}`)}</td>
         <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;">${item.quantity}</td>
         <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">$${Number(item.price || 0).toFixed(2)}</td>
         <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">$${Number(item.total || 0).toFixed(2)}</td>
@@ -57,8 +65,8 @@ const buildInvoiceEmailHtml = invoice => {
             <p style="margin:6px 0 0;opacity:.8;">Formato referencial tipo SRI Ecuador, sin validación electrónica.</p>
           </div>
           <div style="text-align:right;min-width:220px;">
-            <div><strong>Número:</strong> ${invoice.invoiceNumber}</div>
-            <div><strong>Fecha:</strong> ${new Date(invoice.createdAt).toLocaleString()}</div>
+            <div><strong>Número:</strong> ${escapeHtml(invoice.invoiceNumber)}</div>
+            <div><strong>Fecha:</strong> ${escapeHtml(new Date(invoice.createdAt).toLocaleString())}</div>
             <div><strong>Estado:</strong> ${invoice.status === 'paid' ? 'Pagada' : invoice.status === 'pending' ? 'Creada' : 'Eliminada'}</div>
             <div><strong>Documento:</strong> ${documentLabel}</div>
           </div>
@@ -68,15 +76,15 @@ const buildInvoiceEmailHtml = invoice => {
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:20px;">
             <div>
               <h3 style="margin:0 0 8px;font-size:14px;text-transform:uppercase;color:#475569;">Cliente</h3>
-              <div><strong>${invoice.customerName || 'Consumidor final'}</strong></div>
-              <div>${invoice.customerEmail || 'Sin correo registrado'}</div>
-              <div>${invoice.customerIdentification || 'Sin identificación'}</div>
-              <div>${invoice.customerAddress || 'Sin dirección registrada'}</div>
+              <div><strong>${escapeHtml(invoice.customerName || 'Consumidor final')}</strong></div>
+              <div>${escapeHtml(invoice.customerEmail || 'Sin correo registrado')}</div>
+              <div>${escapeHtml(invoice.customerIdentification || 'Sin identificación')}</div>
+              <div>${escapeHtml(invoice.customerAddress || 'Sin dirección registrada')}</div>
             </div>
             <div>
               <h3 style="margin:0 0 8px;font-size:14px;text-transform:uppercase;color:#475569;">Pago</h3>
-              <div><strong>Método:</strong> ${invoice.paymentMethod || 'No indicado'}</div>
-              <div><strong>Referencia:</strong> ${invoice.paymentReference || 'No indicada'}</div>
+              <div><strong>Método:</strong> ${escapeHtml(invoice.paymentMethod || 'No indicado')}</div>
+              <div><strong>Referencia:</strong> ${escapeHtml(invoice.paymentReference || 'No indicada')}</div>
               <div><strong>Recibido:</strong> $${Number(invoice.amountReceived || 0).toFixed(2)}</div>
               <div><strong>Vuelto:</strong> $${Number(invoice.changeAmount || 0).toFixed(2)}</div>
             </div>
@@ -241,35 +249,39 @@ class InvoiceController {
       const { id } = req.params;
       const { email } = req.body;
       const invoice = await InvoiceService.getInvoiceById(id);
-      const recipient = email || invoice.customerEmail;
+      const recipient = String(email || invoice.customerEmail || '').trim();
 
       if (!recipient) {
-        return res.status(400).json({ message: 'The customer does not have a registered email' });
+        return res.status(400).json({ message: 'El cliente no tiene un correo registrado. Ingresa un correo para enviar la factura.' });
       }
 
-      if (!process.env.G_NAME && !process.env.MAIL_USER) {
-        throw new Error('The email service is not configured. Set G_NAME/G_PASSWORD or MAIL_USER/MAIL_PASSWORD in the backend environment.');
+      if (recipient.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+        return res.status(400).json({ message: 'La dirección de correo del cliente no es válida.' });
       }
 
-      await transporter.sendMail({
-        from: process.env.G_NAME || process.env.MAIL_USER,
+      const documentLabel = invoice.documentType === 'sales_note' ? 'Nota de venta' : 'Factura';
+      await mailer.sendMail({
         to: recipient,
-        subject: `Nota de venta ${invoice.invoiceNumber}`,
+        subject: `${documentLabel} ${invoice.invoiceNumber} - DIUR SYSTEM`,
+        text: `${documentLabel} ${invoice.invoiceNumber}\nCliente: ${invoice.customerName || 'Consumidor final'}\nTotal: $${Number(invoice.total || 0).toFixed(2)}\nAdjuntamos el detalle de su comprobante en este correo.`,
         html: buildInvoiceEmailHtml(invoice),
       });
 
-      if (invoice.customer && email && invoice.customer.email !== email) {
-        await invoice.customer.update({ email });
+      if (invoice.customer && email && invoice.customer.email !== recipient) {
+        await invoice.customer.update({ email: recipient });
       }
 
       const updatedInvoice = await InvoiceService.markInvoiceEmailSent(id, recipient);
 
       res.json({
-        message: 'Invoice sent by email successfully',
+        message: `Factura enviada correctamente a ${recipient}.`,
         invoice: updatedInvoice,
       });
     } catch (error) {
-      res.status(400).json({ message: error.message || 'The email could not be sent' });
+      const status = error.code === 'EMAIL_CONFIG_MISSING' ? 503
+        : error.code === 'EMAIL_DELIVERY_FAILED' ? 502
+          : 400;
+      res.status(status).json({ message: error.message || 'No se pudo enviar el correo.' });
     }
   }
 

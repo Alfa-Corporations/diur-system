@@ -30,6 +30,11 @@ const User = db.define('User', {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  mustChangePassword: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
   role: {
     type: DataTypes.ENUM('admin', 'caja', 'bodega', 'vendedor'),
     allowNull: false,

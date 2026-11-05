@@ -20,14 +20,14 @@ const Login: React.FC = () => {
 
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { loading, error, isAuthenticated } = useAppSelector(state => state.auth);
+  const { loading, error, isAuthenticated, user } = useAppSelector(state => state.auth);
 
   // Redirigir si ya está autenticado
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      navigate(user?.mustChangePassword ? '/change-password' : user?.role === 'vendedor' ? '/dashboard/visitor' : '/dashboard');
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, user]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -50,12 +50,21 @@ const Login: React.FC = () => {
       const response = await apiService.login(formData);
       dispatch(loginSuccess(response));
 
+      if (response.user.mustChangePassword) {
+        navigate('/change-password', { replace: true });
+        return;
+      }
+
       // Conectar Socket.IO
       socketService.connect({
         id: response.user.id,
         role: response.user.role
       });
 
+      if(response.user.role === 'vendedor') {
+        navigate('/dashboard/visitor');
+        return
+      }
       navigate('/dashboard');
     } catch (error: unknown) {
       let message = 'Error al iniciar sesión';

@@ -18,6 +18,7 @@ const AccountsReceivablePage: React.FC = () => {
   const { hasPermission } = usePermissions();
   const canPay = user?.role === 'admin' || hasPermission('actualizar_factura');
   const canViewTotals = user?.role === 'admin' || hasPermission('ver_totales');
+  const customerFilterId = Number(new URLSearchParams(window.location.search).get('customerId')) || null;
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [payingId, setPayingId] = useState<number | null>(null);
@@ -147,6 +148,7 @@ const AccountsReceivablePage: React.FC = () => {
         <div className='row row-cols-1 row-cols-md-2 g-3'>
           {accounts
             .filter(acc => {
+              if (customerFilterId && Number(acc.customerId) !== customerFilterId) return false;
               const term = search.trim().toLowerCase();
               if (!term) return true;
               const name = (acc.customer?.name || acc.customerName || '').toLowerCase();

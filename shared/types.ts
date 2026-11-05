@@ -10,6 +10,7 @@ export interface User {
   email: string;
   role: 'admin' | 'caja' | 'bodega' | 'vendedor';
   permissions?: Permission[];
+  mustChangePassword?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -64,6 +65,28 @@ export interface Customer {
   email?: string;
   phone?: string;
   isFinalConsumer?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Visit {
+  id: number;
+  userId: number;
+  customerId: number;
+  visitDate: string;
+  arrivalAt: string;
+  departureAt?: string | null;
+  durationSeconds?: number | null;
+  latitude: number;
+  longitude: number;
+  street: string;
+  city: string;
+  province: string;
+  country: string;
+  user?: Pick<User, 'id' | 'username' | 'email'>;
+  customer?: Customer;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type InvoiceDocumentType = 'consumer_final' | 'sales_note' | 'sri_invoice';
@@ -231,15 +254,24 @@ export interface UpdateStockRequest {
 // Eventos de sincronización
 export interface SyncEvent {
   id: string;
-  type: 'crear_producto' | 'actualizar_producto' | 'eliminar_producto' | 'crear_factura' | 'actualizar_factura' | 'delete_invoice' | 'crear_orden' | 'actualizar_orden' | 'delete_order';
+  type:
+    | 'crear_producto' | 'actualizar_producto' | 'eliminar_producto' | 'actualizar_stock'
+    | 'crear_factura' | 'actualizar_factura' | 'delete_invoice'
+    | 'crear_orden' | 'actualizar_orden' | 'delete_order' | 'cancelar_orden' | 'actualizar_item_orden'
+    | 'crear_cliente' | 'actualizar_cliente' | 'eliminar_cliente'
+    | 'iniciar_visita' | 'finalizar_visita' | 'pagar_cuenta'
+    | 'crear_usuario' | 'actualizar_usuario' | 'eliminar_usuario' | 'asignar_permisos';
   data: unknown;
   timestamp: string;
   synced: boolean;
+  status?: 'pending' | 'conflict';
+  baseUpdatedAt?: string;
+  error?: string;
 }
 
 // Notificaciones en tiempo real
 export interface RealtimeNotification {
-  type: 'invoice_created' | 'invoice_paid' | 'invoice_deleted' | 'inventory_updated' | 'order_created' | 'order_updated' | 'order_assigned';
+  type: 'invoice_created' | 'invoice_paid' | 'invoice_deleted' | 'inventory_updated' | 'order_created' | 'order_updated' | 'order_assigned' | 'system_change' | 'visit_started' | 'visit_finished';
   message: string;
   data: unknown;
   timestamp: string | Date;

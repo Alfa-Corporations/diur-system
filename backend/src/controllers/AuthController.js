@@ -22,6 +22,34 @@ class AuthController {
     } catch (error) {
       res.status(400).json({ message: error.message });
     }
+
+  }
+
+  async createUser(req, res) {
+    try {
+      const { username, email, role } = req.body;
+      const user = await AuthService.createUserWithCredentials({ username, email, role });
+      return res.status(201).json({
+        message: 'Usuario creado y credenciales enviadas por correo.',
+        user,
+      });
+    } catch (error) {
+      const status = error.code === 'EMAIL_CONFIG_MISSING' ? 503
+        : error.code === 'EMAIL_DELIVERY_FAILED' ? 502
+          : error.code === 'USER_EMAIL_ROLLBACK_FAILED' ? 500
+          : 400;
+      return res.status(status).json({ message: error.message });
+    }
+  }
+
+  async changePassword(req, res) {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const user = await AuthService.changePassword(req.user.id, currentPassword, newPassword);
+      return res.json({ message: 'Contraseña actualizada correctamente.', user });
+    } catch (error) {
+      return res.status(400).json({ message: error.message || 'No se pudo actualizar la contraseña.' });
+    }
   }
 
   /**

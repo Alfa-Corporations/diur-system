@@ -21,7 +21,7 @@ export const rolePermissionReferences: Record<User['role'], string[]> = {
     'crear_orden', 'leer_orden', 'actualizar_orden', 'cancelar_orden', 'gestionar_items_orden',
     'crear_usuario', 'leer_usuario', 'actualizar_usuario', 'eliminar_usuario', 'gestionar_usuarios', 'crud_users', 'gestionar_permisos',
     'ver_dashboard', 'ver_reportes', 'acceso_pos', 'acceso_administrativo',
-    'crear_clientes', 'leer_clientes', 'actualizar_clientes', 'eliminar_clientes', 'ver_totales'
+    'crear_clientes', 'leer_clientes', 'actualizar_clientes', 'eliminar_clientes', 'gestionar_visitas', 'leer_visitas', 'ver_totales'
   ],
   caja: [
     'leer_producto', 'leer_clientes', 'crear_factura', 'leer_factura', 'actualizar_factura',
@@ -32,7 +32,8 @@ export const rolePermissionReferences: Record<User['role'], string[]> = {
   ],
   vendedor: [
     'leer_producto', 'crear_clientes', 'leer_clientes', 'actualizar_clientes',
-    'crear_orden', 'leer_orden', 'cancelar_orden', 'crear_factura', 'leer_factura', 'acceso_pos', 'ver_totales'
+    'crear_orden', 'leer_orden', 'cancelar_orden', 'crear_factura', 'leer_factura', 'actualizar_factura',
+    'gestionar_visitas', 'leer_visitas', 'acceso_pos', 'ver_totales'
   ]
 };
 
@@ -42,6 +43,7 @@ const groupDefinitions: Record<string, Omit<PermissionGroup, 'permissions'>> = {
   invoices: { id: 'invoices', title: 'Facturas y cobros', description: 'Emisión, consulta y administración de facturas.' },
   customers: { id: 'customers', title: 'Clientes', description: 'Consulta y mantenimiento de clientes.' },
   users: { id: 'users', title: 'Usuarios y permisos', description: 'Administración de cuentas y accesos.' },
+  visits: { id: 'visits', title: 'Visitas a clientes', description: 'Registro, consulta de historial, ubicación GPS y cierre de visitas.' },
   dashboard: { id: 'dashboard', title: 'Dashboard y reportes', description: 'Acceso a paneles, indicadores y reportes.' },
   pos: { id: 'pos', title: 'Punto de venta', description: 'Acceso a las funciones de ventas en el local.' },
   other: { id: 'other', title: 'Otros permisos', description: 'Permisos que no pertenecen a los módulos anteriores.' }
@@ -52,6 +54,7 @@ const groupByPermission = (name: string): string => {
   if (name.includes('orden') || name.includes('pedido')) return 'orders';
   if (name.includes('factura') || name.includes('cobrar')) return 'invoices';
   if (name.includes('cliente')) return 'customers';
+  if (name.includes('visita')) return 'visits';
   if (name.includes('usuario') || name.includes('permiso') || name === 'crud_users') return 'users';
   if (name.includes('dashboard') || name.includes('reporte') || name.includes('total')) return 'dashboard';
   if (name.includes('pos')) return 'pos';
@@ -103,5 +106,7 @@ export const permissionLabels: Record<string, string> = {
   leer_clientes: 'Ver clientes',
   actualizar_clientes: 'Editar clientes',
   eliminar_clientes: 'Eliminar clientes',
+  gestionar_visitas: 'Registrar y gestionar visitas',
+  leer_visitas: 'Ver historial de visitas',
   ver_totales: 'Ver importes y totales'
 };

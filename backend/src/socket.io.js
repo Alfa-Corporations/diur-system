@@ -9,15 +9,13 @@ module.exports = io => {
         try {
             const token = socket.handshake.auth?.token;
 
-            console.log('🔐 TOKEN RECIBIDO:', token);
-
             if (!token) {
                 return next(new Error('Unauthorized socket connection'));
             }
 
             const user = await AuthService.getCurrentUser(token);
 
-            if (!user) {
+            if (!user || user.mustChangePassword) {
                 return next(new Error('Unauthorized socket connection'));
             }
 
@@ -45,62 +43,6 @@ module.exports = io => {
                 socket.join(socket.user.role);
                 console.log(`User re-joined room: ${socket.user.role}`);
             }
-        });
-
-        socket.on("invoice_created", invoiceData => {
-            io.emit("notification", {
-                type: "invoice_created",
-                message: `Nueva factura creada: ${invoiceData.invoiceNumber}`,
-                data: invoiceData,
-                timestamp: new Date().toISOString()
-            });
-        });
-
-        socket.on("invoice_paid", invoiceData => {
-            io.to('admin').emit("notification", {
-                type: "invoice_paid",
-                message: `Factura pagada: ${invoiceData.invoiceNumber || `#${invoiceData.id}`}`,
-                data: invoiceData,
-                timestamp: new Date().toISOString()
-            });
-        });
-
-        socket.on("inventory_updated", productData => {
-            io.to('admin').to('warehouse').emit("notification", {
-                type: "inventory_updated",
-                message: `Inventario actualizado: ${productData.name}`,
-                data: productData,
-                timestamp: new Date().toISOString()
-            });
-        });
-
-
-
-        socket.on("order_created", orderData => {
-            io.emit("notification", {
-                type: "order_created",
-                message: `Nuevo pedido creado`,
-                data: orderData,
-                timestamp: new Date().toISOString()
-            });
-        });
-
-        socket.on("order_updated", orderData => {
-            io.emit("notification", {
-                type: "order_updated",
-                message: `Pedido asignado para entrega`,
-                data: orderData,
-                timestamp: new Date().toISOString()
-            });
-        });
-
-        socket.on("order_cancelled", orderData => {
-            io.emit("notification", {
-                type: "order_cancelled",
-                message: `Pedido a sido cancelado`,
-                data: orderData,
-                timestamp: new Date().toISOString()
-            });
         });
 
         socket.on("join_user_room", () => {

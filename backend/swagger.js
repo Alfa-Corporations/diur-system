@@ -11,7 +11,7 @@ const options = {
         info: {
             title: "DIUR System API",
             version: "1.0.0",
-            description: "Documentación de endpoints del sistema DIUR para autenticación, productos, facturas y sincronización."
+            description: "Documentación de endpoints del sistema DIUR para autenticación, ventas, visitas y sincronización."
         },
         servers: [
             {
@@ -24,7 +24,8 @@ const options = {
             { name: "Users", description: "Gestión de usuarios" },
             { name: "Products", description: "Inventario y productos" },
             { name: "Invoices", description: "Facturación" },
-            { name: "Sync", description: "Sincronización offline/online" }
+            { name: "Sync", description: "Sincronización offline/online" },
+            { name: "Visits", description: "Registro y seguimiento de visitas a clientes" }
         ],
         components: {
             securitySchemes: {
@@ -106,6 +107,20 @@ const options = {
                         amountReceived: { type: "number", example: 100 },
                         changeAmount: { type: "number", example: 10 }
                     }
+                },
+                VisitRequest: {
+                    type: "object",
+                    required: ["customerId", "visitDate", "latitude", "longitude", "street", "city", "province", "country"],
+                    properties: {
+                        customerId: { type: "integer", example: 12 },
+                        visitDate: { type: "string", format: "date", example: "2026-11-04" },
+                        latitude: { type: "number", example: -2.170998 },
+                        longitude: { type: "number", example: -79.922359 },
+                        street: { type: "string", example: "Av. Principal 123" },
+                        city: { type: "string", example: "Guayaquil" },
+                        province: { type: "string", example: "Guayas" },
+                        country: { type: "string", example: "Ecuador" }
+                    }
                 }
             }
         },
@@ -154,6 +169,33 @@ const options = {
                     responses: {
                         200: { description: "Perfil del usuario" },
                         401: { description: "Token inválido o ausente" }
+                    }
+                }
+            },
+            "/auth/change-password": {
+                post: {
+                    tags: ["Auth"],
+                    summary: "Cambiar la contraseña del usuario autenticado",
+                    description: "La contraseña actual es obligatoria; la nueva debe tener al menos 8 caracteres. Esta ruta está permitida durante el cambio obligatorio de contraseña.",
+                    security: [{ bearerAuth: [] }],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    required: ["currentPassword", "newPassword"],
+                                    properties: {
+                                        currentPassword: { type: "string" },
+                                        newPassword: { type: "string", minLength: 8 }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    responses: {
+                        200: { description: "Contraseña actualizada" },
+                        400: { description: "La contraseña actual no coincide o la nueva es inválida" }
                     }
                 }
             },
@@ -365,6 +407,46 @@ const options = {
                     parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
                     responses: {
                         200: { description: "Factura cancelada" }
+                    }
+                }
+            },
+            "/visits": {
+                get: {
+                    tags: ["Visits"],
+                    summary: "Listar visitas del vendedor autenticado",
+                    security: [{ bearerAuth: [] }],
+                    responses: {
+                        200: { description: "Visitas con los datos del cliente" },
+                        403: { description: "Sin permiso gestionar_visitas" }
+                    }
+                },
+                post: {
+                    tags: ["Visits"],
+                    summary: "Registrar llegada a una visita",
+                    security: [{ bearerAuth: [] }],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            "application/json": {
+                                schema: { $ref: "#/components/schemas/VisitRequest" }
+                            }
+                        }
+                    },
+                    responses: {
+                        201: { description: "Visita iniciada" },
+                        400: { description: "Datos de visita inválidos" }
+                    }
+                }
+            },
+            "/visits/{id}/end": {
+                patch: {
+                    tags: ["Visits"],
+                    summary: "Registrar salida y calcular duración",
+                    security: [{ bearerAuth: [] }],
+                    parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+                    responses: {
+                        200: { description: "Visita finalizada" },
+                        400: { description: "Visita inválida o ya finalizada" }
                     }
                 }
             },

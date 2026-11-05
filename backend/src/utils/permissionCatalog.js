@@ -28,5 +28,7 @@ module.exports = [
   { name: 'leer_clientes', description: 'Ver clientes' },
   { name: 'actualizar_clientes', description: 'Actualizar clientes' },
   { name: 'eliminar_clientes', description: 'Eliminar clientes' },
+  { name: 'gestionar_visitas', description: 'Registrar, consultar y finalizar visitas a clientes' },
+  { name: 'leer_visitas', description: 'Consultar el historial de visitas autorizado' },
   { name: 'ver_totales', description: 'Ver importes y totales' }
 ];

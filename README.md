@@ -83,6 +83,36 @@ cp .env.example .env
 # Editar .env con tus configuraciones
 ```
 
+Para habilitar el envío de facturas y las credenciales de nuevos usuarios, configura el SMTP en `backend/.env`:
+
+```env
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_SECURE=false
+MAIL_USER=tu-cuenta@gmail.com
+MAIL_PASSWORD=tu-contraseña-de-aplicacion
+MAIL_FROM=tu-cuenta@gmail.com
+APP_URL=https://tu-dominio-de-la-aplicacion
+```
+
+En Gmail usa una contraseña de aplicación (con verificación en dos pasos habilitada), no la contraseña normal de la cuenta. No subas el archivo `.env` al repositorio. También puedes usar `G_NAME` y `G_PASSWORD` en lugar de `MAIL_USER` y `MAIL_PASSWORD`.
+
+El enlace del correo de bienvenida apunta a `${APP_URL}/login` (o `FRONTEND_URL` si `APP_URL` no está definido). Cada usuario nuevo recibe un PIN temporal de 5 dígitos y debe cambiarlo por una contraseña de al menos 8 caracteres antes de usar cualquier módulo.
+
+### Notificaciones en tiempo real y push
+
+Las operaciones exitosas de creación, actualización y eliminación generan avisos en tiempo real para los usuarios conectados. Para recibir notificaciones push incluso cuando la aplicación no está abierta, cada usuario debe activar **Activar push** desde su dashboard en cada dispositivo y permitir las notificaciones del navegador. La aplicación debe estar publicada por HTTPS.
+
+Configura las claves VAPID en `backend/.env`; puedes generarlas desde `backend` con `npx web-push generate-vapid-keys`. Se admiten los servicios push habituales de Chrome/Edge, Firefox y Safari:
+
+```env
+VAPID_PUBLIC_KEY=clave-publica-generada
+VAPID_PRIVATE_KEY=clave-privada-generada
+VAPID_SUBJECT=mailto:admin@tu-dominio.com
+```
+
+No compartas ni subas la clave privada al repositorio. Los pedidos nuevos y el inicio o finalización de visitas tienen mensajes específicos; los demás cambios muestran el módulo afectado y el usuario que realizó la operación.
+
 ### 3. Instalar dependencias del backend
 
 ```bash

@@ -3,7 +3,8 @@ import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import { store } from '../redux/store';
 import { logout } from '../redux/slices/authSlice';
-import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, CreateInvoiceRequest, User, Product, Invoice, Order, OrderItem, Permission, CreateOrderDTO, Customer } from '../../../shared/types';
+import localDBService from './localDBService';
+import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, CreateInvoiceRequest, User, Product, Invoice, Order, OrderItem, Permission, CreateOrderDTO, Customer, Visit } from '../../../shared/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://diursystem.alfauzcat.com/api/v1';
 const BACKEND_BASE_HINT = API_BASE_URL.replace(/\/api\/v1$/, '');
@@ -14,6 +15,10 @@ const BACKEND_BASE_HINT = API_BASE_URL.replace(/\/api\/v1$/, '');
  */
 class ApiService {
   private api: AxiosInstance;
+
+  private isOffline(): boolean {
+    return typeof navigator !== 'undefined' && !navigator.onLine;
+  }
 
   constructor() {
     this.api = axios.create({
@@ -44,6 +49,11 @@ class ApiService {
         const requestUrl = String(error.config?.url || '');
         const isAuthRequest = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
 
+        const responseMessage = error.response?.data?.message;
+        if (typeof responseMessage === 'string' && responseMessage.trim()) {
+          error.message = responseMessage;
+        }
+
         if (status === 401 && !isAuthRequest) {
           store.dispatch(logout());
         }
@@ -70,13 +80,15 @@ class ApiService {
     return response.data.user;
   }
 
-  async createUser(userData: RegisterRequest): Promise<User> {
+  async createUser(userData: Omit<RegisterRequest, 'password'>): Promise<User> {
     const response = await this.api.post<{ user: User }>('/users', userData);
     return response.data.user;
   }
 
   async getUsers(params?: { limit?: number; offset?: number }): Promise<User[]> {
+    if (this.isOffline()) return localDBService.getUsers();
     const response = await this.api.get<{ users: User[] }>('/users', { params });
+    await localDBService.saveUsers(response.data.users);
     return response.data.users;
   }
 
@@ -94,8 +106,15 @@ class ApiService {
     return response.data.user;
   }
 
+  async changePassword(currentPassword: string, newPassword: string): Promise<User> {
+    const response = await this.api.post<{ user: User }>('/auth/change-password', { currentPassword, newPassword });
+    return response.data.user;
+  }
+
   async getPermissions(): Promise<Permission[]> {
+    if (this.isOffline()) return localDBService.getPermissions();
     const response = await this.api.get<{ permissions: Permission[] }>('/permissions');
+    await localDBService.savePermissions(response.data.permissions);
     return response.data.permissions;
   }
 
@@ -112,9 +131,32 @@ class ApiService {
     await this.api.post('/auth/logout');
   }
 
+  async getPushPublicKey(): Promise<string> {
+    const response = await this.api.get<{ publicKey: string }>('/notifications/vapid-public-key');
+    return response.data.publicKey;
+  }
+
+  async savePushSubscription(subscription: { endpoint: string; keys: { p256dh: string; auth: string } }): Promise<void> {
+    await this.api.post('/notifications/subscribe', subscription);
+  }
+
+  async removePushSubscription(endpoint: string): Promise<void> {
+    await this.api.delete('/notifications/subscribe', { data: { endpoint } });
+  }
+
   // Métodos de productos
   async getProducts(params?: { limit?: number; offset?: number; category?: string; isActive?: boolean }): Promise<{ products: Product[]; totalCount: number }> {
+    if (this.isOffline()) {
+      const cached = await localDBService.getProducts();
+      const filtered = cached.filter(product =>
+        (params?.category === undefined || product.category === params.category) &&
+        (params?.isActive === undefined || product.isActive === params.isActive));
+      const offset = params?.offset || 0;
+      const products = params?.limit === undefined ? filtered.slice(offset) : filtered.slice(offset, offset + params.limit);
+      return { products, totalCount: filtered.length };
+    }
     const response = await this.api.get('/products', { params });
+    await localDBService.saveProducts(response.data.products);
     return {
       products: response.data.products,
       totalCount: response.data.totalCount || response.data.products.length
@@ -122,6 +164,11 @@ class ApiService {
   }
 
   async getProductById(id: number): Promise<Product> {
+    if (this.isOffline()) {
+      const product = await localDBService.getProductById(id);
+      if (product) return product;
+      throw new Error('El producto no está disponible en los datos guardados en este dispositivo.');
+    }
     const response = await this.api.get<{ product: Product }>(`/products/${id}`);
     return response.data.product;
   }
@@ -157,7 +204,17 @@ class ApiService {
 
   // Métodos de facturas
   async getInvoices(params?: { limit?: number; offset?: number; status?: string; customerId?: number }): Promise<{ invoices: Invoice[]; totalCount: number }> {
+    if (this.isOffline()) {
+      const cached = await localDBService.getInvoices();
+      const filtered = cached.filter(invoice =>
+        (params?.status === undefined || invoice.status === params.status) &&
+        (params?.customerId === undefined || invoice.customerId === params.customerId));
+      const offset = params?.offset || 0;
+      const invoices = params?.limit === undefined ? filtered.slice(offset) : filtered.slice(offset, offset + params.limit);
+      return { invoices, totalCount: filtered.length };
+    }
     const response = await this.api.get('/invoices', { params });
+    await localDBService.saveInvoices(response.data.invoices);
     return {
       invoices: response.data.invoices,
       totalCount: response.data.totalCount || response.data.invoices.length
@@ -165,6 +222,11 @@ class ApiService {
   }
 
   async getInvoiceById(id: number): Promise<Invoice> {
+    if (this.isOffline()) {
+      const invoice = await localDBService.getInvoiceById(id);
+      if (invoice) return invoice;
+      throw new Error('La factura no está disponible en los datos guardados en este dispositivo.');
+    }
     const response = await this.api.get<{ invoice: Invoice }>(`/invoices/${id}`);
     return response.data.invoice;
   }
@@ -213,7 +275,16 @@ class ApiService {
 
   // Cuentas por cobrar
   async getAccountsReceivable(params?: { status?: string; customerId?: number }): Promise<{ accounts: any[] }> {
+    if (this.isOffline()) {
+      const cached = await localDBService.getAccounts();
+      return {
+        accounts: cached.filter(account =>
+          (params?.status === undefined || account.status === params.status) &&
+          (params?.customerId === undefined || Number(account.customerId) === params.customerId))
+      };
+    }
     const response = await this.api.get('/accounts-receivable', { params });
+    await localDBService.saveAccounts(response.data.accounts);
     return response.data;
   }
 
@@ -232,7 +303,16 @@ class ApiService {
 
   // Métodos de pedidos
   async getOrders(params?: { status?: string; type?: string; customerId?: number }): Promise<{ orders: Order[]; totalCount: number }> {
+    if (this.isOffline()) {
+      const cached = await localDBService.getOrders();
+      const orders = cached.filter(order =>
+        (params?.status === undefined || order.status === params.status) &&
+        (params?.type === undefined || order.type === params.type) &&
+        (params?.customerId === undefined || order.customerId === params.customerId));
+      return { orders, totalCount: orders.length };
+    }
     const response = await this.api.get('/orders', { params });
+    await localDBService.saveOrders(response.data.orders);
     return {
       orders: response.data.orders,
       totalCount: response.data.totalCount || response.data.orders.length
@@ -240,6 +320,11 @@ class ApiService {
   }
 
   async getOrderById(id: number): Promise<Order> {
+    if (this.isOffline()) {
+      const order = await localDBService.getOrderById(id);
+      if (order) return order;
+      throw new Error('El pedido no está disponible en los datos guardados en este dispositivo.');
+    }
     const response = await this.api.get<{ order: Order }>(`/orders/${id}`);
     return response.data.order;
   }
@@ -275,7 +360,12 @@ class ApiService {
   // Métodos de customers
 
   async getCustomers(): Promise<{ customers: Customer[]; totalCount: number }> {
+    if (this.isOffline()) {
+      const customers = await localDBService.getCustomers();
+      return { customers, totalCount: customers.length };
+    }
     const response = await this.api.get('/customers');
+    await localDBService.saveCustomers(response.data.customers);
     return {
       customers: response.data.customers,
       totalCount: response.data.totalCount || response.data.customers.length
@@ -307,9 +397,34 @@ class ApiService {
     await this.api.delete(`/customers/${id}`);
   }
 
+  async getVisits(params?: { customerId?: number; dateFrom?: string; dateTo?: string; userId?: number }): Promise<Visit[]> {
+    if (this.isOffline()) {
+      return (await localDBService.getVisits()).filter(visit =>
+        (params?.customerId === undefined || visit.customerId === params.customerId) &&
+        (params?.userId === undefined || visit.userId === params.userId) &&
+        (params?.dateFrom === undefined || visit.visitDate >= params.dateFrom) &&
+        (params?.dateTo === undefined || visit.visitDate <= params.dateTo));
+    }
+    const response = await this.api.get<{ visits: Visit[] }>('/visits', { params });
+    await localDBService.saveVisits(response.data.visits);
+    return response.data.visits;
+  }
+
+  async startVisit(data: Pick<Visit, 'customerId' | 'visitDate' | 'latitude' | 'longitude' | 'street' | 'city' | 'province' | 'country'>): Promise<Visit> {
+    const response = await this.api.post<{ visit: Visit }>('/visits', data);
+    return response.data.visit;
+  }
+
+  async finishVisit(id: number): Promise<Visit> {
+    const response = await this.api.patch<{ visit: Visit }>(`/visits/${id}/end`);
+    return response.data.visit;
+  }
+
   // Métodos de sincronización
   async getSuppliers(): Promise<{ suppliers: Array<{ id: number; name: string }> }> {
+    if (this.isOffline()) return { suppliers: await localDBService.getSuppliers() };
     const response = await this.api.get('/suppliers');
+    await localDBService.saveSuppliers(response.data.suppliers);
     return response.data;
   }
 

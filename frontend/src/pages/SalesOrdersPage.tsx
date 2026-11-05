@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { usePermissions } from '../hooks/permissions';
 import { Button, Badge, Modal, Form, Alert, Spinner } from 'react-bootstrap';
 import type { RootState } from '../redux/store';
 
-import { fetchOrdersStart, fetchOrdersSuccess, fetchOrdersFailure, createOrderStart, createOrderSuccess, createOrderFailure, updateOrderItemStatusSuccess, cancelOrderSuccess } from '../redux/slices/orderSlice';
+import { fetchOrdersStart, fetchOrdersSuccess, fetchOrdersFailure, createOrderStart, createOrderSuccess, createOrderFailure, cancelOrderSuccess } from '../redux/slices/orderSlice';
 
 import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure } from '../redux/slices/productSlice';
 
@@ -13,7 +13,7 @@ import { fetchCustomersStart, fetchCustomersSuccess, fetchCustomersFailure } fro
 
 import apiService from '../services/apiService';
 import socketService from '../services/socketService';
-import type { Order, OrderItem } from '../../../shared/types';
+import type { Order, OrderItem, RealtimeNotification } from '../../../shared/types';
 import { Html5Qrcode } from 'html5-qrcode';
 
 const WholesaleSalesPage: React.FC = () => {
@@ -27,11 +27,12 @@ const WholesaleSalesPage: React.FC = () => {
   const canCreateOrder = user?.role === 'admin' || hasPermission('crear_orden');
   const canCancelOrder = user?.role === 'admin' || hasPermission('cancelar_orden');
   const canCreateInvoice = user?.role === 'admin' || hasPermission('crear_factura');
+  const requestedCustomerId = Number(new URLSearchParams(window.location.search).get('customerId'));
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(canCreateOrder && requestedCustomerId > 0);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<Array<{ productId: number; quantity: number }>>([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(requestedCustomerId > 0 ? requestedCustomerId : null);
   const [invoiceQuantities, setInvoiceQuantities] = useState<{ [key: number]: number }>({});
   const [invoicePriceTier, setInvoicePriceTier] = useState<{ [key: number]: 1 | 2 | 3 }>({});
   const [invoiceLoading, setInvoiceLoading] = useState(false);
@@ -39,23 +40,6 @@ const WholesaleSalesPage: React.FC = () => {
   const [filters, setFilters] = useState({ search: '' });
   const [showScanner, setShowScanner] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState(0);
-
-  const ordersRef = useRef(orders);
-  useEffect(() => {
-    ordersRef.current = orders;
-  }, [orders]);
-
-  useEffect(() => {
-    loadOrders();
-    loadProducts();
-    loadCustomers();
-
-    socketService.on('notification', handleSocketNotification);
-
-    return () => {
-      socketService.off('notification', handleSocketNotification);
-    };
-  }, []);
 
   // =========================
   // SCANNER
@@ -114,52 +98,9 @@ const WholesaleSalesPage: React.FC = () => {
   }, [showScanner]);
 
   // ========================
-  // SOCKETS
-  // ========================
-  const handleSocketNotification = (payload: any) => {
-    const { type, data } = payload;
-
-    switch (type) {
-      case 'order_created':
-        if (data.userId !== user?.id) {
-          dispatch(createOrderSuccess(data.order));
-        }
-        break;
-
-      case 'order_updated': {
-        const order = ordersRef.current.find(o => o.id === data.orderId);
-        if (!order) return;
-
-        const item = order.items?.find(i => i.productId === data.productId);
-        if (!item) return;
-
-        dispatch(
-          updateOrderItemStatusSuccess({
-            orderId: data.orderId,
-            item: {
-              ...item,
-              quantityProcessed: data.quantityProcessed,
-              status: data.status
-            }
-          })
-        );
-        break;
-      }
-
-      case 'order_cancelled': {
-        const order = ordersRef.current.find(o => o.id === data.orderId);
-        if (!order) return;
-
-        dispatch(cancelOrderSuccess({ ...order, status: 'cancelado' }));
-        break;
-      }
-    }
-  };
-
-  // ========================
   // LOAD DATA
   // ========================
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     dispatch(fetchOrdersStart());
     try {
       const res = await apiService.getOrders({ type: 'venta al mayor' });
@@ -169,9 +110,9 @@ const WholesaleSalesPage: React.FC = () => {
       dispatch(fetchOrdersFailure('Error al cargar pedidos'));
       return [];
     }
-  };
+  }, [dispatch]);
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     dispatch(fetchProductsStart());
     try {
       const res = await apiService.getProducts();
@@ -179,9 +120,9 @@ const WholesaleSalesPage: React.FC = () => {
     } catch {
       dispatch(fetchProductsFailure('Error'));
     }
-  };
+  }, [dispatch]);
 
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     dispatch(fetchCustomersStart());
     try {
       const res = await apiService.getCustomers();
@@ -189,7 +130,23 @@ const WholesaleSalesPage: React.FC = () => {
     } catch {
       dispatch(fetchCustomersFailure('Error'));
     }
-  };
+  }, [dispatch]);
+
+  const handleSocketNotification = useCallback((notification: RealtimeNotification) => {
+    const data = notification.data as { resource?: string } | null;
+    if (data?.resource === 'orders') void loadOrders();
+  }, [loadOrders]);
+
+  useEffect(() => {
+    void loadOrders();
+    void loadProducts();
+    void loadCustomers();
+    socketService.on('notification', handleSocketNotification);
+
+    return () => {
+      socketService.off('notification', handleSocketNotification);
+    };
+  }, [handleSocketNotification, loadCustomers, loadOrders, loadProducts]);
 
   // ========================
   // CREATE ORDER
@@ -218,11 +175,6 @@ const WholesaleSalesPage: React.FC = () => {
 
       // Mostrar alerta con número de orden para facilitar edición posterior
       alert(`Orden creada: #${created.id}`);
-
-      socketService.emit('order_created', {
-        order: created,
-        userId: user?.id
-      });
 
       setShowCreateModal(false);
       setOrderItems([]);

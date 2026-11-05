@@ -7,7 +7,7 @@ export interface User {
   id: number;
   username: string;
   email: string;
-  role: 'admin' | 'cashier' | 'warehouse' | 'delivery';
+  role: 'admin' | 'cashier' | 'warehouse' | 'delivery' | 'visitor';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

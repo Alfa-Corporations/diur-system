@@ -7,22 +7,31 @@ const OrderController = require('../controllers/OrderController');
 const PermissionController = require('../controllers/PermissionController');
 const SupplierController = require('../controllers/SupplierController');
 const SyncService = require('../services/SyncService');
-const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { authenticate, authorize, requirePasswordChange, limitLoginAttempts } = require('../middlewares/auth.middleware');
 const { validateProductData, validateInvoiceData } = require('../middlewares/validation.middleware');
 const CustomerController = require('../controllers/CustomerController');
+const VisitController = require('../controllers/VisitController');
+const NotificationController = require('../controllers/NotificationController');
+const changeNotification = require('../middlewares/changeNotification.middleware');
 
 const router = express.Router();
 
 // Rutas de autenticación (públicas)
-router.post('/auth/register', AuthController.register);
-router.post('/auth/login', AuthController.login);
+router.post('/auth/register', changeNotification, AuthController.register);
+router.post('/auth/login', limitLoginAttempts, AuthController.login);
 
 // Rutas protegidas
 router.use(authenticate); // Todas las rutas siguientes requieren autenticación
 
 router.get('/auth/profile', AuthController.getProfile);
+router.post('/auth/change-password', AuthController.changePassword);
 router.post('/auth/logout', AuthController.logout);
-router.post('/users', authorize('crear_usuario', 'gestionar_usuarios', 'crud_users'), AuthController.register);
+router.use(requirePasswordChange);
+router.use(changeNotification);
+router.get('/notifications/vapid-public-key', NotificationController.getPublicKey);
+router.post('/notifications/subscribe', NotificationController.subscribe);
+router.delete('/notifications/subscribe', NotificationController.unsubscribe);
+router.post('/users', authorize('crear_usuario', 'gestionar_usuarios', 'crud_users'), AuthController.createUser);
 router.get('/users', authorize('leer_usuario', 'gestionar_usuarios', 'crud_users'), AuthController.listUsers);
 router.put('/users/:id', authorize('actualizar_usuario', 'gestionar_usuarios', 'crud_users'), AuthController.updateUser);
 router.delete('/users/:id', authorize('eliminar_usuario', 'gestionar_usuarios', 'crud_users'), AuthController.deleteUser);
@@ -33,6 +42,10 @@ router.post('/customers', authorize('crear_clientes'), CustomerController.create
 router.get('/customers', authorize('leer_clientes'), CustomerController.getCustomers);
 router.put('/customers/:id', authorize('actualizar_clientes'), CustomerController.updateCustomer);
 router.delete('/customers/:id', authorize('eliminar_clientes'), CustomerController.deleteCustomer);
+
+router.post('/visits', authorize('gestionar_visitas'), VisitController.create);
+router.get('/visits', authorize('leer_visitas'), VisitController.list);
+router.patch('/visits/:id/end', authorize('gestionar_visitas'), VisitController.finish);
 
 // 🟣 CRUD SUPPLIERS
 router.get('/suppliers', SupplierController.getSuppliers);
@@ -62,7 +75,7 @@ router.post('/invoices/:id/create-ar', authorize('actualizar_factura'), InvoiceC
 
 // Rutas de cuentas por cobrar
 const AccountsReceivableController = require('../controllers/AccountsReceivableController');
-router.get('/accounts-receivable', authorize('leer_factura'), AccountsReceivableController.listPending);
+router.get('/accounts-receivable', authorize('leer_factura', 'actualizar_factura'), AccountsReceivableController.listPending);
 router.get('/accounts-receivable/:id', authorize('leer_factura'), AccountsReceivableController.get);
 router.post('/accounts-receivable/:id/pay', authorize('actualizar_factura'), AccountsReceivableController.pay);
 

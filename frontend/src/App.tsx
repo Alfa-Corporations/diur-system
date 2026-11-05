@@ -31,6 +31,9 @@ import HistoryClient from './pages/HistoryClient';
 import Sales from './pages/Sales';
 import BackButton from './components/BackButton';
 import { useLocation } from 'react-router-dom';
+import DashboardVisitor from './pages/DashboardVisitor';
+import VisitHistoryPage from './pages/VisitHistoryPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 
 /**
  * Componente principal de la aplicación
@@ -57,7 +60,6 @@ const AppContent: React.FC = () => {
     const initializeApp = async () => {
       dispatch(loadFromStorage());
       dispatch(setOnline(navigator.onLine));
-      void socketService.requestNotificationPermission();
 
       const storedToken = localStorage.getItem('token');
       const storedUser = localStorage.getItem('authUser');
@@ -106,7 +108,7 @@ const AppContent: React.FC = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user && !user.mustChangePassword) {
       socketService.connect({ id: user.id, role: user.role });
       return;
     }
@@ -157,34 +159,52 @@ const AppContent: React.FC = () => {
       <div className='App'>
         {/* Botón de retroceso minimalista: oculto en la pantalla principal y login */}
         <BackButtonWrapper />
-        <Routes>
-          <Route path='/login' element={isAuthenticated ? <Navigate to='/dashboard' /> : <Login />} />
-          <Route path='/dashboard' element={isAuthenticated ? <Dashboard /> : <Navigate to='/login' />} />
-          <Route path='/products' element={permissionRoute(['leer_producto', 'gestionar_productos'], <ProductsPage />)} />
-          <Route path='/products/importer' element={permissionRoute(['crear_producto', 'gestionar_productos'], <FileImporter />)} />
-          <Route path='/invoices' element={permissionRoute(['leer_factura'], <InvoicesPage />)} />
-          <Route path='/accounts-receivable' element={permissionRoute(['leer_factura'], <AccountsReceivablePage />)} />
-          <Route path='/users' element={permissionRoute(['leer_usuario', 'gestionar_usuarios', 'crud_users'], <UserManagementPage />)} />
-          <Route path='/customer' element={permissionRoute(['leer_clientes'], <CustomerManager />)} />
-          <Route path='/customer/history/:customerId' element={permissionRouteAll(['leer_clientes', 'leer_factura', 'leer_orden'], <HistoryClient />)} />
-          <Route path='/orders/dashboard' element={permissionRoute(['leer_orden'], <OrdersDashboardPage />)} />
-          <Route path='/orders/dispatch' element={permissionRoute(['leer_orden'], <PendingDeliveriesPage />)} />
-          <Route path='/orders/purchase' element={permissionRoute(['leer_orden'], <PurchaseOrdersPage />)} />
-          <Route path='/orders/sale' element={permissionRoute(['leer_orden'], <SalesOrdersPage />)} />
-          <Route path='/orders/local' element={permissionRoute(['leer_orden'], <LocalSalesOrdersPage />)} />
-          <Route path='/sales' element={permissionRoute(['acceso_pos'], <Sales />)} />
-          <Route path='/pos' element={permissionRoute(['acceso_pos'], <POSPage />)} />
-          <Route path='/' element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
-        </Routes>
+        <PasswordChangeGuard>
+          <Routes>
+            <Route path='/login' element={isAuthenticated ? <Navigate to={user?.mustChangePassword ? '/change-password' : user?.role === 'vendedor' ? '/dashboard/visitor' : '/dashboard'} replace /> : <Login />} />
+            <Route path='/change-password' element={isAuthenticated && user?.mustChangePassword ? <ChangePasswordPage /> : isAuthenticated ? <Navigate to={user?.role === 'vendedor' ? '/dashboard/visitor' : '/dashboard'} replace /> : <Navigate to='/login' replace />} />
+            <Route path='/dashboard' element={isAuthenticated ? <Dashboard /> : <Navigate to='/login' />} />
+            <Route path='/dashboard/visitor' element={isAuthenticated ? <DashboardVisitor /> : <Navigate to='/login' />} />
+            <Route path='/visits' element={permissionRoute(['leer_visitas'], <VisitHistoryPage />)} />
+            <Route path='/products' element={permissionRoute(['leer_producto', 'gestionar_productos'], <ProductsPage />)} />
+            <Route path='/products/importer' element={permissionRoute(['crear_producto', 'gestionar_productos'], <FileImporter />)} />
+            <Route path='/invoices' element={permissionRoute(['leer_factura'], <InvoicesPage />)} />
+            <Route path='/accounts-receivable' element={permissionRoute(['leer_factura', 'actualizar_factura'], <AccountsReceivablePage />)} />
+            <Route path='/users' element={permissionRoute(['leer_usuario', 'gestionar_usuarios', 'crud_users'], <UserManagementPage />)} />
+            <Route path='/customer' element={permissionRoute(['leer_clientes'], <CustomerManager />)} />
+            <Route path='/customer/history/:customerId' element={permissionRouteAll(['leer_clientes', 'leer_factura', 'leer_orden'], <HistoryClient />)} />
+            <Route path='/orders/dashboard' element={permissionRoute(['leer_orden'], <OrdersDashboardPage />)} />
+            <Route path='/orders/dispatch' element={permissionRoute(['leer_orden'], <PendingDeliveriesPage />)} />
+            <Route path='/orders/purchase' element={permissionRoute(['leer_orden'], <PurchaseOrdersPage />)} />
+            <Route path='/orders/sale' element={permissionRoute(['leer_orden', 'crear_orden'], <SalesOrdersPage />)} />
+            <Route path='/orders/local' element={permissionRoute(['leer_orden'], <LocalSalesOrdersPage />)} />
+            <Route path='/sales' element={permissionRoute(['acceso_pos'], <Sales />)} />
+            <Route path='/pos' element={permissionRoute(['acceso_pos'], <POSPage />)} />
+            <Route path='/' element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
+          </Routes>
+        </PasswordChangeGuard>
       </div>
     </Router>
   );
 };
 
+const PasswordChangeGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, user } = useAppSelector(state => state.auth);
+  const location = useLocation();
+
+  if (isAuthenticated && user?.mustChangePassword && location.pathname !== '/change-password') {
+    return <Navigate to='/change-password' replace />;
+  }
+  if (isAuthenticated && user && !user.mustChangePassword && location.pathname === '/change-password') {
+    return <Navigate to={user.role === 'vendedor' ? '/dashboard/visitor' : '/dashboard'} replace />;
+  }
+  return <>{children}</>;
+};
+
 const BackButtonWrapper: React.FC = () => {
   const loc = useLocation();
   const path = loc.pathname || '';
-  if (path === '/dashboard' || path === '/login' || path === '/') return null;
+  if (path === '/dashboard' || path === '/dashboard/visitor' || path === '/login' || path === '/') return null;
   return (
     <div style={{ position: 'fixed', top: 12, left: 12, zIndex: 1200 }}>
       <BackButton />

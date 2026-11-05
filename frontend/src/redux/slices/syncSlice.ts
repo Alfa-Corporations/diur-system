@@ -61,12 +61,16 @@ const syncSlice = createSlice({
     },
     addNotification: (state, action: PayloadAction<RealtimeNotification>) => {
       const incoming = action.payload;
-      const incomingData = typeof incoming.data === 'object' && incoming.data !== null ? (incoming.data as { invoiceId?: number | string; status?: string }) : {};
+      const incomingData = typeof incoming.data === 'object' && incoming.data !== null ? (incoming.data as { eventId?: string; invoiceId?: number | string; status?: string }) : {};
       const incomingTime = new Date(incoming.timestamp).getTime();
 
       const isDuplicate = state.notifications.some(notification => {
-        const existingData = typeof notification.data === 'object' && notification.data !== null ? (notification.data as { invoiceId?: number | string; status?: string }) : {};
+        const existingData = typeof notification.data === 'object' && notification.data !== null ? (notification.data as { eventId?: string; invoiceId?: number | string; status?: string }) : {};
         const existingTime = new Date(notification.timestamp).getTime();
+
+        if (incomingData.eventId || existingData.eventId) {
+          return Boolean(incomingData.eventId && incomingData.eventId === existingData.eventId);
+        }
 
         return (
           notification.type === incoming.type && String(existingData.invoiceId ?? '') === String(incomingData.invoiceId ?? '') && String(existingData.status ?? '') === String(incomingData.status ?? '') && Math.abs(existingTime - incomingTime) < 4000

@@ -11,6 +11,8 @@ const UserPermission = require('./UserPermission');
 const Suppliers = require('./Suppliers');
 const AccountsReceivable = require('./AccountsReceivable');
 const AccountsReceivablePayment = require('./AccountsReceivablePayment');
+const Visit = require('./Visit');
+const PushSubscription = require('./PushSubscription');
 
 module.exports = {
   User,
@@ -23,6 +25,8 @@ module.exports = {
   Permission,
   UserPermission,
   Suppliers,
-  AccountsReceivable
-  , AccountsReceivablePayment
+  AccountsReceivable,
+  AccountsReceivablePayment,
+  Visit,
+  PushSubscription
 };

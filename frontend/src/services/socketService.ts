@@ -119,30 +119,9 @@ class SocketService {
     this.currentUserData = null;
   }
 
-  private getNotificationTypeLabel(type: RealtimeNotification['type']): string {
-    switch (type) {
-      case 'invoice_created':
-        return 'Factura creada';
-      case 'invoice_paid':
-        return 'Factura pagada';
-      case 'invoice_deleted':
-        return 'Factura eliminada';
-      case 'inventory_updated':
-        return 'Inventario actualizado';
-      case 'order_created':
-        return 'Pedido creado';
-      case 'order_updated':
-        return 'Pedido actualizado';
-      case 'order_assigned':
-        return 'Pedido asignado';
-      default:
-        return 'Notificación del sistema';
-    }
-  }
-
   private isDuplicateNotification(notification: RealtimeNotification): boolean {
-    const payload = typeof notification.data === 'object' && notification.data !== null ? (notification.data as { invoiceId?: number | string; status?: string }) : {};
-    const key = `${notification.type}:${payload.invoiceId ?? 'na'}:${payload.status ?? 'na'}:${notification.message}`;
+    const payload = typeof notification.data === 'object' && notification.data !== null ? (notification.data as { eventId?: string; invoiceId?: number | string; status?: string }) : {};
+    const key = payload.eventId || `${notification.type}:${payload.invoiceId ?? 'na'}:${payload.status ?? 'na'}:${notification.message}:${notification.timestamp}`;
     const now = Date.now();
 
     for (const [storedKey, timestamp] of this.recentNotifications.entries()) {
@@ -170,29 +149,12 @@ class SocketService {
 
     window.dispatchEvent(new CustomEvent('socket-notification', { detail: notification }));
 
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(notification.message, {
-        body: `Evento: ${this.getNotificationTypeLabel(notification.type)}`,
-        icon: '/favicon.ico'
-      });
-    }
-  }
-
-  /**
-   * Emite eventos al servidor
-   */
-  emit(event: string, data?: any): void {
-    if (this.socket?.connected) {
-      this.socket.emit(event, data);
-    } else {
-      console.warn('Socket not connected, event not sent:', event);
-    }
   }
 
   /**
    * Escucha eventos del servidor
    */
-  on(event: string, callback: (...args: any[]) => void): void {
+  on<Args extends unknown[]>(event: string, callback: (...args: Args) => void): void {
     if (this.socket) {
       this.socket.on(event, callback);
     }
@@ -201,7 +163,7 @@ class SocketService {
   /**
    * Deja de escuchar eventos
    */
-  off(event: string, callback?: (...args: any[]) => void): void {
+  off<Args extends unknown[]>(event: string, callback?: (...args: Args) => void): void {
     if (this.socket) {
       if (callback) {
         this.socket.off(event, callback);
@@ -218,18 +180,6 @@ class SocketService {
     return this.socket?.connected || false;
   }
 
-  /**
-   * Solicita permisos para notificaciones del navegador
-   */
-  async requestNotificationPermission(): Promise<boolean> {
-    if (!('Notification' in window)) return false;
-
-    if (Notification.permission === 'granted') return true;
-    if (Notification.permission === 'denied') return false;
-
-    const permission = await Notification.requestPermission();
-    return permission === 'granted';
-  }
 }
 
 export default new SocketService();
