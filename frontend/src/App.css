@@ -1111,6 +1111,432 @@
   margin-top: 16px;
 }
 
+.pending-products-page {
+  width: min(1280px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 34px 0 56px;
+  color: #1e2d42;
+}
+
+.pending-products-header h1 {
+  margin: 0 0 8px;
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+}
+
+.pending-products-header > div > p:last-child {
+  color: #718096;
+}
+
+.pending-products-eyebrow {
+  margin: 0 0 8px;
+  color: #718096;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+
+.pending-products-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 24px 0;
+}
+
+.pending-products-summary > div,
+.pending-products-filters,
+.pending-products-table-card {
+  padding: 18px;
+  background: #fff;
+  border: 1px solid #e8edf4;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgb(22 46 78 / 5%);
+}
+
+.pending-products-summary span,
+.pending-products-summary strong {
+  display: block;
+}
+
+.pending-products-summary span {
+  color: #718096;
+  font-size: 0.86rem;
+}
+
+.pending-products-summary strong {
+  margin-top: 4px;
+  color: #123769;
+  font-size: 1.7rem;
+}
+
+.pending-products-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.pending-products-filters .form-label {
+  font-weight: 650;
+}
+
+.pending-products-invoices {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid #dce7f7;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgb(22 46 78 / 5%);
+}
+
+.pending-products-invoices-heading,
+.pending-products-invoice-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pending-products-invoices-heading h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.pending-products-invoice-group {
+  padding: 12px 0;
+  border-top: 1px solid #edf1f6;
+}
+
+.pending-products-invoice-group > div:first-child {
+  min-width: 0;
+}
+
+.pending-products-invoice-group strong,
+.pending-products-invoice-group small {
+  display: block;
+}
+
+.pending-products-invoice-group small {
+  margin-top: 4px;
+  color: #718096;
+}
+
+.pending-products-invoice-group .form-group {
+  width: min(280px, 42%);
+  flex: 0 0 auto;
+}
+
+.pending-products-invoice-group .form-label {
+  margin-bottom: 4px;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.pending-products-table-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.pending-products-table {
+  min-width: 760px;
+}
+
+.pending-products-table th {
+  padding: 14px 16px;
+  color: #68778c;
+  background: #f7f9fc;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pending-products-table td {
+  padding: 15px 16px;
+  vertical-align: middle;
+}
+
+.pending-products-table td strong,
+.pending-products-table td small {
+  display: block;
+}
+
+.pending-products-quantity {
+  width: 130px;
+  min-width: 90px;
+}
+
+.pending-products-delivery-preview {
+  display: block;
+  width: min(100%, 220px);
+  max-height: 180px;
+  margin-top: 8px;
+  object-fit: contain;
+  border: 1px solid #e8edf4;
+  border-radius: 10px;
+}
+
+.order-dispatch-page {
+  width: min(1200px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 34px 0 56px;
+  color: #1e2d42;
+}
+
+.order-dispatch-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.order-dispatch-header h1 {
+  margin: 0 0 8px;
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+}
+
+.order-dispatch-header p:last-child {
+  color: #718096;
+}
+
+.order-dispatch-stage {
+  margin-bottom: 20px;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid #e8edf4;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgb(22 46 78 / 5%);
+}
+
+.order-dispatch-stage__heading {
+  margin-bottom: 10px;
+}
+
+.order-dispatch-stage__heading > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.order-dispatch-stage__heading h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.order-dispatch-stage__heading > span {
+  display: block;
+  margin: 6px 0 0 34px;
+  color: #718096;
+  font-size: 0.88rem;
+}
+
+.order-dispatch-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 0;
+  border-top: 1px solid #edf1f6;
+}
+
+.order-dispatch-line__info {
+  min-width: 0;
+}
+
+.order-dispatch-line__info strong,
+.order-dispatch-line__info span,
+.order-dispatch-line__info small {
+  display: block;
+}
+
+.order-dispatch-line__info span,
+.order-dispatch-line__info small {
+  margin-top: 3px;
+  color: #718096;
+}
+
+.order-dispatch-line__action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.order-dispatch-quantity {
+  width: 100px;
+}
+
+.order-dispatch-empty {
+  margin: 12px 0 0;
+  color: #718096;
+}
+
+.pending-products-table td small {
+  margin-top: 3px;
+  color: #718096;
+  font-size: 0.8rem;
+}
+
+.pending-products-state {
+  display: flex;
+  min-height: 220px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  color: #718096;
+  text-align: center;
+}
+
+.pending-products-state strong {
+  color: #1e2d42;
+}
+
+.visitor-customer-suggestions {
+  display: grid;
+  max-height: 260px;
+  margin-top: 6px;
+  overflow-y: auto;
+  border: 1px solid #e1e7f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.visitor-customer-suggestions button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid #edf1f6;
+  background: white;
+  color: inherit;
+  text-align: left;
+}
+
+.visitor-customer-suggestions button:last-child {
+  border-bottom: 0;
+}
+
+.visitor-customer-suggestions button:hover,
+.visitor-customer-suggestions button:focus-visible {
+  background: #f4f7fc;
+}
+
+.visitor-customer-suggestions strong,
+.visitor-customer-suggestions small {
+  display: block;
+}
+
+.visitor-customer-suggestions small {
+  margin-top: 3px;
+  color: #718096;
+}
+
+@media (max-width: 600px) {
+  .pending-products-page {
+    width: calc(100% - 24px);
+    padding-top: 24px;
+  }
+
+  .pending-products-summary,
+  .pending-products-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .pending-products-invoices-heading,
+  .pending-products-invoice-group,
+  .order-dispatch-line {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pending-products-invoices-heading .badge,
+  .pending-products-invoice-group .form-group {
+    width: 100%;
+  }
+
+  .pending-products-summary {
+    gap: 10px;
+    margin: 18px 0;
+  }
+
+  .pending-products-summary > div,
+  .pending-products-filters {
+    padding: 14px;
+  }
+
+  .order-dispatch-page {
+    width: calc(100% - 24px);
+    padding-top: 24px;
+  }
+
+  .order-dispatch-header {
+    flex-direction: column;
+  }
+
+  .order-dispatch-stage {
+    padding: 14px;
+  }
+
+  .order-dispatch-line__action {
+    justify-content: flex-start;
+  }
+
+  .pending-products-table {
+    display: block;
+    min-width: 0;
+  }
+
+  .pending-products-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .pending-products-table tbody {
+    display: block;
+  }
+
+  .pending-products-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 8px;
+    border-bottom: 1px solid #e8edf4;
+  }
+
+  .pending-products-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .pending-products-table tbody td {
+    display: block;
+    min-width: 0;
+    padding: 8px;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .pending-products-table tbody td::before {
+    display: block;
+    margin-bottom: 4px;
+    color: #718096;
+    content: attr(data-label);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+}
+
 .visitor-topbar,
 .visitor-brand,
 .visitor-topbar-user,

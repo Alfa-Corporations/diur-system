@@ -38,7 +38,7 @@ class NotificationService {
     await PushSubscription.destroy({ where: { userId, endpoint } });
   }
 
-  async sendToAll(notification) {
+  async sendToAdmins(notification) {
     if (!isConfigured) return;
 
     const subscriptions = await PushSubscription.findAll({
@@ -46,7 +46,7 @@ class NotificationService {
         model: User,
         as: 'user',
         attributes: [],
-        where: { isActive: true },
+        where: { isActive: true, role: 'admin' },
         required: true,
       }],
     });

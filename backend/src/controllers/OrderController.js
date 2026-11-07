@@ -124,6 +124,38 @@ class OrderController {
     }
   }
 
+  async updateDispatchLoad(req, res) {
+    const orderId = Number(req.params.orderId);
+    const orderItemId = Number(req.params.orderItemId);
+    const { quantityLoaded } = req.body;
+    if (!Number.isSafeInteger(orderId) || orderId <= 0 || !Number.isSafeInteger(orderItemId) || orderItemId <= 0) {
+      return res.status(400).json({ message: 'Identificadores de orden y producto no válidos' });
+    }
+    if (!Number.isSafeInteger(quantityLoaded) || quantityLoaded < 0) {
+      return res.status(400).json({ message: 'quantityLoaded debe ser un entero igual o mayor a cero' });
+    }
+    try {
+      const item = await OrderService.loadOrderItem(orderId, orderItemId, quantityLoaded);
+      return res.json({ item });
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
+    }
+  }
+
+  async markDispatchArrived(req, res) {
+    const orderId = Number(req.params.orderId);
+    const orderItemId = Number(req.params.orderItemId);
+    if (!Number.isSafeInteger(orderId) || orderId <= 0 || !Number.isSafeInteger(orderItemId) || orderItemId <= 0) {
+      return res.status(400).json({ message: 'Identificadores de orden y producto no válidos' });
+    }
+    try {
+      const item = await OrderService.markOrderItemArrived(orderId, orderItemId);
+      return res.json({ item });
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
+    }
+  }
+
   /**
    * Cancela un pedido
    * PUT /orders/:id/cancel

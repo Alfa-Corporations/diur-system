@@ -32,8 +32,15 @@ const changeNotification = (req, res, next) => {
   res.once('finish', () => {
     if (res.statusCode < 200 || res.statusCode >= 300 || (!req.user && !isNewRegistration)) return;
 
+    const invoiceNotificationHandled = resourceKey === 'invoices' && (
+      (method === 'POST' && req.path === '/invoices') ||
+      (method === 'POST' && req.path.endsWith('/cancel')) ||
+      method === 'DELETE' ||
+      (method === 'PATCH' && req.path.endsWith('/status') && ['paid', 'cancelled'].includes(req.body?.status))
+    );
+
     let type = 'system_change';
-    const actorName = req.user?.username;
+    const actorName = req.user?.username || 'Un usuario';
     let message = isNewRegistration
       ? 'Nuevo usuario registrado.'
       : `${actorName} ${methodActions[method]} ${resourceLabels[resourceKey] || 'información del sistema'}.`;
@@ -60,8 +67,10 @@ const changeNotification = (req, res, next) => {
       timestamp: new Date().toISOString(),
     };
 
-    req.app.get('io')?.emit('notification', notification);
-    NotificationService.sendToAll(notification).catch(error => {
+    if (!invoiceNotificationHandled) {
+      req.app.get('io')?.to('admin').emit('notification', notification);
+    }
+    NotificationService.sendToAdmins(notification).catch(error => {
       console.error('Could not dispatch push notifications:', error.message);
     });
   });

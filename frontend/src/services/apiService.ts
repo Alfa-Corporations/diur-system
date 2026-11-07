@@ -372,6 +372,14 @@ class ApiService {
     return response.data.invoice;
   }
 
+  async getInvoiceEvidence(id: number): Promise<string> {
+    if (this.isOffline()) {
+      throw new Error('La evidencia de entrega solo está disponible con conexión.');
+    }
+    const response = await this.api.get<{ evidence: string }>(`/invoices/${id}/evidence`);
+    return response.data.evidence;
+  }
+
   async createInvoice(invoiceData: CreateInvoiceRequest): Promise<Invoice> {
     if (this.isOffline()) {
       const user = this.getStoredUser();
@@ -632,6 +640,8 @@ class ApiService {
           id: this.createLocalId(),
           orderId: 0,
           quantityProcessed: 0,
+          quantityLoaded: 0,
+          dispatchStatus: 'pendiente',
           status: 'pendiente',
           unitPrice: 0,
           createdAt: now,
@@ -706,6 +716,23 @@ class ApiService {
         items: order.items?.map(item => item.productId === productId ? response.data.item : item),
       });
     }
+    return response.data.item;
+  }
+
+  async updateDispatchLoad(orderId: number, orderItemId: number, quantityLoaded: number): Promise<OrderItem> {
+    if (this.isOffline()) throw new Error('Debes conectarte para registrar cargas de bodega.');
+    const response = await this.api.patch<{ item: OrderItem }>(
+      `/orders/${orderId}/items/${orderItemId}/dispatch-load`,
+      { quantityLoaded }
+    );
+    return response.data.item;
+  }
+
+  async markDispatchArrived(orderId: number, orderItemId: number): Promise<OrderItem> {
+    if (this.isOffline()) throw new Error('Debes conectarte para registrar la llegada al local.');
+    const response = await this.api.patch<{ item: OrderItem }>(
+      `/orders/${orderId}/items/${orderItemId}/dispatch-arrival`
+    );
     return response.data.item;
   }
 

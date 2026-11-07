@@ -38,6 +38,19 @@ const OrderItem = db.define('OrderItem', {
     allowNull: false,
     defaultValue: 0,
   },
+  quantityLoaded: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  },
+  dispatchStatus: {
+    type: DataTypes.STRING(20),
+    allowNull: false,
+    defaultValue: 'pendiente',
+    validate: {
+      isIn: [['pendiente', 'cargando', 'en_local', 'entregado']],
+    },
+  },
   status: {
     type: DataTypes.ENUM('pendiente', 'en_transito', 'en_bodega', 'repartidor', 'facturado'),
     allowNull: false,

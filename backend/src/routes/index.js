@@ -66,6 +66,7 @@ router.delete('/products/:id', authorize('eliminar_producto', 'gestionar_product
 // Rutas de facturas
 router.post('/invoices', authorize('crear_factura'), InvoiceController.createInvoice);
 router.get('/invoices', authorize('leer_factura'), InvoiceController.getInvoices);
+router.get('/invoices/:id/evidence', authorize('leer_factura'), InvoiceController.getDeliveryEvidence);
 router.get('/invoices/:id', authorize('leer_factura'), InvoiceController.getInvoice);
 router.patch('/invoices/:id/status', authorize('actualizar_factura'), InvoiceController.updateInvoiceStatus);
 router.delete('/invoices/:id', authorize('cancelar_factura'), InvoiceController.cancelInvoice);
@@ -83,6 +84,8 @@ router.post('/accounts-receivable/:id/pay', authorize('actualizar_factura'), Acc
 router.post('/orders', authorize('crear_orden'), OrderController.createOrder);
 router.get('/orders', authorize('leer_orden'), OrderController.getOrders);
 router.patch('/orders/:orderId/items/:productId/status', authorize('actualizar_orden', 'gestionar_items_orden'), OrderController.updateOrderItemStatus);
+router.patch('/orders/:orderId/items/:orderItemId/dispatch-load', authorize('actualizar_orden', 'gestionar_items_orden'), OrderController.updateDispatchLoad);
+router.patch('/orders/:orderId/items/:orderItemId/dispatch-arrival', authorize('actualizar_orden', 'gestionar_items_orden'), OrderController.markDispatchArrived);
 router.put('/orders/:id/status', authorize('cancelar_orden'), OrderController.cancelOrder);
 router.get('/orders/:id', authorize('leer_orden'), OrderController.getOrder);
 

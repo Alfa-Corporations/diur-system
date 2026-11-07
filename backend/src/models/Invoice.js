@@ -107,6 +107,15 @@ const Invoice = db.define('Invoice', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  deliveryEvidence: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  hasDeliveryEvidence: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
   emailSentAt: {
     type: DataTypes.DATE,
     allowNull: true,

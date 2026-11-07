@@ -11,7 +11,7 @@ const hendleError = require('./middlewares/error.middleware');
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: '4mb' }));
 app.use(morgan('dev'));
 app.use(cors());
 swaggerDocs(app);
@@ -21,6 +21,10 @@ db.sync({ force: false, alter: process.env.NODE_ENV !== 'production' })
         console.log('Database synchronized');
         if (process.env.NODE_ENV === 'production') {
             await db.query('ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE');
+            await db.query('ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "quantityLoaded" INTEGER NOT NULL DEFAULT 0');
+            await db.query('ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "dispatchStatus" VARCHAR(20) NOT NULL DEFAULT \'pendiente\'');
+            await db.query('ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "deliveryEvidence" TEXT');
+            await db.query('ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "hasDeliveryEvidence" BOOLEAN NOT NULL DEFAULT FALSE');
             await db.query(`
                 CREATE TABLE IF NOT EXISTS "push_subscriptions" (
                     "id" SERIAL PRIMARY KEY,

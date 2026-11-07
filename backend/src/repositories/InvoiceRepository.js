@@ -29,6 +29,7 @@ class InvoiceRepository {
    */
   async findById(id) {
     return await Invoice.findByPk(id, {
+      attributes: { exclude: ['deliveryEvidence'] },
       include: [
         { model: User, as: 'user', attributes: ['id', 'username', 'email', 'role'] },
         { model: Customer, as: 'customer' },
@@ -45,6 +46,7 @@ class InvoiceRepository {
   async findByNumber(invoiceNumber) {
     return await Invoice.findOne({
       where: { invoiceNumber },
+      attributes: { exclude: ['deliveryEvidence'] },
       include: [
         { model: User, as: 'user', attributes: ['id', 'username', 'email', 'role'] },
         { model: Customer, as: 'customer' },
@@ -98,6 +100,7 @@ class InvoiceRepository {
       where,
       limit,
       offset,
+      attributes: { exclude: ['deliveryEvidence'] },
       order: [['createdAt', 'DESC']],
       include: [
         { model: User, as: 'user', attributes: ['id', 'username', 'email', 'role'] },

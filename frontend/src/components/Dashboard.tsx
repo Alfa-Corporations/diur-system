@@ -33,9 +33,11 @@ const Dashboard: React.FC = () => {
     navigate('/login');
   };
 
-  const menuItems = [
+  const menuItems: Array<{ label: string; path: string; icon: string; helper: string; permissions: string[]; requiresAll?: string[]; adminOnly?: boolean }> = [
     { label: 'Ordenes', path: '/orders/sale', icon: '📤', helper: 'Consultar y gestionar órdenes', permissions: ['leer_orden'] },
     { label: 'Despachos pendientes', path: '/orders/dispatch', icon: '🚚', helper: 'Pendientes por cliente y orden', permissions: ['leer_orden'] },
+    { label: 'Productos por entregar', path: '/orders/pending-products', icon: '📦', helper: 'Facturar productos recibidos y registrar su entrega', permissions: ['gestionar_items_orden', 'actualizar_orden'], requiresAll: ['leer_orden', 'leer_clientes', 'crear_factura'] },
+    { label: 'Preparación de despachos', path: '/orders/dispatch-center', icon: '🚛', helper: 'Cargar bodega y registrar llegada al local', permissions: ['gestionar_items_orden', 'actualizar_orden'], requiresAll: ['leer_orden'] },
     //{ label: 'Compras', path: '/orders/purchase', icon: '📥', helper: 'Órdenes de compra y recepción', permissions: ['leer_orden'] },
     { label: 'Dashboard de pedidos', path: '/orders/dashboard', icon: '📊', helper: 'Vista global de órdenes', permissions: ['leer_orden'] },
     { label: 'Facturas', path: '/invoices', icon: '🧾', helper: 'Consultar ventas y cobros', permissions: ['leer_factura'] },
@@ -47,7 +49,11 @@ const Dashboard: React.FC = () => {
     { label: 'Usuarios', path: '/users', icon: '🔐', helper: 'Administración de accesos', permissions: ['leer_usuario', 'gestionar_usuarios', 'crud_users'] }
   ];
 
-  const availableMenuItems = menuItems.filter(item => user?.role === 'admin' || item.permissions.some(hasPermission));
+  const availableMenuItems = menuItems.filter(item =>
+    (!item.adminOnly || user?.role === 'admin') &&
+    (user?.role === 'admin' || (item.requiresAll || []).every(hasPermission)) &&
+    (user?.role === 'admin' || item.permissions.some(hasPermission))
+  );
   const [pendingAccounts, setPendingAccounts] = useState<number | null>(null);
   const [pendingDeliveryUnits, setPendingDeliveryUnits] = useState<number | null>(null);
 

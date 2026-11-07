@@ -31,6 +31,8 @@ type VisitAddress = {
   country: string;
 };
 
+const getVisitAddressStorageKey = (userId: number) => `visit-address-${userId}`;
+
 const DashboardVisitor: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -78,6 +80,30 @@ const DashboardVisitor: React.FC = () => {
     province: '',
     country: ''
   });
+  const [savedVisitAddress, setSavedVisitAddress] = useState<VisitAddress | null>(null);
+  const [editVisitAddress, setEditVisitAddress] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const storedAddress = localStorage.getItem(getVisitAddressStorageKey(user.id));
+      if (storedAddress) {
+        const parsedAddress: unknown = JSON.parse(storedAddress);
+        if (
+          parsedAddress &&
+          typeof parsedAddress === 'object' &&
+          ['street', 'city', 'province', 'country'].every(key => {
+            const value = (parsedAddress as Record<string, unknown>)[key];
+            return typeof value === 'string' && value.trim().length > 0;
+          })
+        ) {
+          setSavedVisitAddress(parsedAddress as VisitAddress);
+        }
+      }
+    } catch {
+      setError('No se pudieron recuperar los datos de ubicación guardados en este dispositivo.');
+    }
+  }, [user]);
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -140,6 +166,7 @@ const DashboardVisitor: React.FC = () => {
     setError('');
     setNotice('');
     setStep('select');
+    setEditVisitAddress(false);
     setCode('');
     setCustomerForm({
       name: '',
@@ -152,17 +179,18 @@ const DashboardVisitor: React.FC = () => {
     setShowVisit(true);
   };
 
-  const chooseCustomer = (selected: Customer) => {
+  const chooseCustomer = useCallback((selected: Customer) => {
     setCustomer(selected);
-    setVisitAddress({
+    setVisitAddress(savedVisitAddress || {
       street: selected.address || '',
       city: '',
       province: '',
       country: ''
     });
+    setEditVisitAddress(!savedVisitAddress);
     setStep('location');
     setError('');
-  };
+  }, [savedVisitAddress]);
 
   const resolveCustomer = useCallback((rawCode: string) => {
     let lookup = rawCode.trim();
@@ -174,14 +202,15 @@ const DashboardVisitor: React.FC = () => {
     }
     const match = customers.find(item =>
       String(item.id) === lookup ||
-      String(item.identificationNumber || '').toLowerCase() === lookup.toLowerCase()
+      String(item.identificationNumber || '').toLowerCase() === lookup.toLowerCase() ||
+      item.name.trim().toLocaleLowerCase() === lookup.toLocaleLowerCase()
     );
     if (!match) {
       setError('No encontramos un cliente con ese código. Verifica el código o escanea su QR.');
       return;
     }
     chooseCustomer(match);
-  }, [customers]);
+  }, [chooseCustomer, customers]);
 
   useEffect(() => {
     if (!showScanner) return;
@@ -227,7 +256,8 @@ const DashboardVisitor: React.FC = () => {
       });
       setCustomers(previous => [...previous, created]);
       setCustomer(created);
-      setVisitAddress({ street: created.address || '', city: '', province: '', country: '' });
+      setVisitAddress(savedVisitAddress || { street: created.address || '', city: '', province: '', country: '' });
+      setEditVisitAddress(!savedVisitAddress);
       setStep('location');
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : 'No se pudo crear el cliente.');
@@ -246,12 +276,12 @@ const DashboardVisitor: React.FC = () => {
       setError('Selecciona o crea un cliente antes de iniciar la visita.');
       return;
     }
-    if (!visitAddress.street.trim() || !visitAddress.city.trim() || !visitAddress.province.trim() || !visitAddress.country.trim()) {
-      setError('Completa calle, ciudad, provincia y país para registrar la visita.');
-      return;
-    }
     if (!navigator.geolocation) {
       setError('Este dispositivo no permite geolocalización. No se puede registrar la visita sin coordenadas.');
+      return;
+    }
+    if (!visitAddress.street.trim() || !visitAddress.city.trim() || !visitAddress.province.trim() || !visitAddress.country.trim()) {
+      setError('Completa calle, cantón, provincia y país para registrar tu primera ubicación.');
       return;
     }
     setBusy(true);
@@ -267,6 +297,12 @@ const DashboardVisitor: React.FC = () => {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
         });
+        setSavedVisitAddress(visitAddress);
+        try {
+          if (user) localStorage.setItem(getVisitAddressStorageKey(user.id), JSON.stringify(visitAddress));
+        } catch {
+          setNotice('Visita iniciada. No se pudieron guardar los datos de dirección para la próxima visita.');
+        }
         setActiveVisit(visit);
         setShowVisit(false);
         await loadCustomerOrders(customer.id);
@@ -354,7 +390,10 @@ const DashboardVisitor: React.FC = () => {
   };
 
   const filteredCustomers = customers.filter(item =>
-    `${item.name} ${item.identificationNumber || ''} ${item.id}`.toLowerCase().includes(search.toLowerCase())
+    `${item.name} ${item.identificationNumber || ''} ${item.id}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())
+  );
+  const matchingCustomers = customers.filter(item =>
+    `${item.name} ${item.identificationNumber || ''} ${item.id}`.toLocaleLowerCase().includes(code.trim().toLocaleLowerCase())
   );
   const filteredOrders = orders.filter(order => orderFilter === 'all' || order.status === orderFilter);
 
@@ -464,7 +503,7 @@ const DashboardVisitor: React.FC = () => {
                   <Form.Control className='visitor-search' value={search} onChange={event => setSearch(event.target.value)} placeholder='Buscar cliente o código…' />
                   <div className='visitor-customer-list'>
                     {filteredCustomers.slice(0, 5).map(item => (
-                      <button className='visitor-customer-row' key={item.id} onClick={() => { if (canManageVisits) { setCustomer(item); setVisitAddress({ street: item.address || '', city: '', province: '', country: '' }); setStep('location'); setShowVisit(true); } else { navigate('/customer'); } }}>
+                      <button className='visitor-customer-row' key={item.id} onClick={() => { if (canManageVisits) { chooseCustomer(item); setShowVisit(true); } else { navigate('/customer'); } }}>
                         <span className='visitor-customer-avatar'>{item.name.charAt(0).toUpperCase()}</span><span><strong>{item.name}</strong><small>Código #{item.id}</small></span><span className='visitor-customer-arrow'>›</span>
                       </button>
                     ))}
@@ -492,12 +531,22 @@ const DashboardVisitor: React.FC = () => {
             <div className='visitor-flow-step'>
               <p>Busca un cliente existente por código, identificación o escanea su QR. También puedes registrar un cliente nuevo.</p>
               {canReadCustomers && <>
-                <Form.Label htmlFor='visitor-customer-code'>Código o identificación del cliente</Form.Label>
+                <Form.Label htmlFor='visitor-customer-code'>Buscar por nombre, código o cédula</Form.Label>
                 <div className='visitor-code-input'>
-                  <Form.Control id='visitor-customer-code' value={code} onChange={event => setCode(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); resolveCustomer(code); } }} placeholder='Ej. 125 o número de identificación' />
+                  <Form.Control id='visitor-customer-code' value={code} onChange={event => setCode(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); resolveCustomer(code); } }} placeholder='Escribe un nombre, código o cédula…' autoComplete='off' />
                   <Button variant='outline-primary' onClick={() => resolveCustomer(code)}>Buscar</Button>
                   <Button variant='outline-secondary' onClick={() => setShowScanner(true)}>Escanear QR</Button>
                 </div>
+                {code.trim() && matchingCustomers.length > 0 && (
+                  <div className='visitor-customer-suggestions' role='listbox' aria-label='Clientes encontrados'>
+                    {matchingCustomers.slice(0, 6).map(item => (
+                      <button type='button' key={item.id} role='option' aria-selected='false' onClick={() => chooseCustomer(item)}>
+                        <span><strong>{item.name}</strong><small>Código #{item.id}{item.identificationNumber ? ` · Cédula ${item.identificationNumber}` : ''}</small></span>
+                        <span aria-hidden='true'>›</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div id='visitor-customer-reader' className={showScanner ? 'visitor-scanner' : 'd-none'} />
               </>}
               {canCreateCustomers && <Button className='w-100 mt-3' variant='light' onClick={() => { setCustomer(null); setStep('create'); }}>＋ Crear cliente nuevo</Button>}
@@ -521,13 +570,22 @@ const DashboardVisitor: React.FC = () => {
           )}
           {step === 'location' && (
             <Form onSubmit={startVisit}>
-              <Alert variant='info'>Cliente: <strong>{customer?.name}</strong>. La ubicación GPS se guardará junto con la dirección de la visita.</Alert>
-              <Form.Group className='mb-3'><Form.Label>Calle y número *</Form.Label><Form.Control required value={visitAddress.street} onChange={event => setVisitAddress({ ...visitAddress, street: event.target.value })} /></Form.Group>
-              <div className='row'>
-                <Form.Group className='col-md-4 mb-3'><Form.Label>Ciudad *</Form.Label><Form.Control required value={visitAddress.city} onChange={event => setVisitAddress({ ...visitAddress, city: event.target.value })} /></Form.Group>
-                <Form.Group className='col-md-4 mb-3'><Form.Label>Provincia *</Form.Label><Form.Control required value={visitAddress.province} onChange={event => setVisitAddress({ ...visitAddress, province: event.target.value })} /></Form.Group>
-                <Form.Group className='col-md-4 mb-3'><Form.Label>País *</Form.Label><Form.Control required value={visitAddress.country} onChange={event => setVisitAddress({ ...visitAddress, country: event.target.value })} /></Form.Group>
-              </div>
+              <Alert variant='info'>
+                Cliente: <strong>{customer?.name}</strong>. El GPS es obligatorio y registrará la ubicación exacta de esta visita.
+                {!editVisitAddress && savedVisitAddress && <span className='d-block mt-1'>Usaremos la dirección administrativa guardada en este dispositivo: {savedVisitAddress.city}, {savedVisitAddress.province}, {savedVisitAddress.country}.</span>}
+              </Alert>
+              {editVisitAddress ? (
+                <>
+                  <Form.Group className='mb-3'><Form.Label>Calle y número *</Form.Label><Form.Control required value={visitAddress.street} onChange={event => setVisitAddress({ ...visitAddress, street: event.target.value })} /></Form.Group>
+                  <div className='row'>
+                    <Form.Group className='col-md-4 mb-3'><Form.Label>Cantón *</Form.Label><Form.Control required value={visitAddress.city} onChange={event => setVisitAddress({ ...visitAddress, city: event.target.value })} /></Form.Group>
+                    <Form.Group className='col-md-4 mb-3'><Form.Label>Provincia *</Form.Label><Form.Control required value={visitAddress.province} onChange={event => setVisitAddress({ ...visitAddress, province: event.target.value })} /></Form.Group>
+                    <Form.Group className='col-md-4 mb-3'><Form.Label>País *</Form.Label><Form.Control required value={visitAddress.country} onChange={event => setVisitAddress({ ...visitAddress, country: event.target.value })} /></Form.Group>
+                  </div>
+                </>
+              ) : (
+                <Button type='button' variant='link' className='p-0 mb-3' onClick={() => setEditVisitAddress(true)}>Editar dirección administrativa</Button>
+              )}
               <div className='d-flex justify-content-between'><Button variant='light' onClick={() => setStep('select')}>Volver</Button><Button type='submit' disabled={busy}>{busy ? <><Spinner size='sm' className='me-2' />Obteniendo ubicación…</> : 'Registrar llegada y abrir cliente'}</Button></div>
             </Form>
           )}

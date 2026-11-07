@@ -1,5 +1,7 @@
 const OrderRepository = require('../repositories/OrderRepository');
 const ProductRepository = require('../repositories/ProductRepository');
+const { Order, OrderItem, Product } = require('../models');
+const db = require('../utils/database');
 
 /**
  * Servicio de Pedidos
@@ -64,6 +66,53 @@ class OrderService {
    */
   async getOrders(filters = {}) {
     return await OrderRepository.findAll(filters);
+  }
+
+  async loadOrderItem(orderId, orderItemId, quantityLoaded) {
+    return db.transaction(async transaction => {
+      const [order, item] = await Promise.all([
+        Order.findByPk(orderId, { transaction, lock: transaction.LOCK.UPDATE }),
+        OrderItem.findOne({ where: { id: orderItemId, orderId }, transaction, lock: transaction.LOCK.UPDATE }),
+      ]);
+      if (!order || !item) throw new Error('Orden o producto de orden no encontrado');
+      if (order.type === 'compra' || order.status === 'cancelado') {
+        throw new Error('Esta orden no está disponible para despacho');
+      }
+      if (item.dispatchStatus === 'en_local' || item.dispatchStatus === 'entregado') {
+        throw new Error('El producto ya salió de la etapa de carga en bodega');
+      }
+
+      const remaining = Number(item.quantityRequested) - Number(item.quantityProcessed);
+      if (quantityLoaded > remaining) {
+        throw new Error(`La cantidad cargada no puede superar las ${remaining} unidades pendientes`);
+      }
+
+      const currentLoaded = Number(item.quantityLoaded || 0);
+      const difference = quantityLoaded - currentLoaded;
+      const product = await Product.findByPk(item.productId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!product) throw new Error('Producto no encontrado');
+      if (difference > Number(product.stock)) {
+        throw new Error(`Stock físico insuficiente de ${product.name}. Disponible: ${product.stock}`);
+      }
+
+      if (difference !== 0) {
+        await product.update({ stock: Number(product.stock) - difference }, { transaction });
+      }
+
+      return item.update({
+        quantityLoaded,
+        dispatchStatus: quantityLoaded > 0 ? 'cargando' : 'pendiente',
+      }, { transaction });
+    });
+  }
+
+  async markOrderItemArrived(orderId, orderItemId) {
+    const item = await OrderItem.findOne({ where: { id: orderItemId, orderId } });
+    if (!item) throw new Error('Producto de orden no encontrado');
+    if (item.dispatchStatus !== 'cargando' || Number(item.quantityLoaded) <= 0) {
+      throw new Error('Registra primero la cantidad cargada en bodega');
+    }
+    return item.update({ dispatchStatus: 'en_local' });
   }
 
   /**
@@ -164,7 +213,31 @@ class OrderService {
    * @returns {Promise<Object>} Pedido cancelado
    */
   async cancelOrder(id) {
-    return await OrderRepository.update(id, { status: 'cancelado' });
+    return db.transaction(async transaction => {
+      const order = await Order.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!order) throw new Error('Order not found');
+      if (order.status === 'cancelado') return order;
+
+      const loadedItems = await OrderItem.findAll({
+        where: { orderId: id },
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      for (const item of loadedItems) {
+        const quantityLoaded = Number(item.quantityLoaded || 0);
+        if (quantityLoaded > 0) {
+          const product = await Product.findByPk(item.productId, { transaction, lock: transaction.LOCK.UPDATE });
+          if (!product) throw new Error(`Product ${item.productId} not found`);
+          await product.update({ stock: Number(product.stock) + quantityLoaded }, { transaction });
+        }
+        await item.update({
+          quantityLoaded: 0,
+          dispatchStatus: 'pendiente',
+        }, { transaction });
+      }
+
+      return order.update({ status: 'cancelado' }, { transaction });
+    });
   }
 }
 

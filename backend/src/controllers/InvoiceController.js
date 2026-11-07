@@ -9,15 +9,9 @@ const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({
   "'": '&#39;',
 }[character]));
 
-const emitNotification = (io, target, notification) => {
+const emitNotification = (io, notification) => {
   if (!io) return;
-
-  if (target === 'all') {
-    io.emit('notification', notification);
-    return;
-  }
-
-  io.to(target).emit('notification', notification);
+  io.to('admin').emit('notification', notification);
 };
 
 const getInvoiceStatusLabel = status => {
@@ -132,7 +126,7 @@ class InvoiceController {
       const invoice = await InvoiceService.createInvoice(invoiceData, req.body.items);
       const io = req.app.get('io');
 
-      emitNotification(io, 'all', buildInvoiceStatusNotification({
+      emitNotification(io, buildInvoiceStatusNotification({
         invoice,
         username: req.user.username,
         status: 'pending',
@@ -163,6 +157,20 @@ class InvoiceController {
       res.json({ invoice });
     } catch (error) {
       res.status(404).json({ message: error.message });
+    }
+  }
+
+  async getDeliveryEvidence(req, res) {
+    const invoiceId = Number(req.params.id);
+    if (!Number.isSafeInteger(invoiceId) || invoiceId <= 0) {
+      return res.status(400).json({ message: 'El identificador de factura no es válido' });
+    }
+    try {
+      const evidence = await InvoiceService.getDeliveryEvidence(invoiceId);
+      return res.json({ evidence });
+    } catch (error) {
+      const statusCode = error.message === 'Invoice not found' ? 404 : 400;
+      return res.status(statusCode).json({ message: error.message });
     }
   }
 
@@ -228,7 +236,7 @@ class InvoiceController {
       const io = req.app.get('io');
 
       if (status === 'paid' || status === 'cancelled') {
-        emitNotification(io, 'all', buildInvoiceStatusNotification({
+        emitNotification(io, buildInvoiceStatusNotification({
           invoice,
           username: req.user.username,
           status,
@@ -295,7 +303,7 @@ class InvoiceController {
       const invoice = await InvoiceService.cancelInvoice(id);
       const io = req.app.get('io');
 
-      emitNotification(io, 'all', buildInvoiceStatusNotification({
+      emitNotification(io, buildInvoiceStatusNotification({
         invoice,
         username: req.user.username,
         status: 'cancelled',

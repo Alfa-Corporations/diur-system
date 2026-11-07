@@ -114,6 +114,7 @@ export interface Invoice {
   customerIdentificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
   customerIdentification?: string;
   customerAddress?: string;
+  hasDeliveryEvidence?: boolean;
   emailSentAt?: string;
   user?: User;
   customer?: Customer;
@@ -149,6 +150,8 @@ export interface OrderItem {
   productId: number;
   quantityRequested: number;
   quantityProcessed: number;
+  quantityLoaded: number;
+  dispatchStatus: 'pendiente' | 'cargando' | 'en_local' | 'entregado';
   status: 'pendiente' | 'en_transito' | 'en_bodega' | 'repartidor' | 'facturado';
   unitPrice: number;
   product?: Product;
@@ -226,6 +229,7 @@ export interface CreateInvoiceRequest {
     price?: number;
     orderItemId?: number;
   }>;
+  deliveryEvidence?: string;
   invoiceNumberExternal?: string;
   documentType?: InvoiceDocumentType;
   customer?: {

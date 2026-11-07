@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
+import { Toast, ToastContainer } from 'react-bootstrap';
 import { store } from './redux/store';
 import { useAppSelector, useAppDispatch } from './hooks/redux';
 import { usePermissions } from './hooks/permissions';
@@ -25,6 +26,8 @@ import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
 import SalesOrdersPage from './pages/SalesOrdersPage';
 import LocalSalesOrdersPage from './pages/LocalSalesOrdersPage';
 import PendingDeliveriesPage from './pages/PendingDeliveriesPage';
+import PendingProductsPage from './pages/PendingProductsPage';
+import OrderDispatchPage from './pages/OrderDispatchPage';
 import FileImporter from './components/FileImporter';
 import CustomerManager from './pages/CustomerManager';
 import HistoryClient from './pages/HistoryClient';
@@ -36,6 +39,7 @@ import VisitHistoryPage from './pages/VisitHistoryPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import OfflineSyncStatus from './components/OfflineSyncStatus';
 import localDBService from './services/localDBService';
+import type { RealtimeNotification } from '../../shared/types';
 
 /**
  * Componente principal de la aplicación
@@ -44,13 +48,25 @@ import localDBService from './services/localDBService';
 const AppContent: React.FC = () => {
   const dispatch = useAppDispatch();
   const { isAuthenticated, user } = useAppSelector(state => state.auth);
+  const [adminNotification, setAdminNotification] = useState<RealtimeNotification | null>(null);
   const { hasPermission } = usePermissions();
   const canAccess = (permissionNames: string[]) => user?.role === 'admin' || permissionNames.some(hasPermission);
   const canAccessAll = (permissionNames: string[]) => user?.role === 'admin' || permissionNames.every(hasPermission);
+  const canAccessWithRequirements = (requiredPermissions: string[], anyPermissions: string[]) =>
+    user?.role === 'admin' || (
+      requiredPermissions.every(hasPermission) && anyPermissions.some(hasPermission)
+    );
   const permissionRoute = (permissionNames: string[], element: React.ReactElement) =>
     isAuthenticated ? canAccess(permissionNames) ? element : <Navigate to='/dashboard' replace /> : <Navigate to='/login' replace />;
   const permissionRouteAll = (permissionNames: string[], element: React.ReactElement) =>
     isAuthenticated ? canAccessAll(permissionNames) ? element : <Navigate to='/dashboard' replace /> : <Navigate to='/login' replace />;
+  const permissionRouteWithRequirements = (
+    requiredPermissions: string[],
+    anyPermissions: string[],
+    element: React.ReactElement
+  ) => isAuthenticated
+    ? canAccessWithRequirements(requiredPermissions, anyPermissions) ? element : <Navigate to='/dashboard' replace />
+    : <Navigate to='/login' replace />;
   const { isOnline } = useAppSelector(state => state.sync);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const isSyncingPending = useRef(false);
@@ -100,6 +116,9 @@ const AppContent: React.FC = () => {
     const handleSocketNotification = (event: Event) => {
       const customEvent = event as CustomEvent;
       dispatch(addNotification(customEvent.detail));
+      if (user?.role === 'admin') {
+        setAdminNotification(customEvent.detail as RealtimeNotification);
+      }
     };
 
     window.addEventListener('socket-notification', handleSocketNotification);
@@ -107,7 +126,13 @@ const AppContent: React.FC = () => {
     return () => {
       window.removeEventListener('socket-notification', handleSocketNotification);
     };
-  }, [dispatch]);
+  }, [dispatch, user?.role]);
+
+  useEffect(() => {
+    if (!adminNotification) return;
+    const timeout = window.setTimeout(() => setAdminNotification(null), 8000);
+    return () => window.clearTimeout(timeout);
+  }, [adminNotification]);
 
   useEffect(() => {
     if (isAuthenticated && user && !user.mustChangePassword) {
@@ -163,6 +188,22 @@ const AppContent: React.FC = () => {
   return (
     <Router>
       <div className='App'>
+        {user?.role === 'admin' && (
+          <ToastContainer position='top-end' className='p-3 admin-live-notifications'>
+            <Toast
+              show={Boolean(adminNotification)}
+              onClose={() => setAdminNotification(null)}
+              delay={8000}
+              autohide
+            >
+              <Toast.Header>
+                <strong className='me-auto'>DIUR · Actualización</strong>
+                <small>{adminNotification ? new Date(adminNotification.timestamp).toLocaleTimeString() : ''}</small>
+              </Toast.Header>
+              <Toast.Body>{adminNotification?.message}</Toast.Body>
+            </Toast>
+          </ToastContainer>
+        )}
         {/* Botón de retroceso minimalista: oculto en la pantalla principal y login */}
         <BackButtonWrapper />
         {isAuthenticated && !user?.mustChangePassword && <OfflineSyncStatus />}
@@ -182,6 +223,8 @@ const AppContent: React.FC = () => {
             <Route path='/customer/history/:customerId' element={permissionRouteAll(['leer_clientes', 'leer_factura', 'leer_orden'], <HistoryClient />)} />
             <Route path='/orders/dashboard' element={permissionRoute(['leer_orden'], <OrdersDashboardPage />)} />
             <Route path='/orders/dispatch' element={permissionRoute(['leer_orden'], <PendingDeliveriesPage />)} />
+            <Route path='/orders/pending-products' element={permissionRouteWithRequirements(['leer_orden', 'leer_clientes', 'crear_factura'], ['gestionar_items_orden', 'actualizar_orden'], <PendingProductsPage />)} />
+            <Route path='/orders/dispatch-center' element={permissionRouteWithRequirements(['leer_orden'], ['gestionar_items_orden', 'actualizar_orden'], <OrderDispatchPage />)} />
             <Route path='/orders/purchase' element={permissionRoute(['leer_orden'], <PurchaseOrdersPage />)} />
             <Route path='/orders/sale' element={permissionRoute(['leer_orden', 'crear_orden'], <SalesOrdersPage />)} />
             <Route path='/orders/local' element={permissionRoute(['leer_orden'], <LocalSalesOrdersPage />)} />

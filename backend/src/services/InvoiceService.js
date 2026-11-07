@@ -1,7 +1,7 @@
 const InvoiceRepository = require('../repositories/InvoiceRepository');
 const ProductService = require('./ProductService');
 const OrderService = require('./OrderService');
-const { Customer, OrderItem, AccountsReceivable, AccountsReceivablePayment } = require('../models');
+const { Customer, Invoice, Order, OrderItem, AccountsReceivable, AccountsReceivablePayment } = require('../models');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -65,18 +65,95 @@ class InvoiceService {
   async createInvoice(invoiceData, items) {
     const { customer: customerData = {}, documentType = 'consumer_final', ...baseInvoiceData } = invoiceData;
 
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error('La factura debe incluir al menos un producto');
+    }
+
+    const deliveryEvidence = baseInvoiceData.deliveryEvidence;
+    delete baseInvoiceData.deliveryEvidence;
+    const orderItemsById = new Map();
+    const quantitiesByOrderItemId = new Map();
+    const dispatchOrderItemIds = new Set();
+    const regularQuantitiesByProductId = new Map();
+    for (const item of items) {
+      if (!Number.isSafeInteger(Number(item.quantity)) || Number(item.quantity) <= 0) {
+        throw new Error('La cantidad facturada debe ser un entero mayor a cero');
+      }
+
+      if (item.orderItemId === undefined || item.orderItemId === null) {
+        regularQuantitiesByProductId.set(
+          Number(item.productId),
+          (regularQuantitiesByProductId.get(Number(item.productId)) || 0) + Number(item.quantity)
+        );
+        continue;
+      }
+
+      const orderItemId = Number(item.orderItemId);
+      if (!Number.isSafeInteger(orderItemId) || orderItemId <= 0) {
+        throw new Error('El producto de la orden asociado a la factura no es válido');
+      }
+      let orderItem = orderItemsById.get(orderItemId);
+      if (!orderItem) {
+        orderItem = await OrderItem.findByPk(orderItemId);
+        if (!orderItem) throw new Error(`No se encontró el producto de orden ${orderItemId}`);
+        if (Number(orderItem.productId) !== Number(item.productId)) {
+          throw new Error('El producto facturado no coincide con el producto de la orden');
+        }
+        orderItemsById.set(orderItemId, orderItem);
+      }
+      quantitiesByOrderItemId.set(
+        orderItemId,
+        (quantitiesByOrderItemId.get(orderItemId) || 0) + Number(item.quantity)
+      );
+    }
+
+    for (const [orderItemId, quantity] of quantitiesByOrderItemId) {
+      const orderItem = orderItemsById.get(orderItemId);
+      const order = await Order.findByPk(orderItem.orderId);
+      if (!order || order.status === 'cancelado') {
+        throw new Error(`La orden ${orderItem.orderId} no está disponible para despacho`);
+      }
+      if (orderItem.dispatchStatus !== 'en_local') {
+        throw new Error(`El producto de la orden ${orderItem.orderId} debe cargarse y recibirse en el local antes de facturar`);
+      }
+      const remaining = Number(orderItem.quantityRequested) - Number(orderItem.quantityProcessed);
+      if (quantity > remaining) {
+        throw new Error(`La cantidad a despachar supera lo pendiente en la orden ${orderItem.orderId}`);
+      }
+      if (quantity > Number(orderItem.quantityLoaded)) {
+        throw new Error(`La cantidad supera lo cargado en el vehículo para la orden ${orderItem.orderId}`);
+      }
+      dispatchOrderItemIds.add(orderItemId);
+    }
+
+    if (dispatchOrderItemIds.size > 0 && !deliveryEvidence) {
+      throw new Error('Debes adjuntar una foto de la entrega para facturar productos despachados');
+    }
+    if (deliveryEvidence !== undefined) {
+      const evidenceMatch = typeof deliveryEvidence === 'string'
+        ? deliveryEvidence.match(/^data:image\/jpeg;base64,([A-Za-z0-9+/]+={0,2})$/)
+        : null;
+      if (!evidenceMatch || Buffer.byteLength(evidenceMatch[1], 'base64') > 2 * 1024 * 1024) {
+        throw new Error('La evidencia debe ser una imagen JPEG válida de máximo 2 MB');
+      }
+    }
+
     const invoiceNumber = `INV-${Date.now()}-${uuidv4().slice(0, 8).toUpperCase()}`;
     const customer = await this.resolveCustomer(customerData, documentType);
 
     let total = 0;
     for (const item of items) {
       const product = await ProductService.getProductById(item.productId);
-      if (!await ProductService.checkStock(item.productId, item.quantity)) {
-        throw new Error(`Insufficient stock for product ${product.name}`);
-      }
       item.price = item.price ?? product.price;
       item.total = item.quantity * item.price;
       total += item.total;
+    }
+
+    for (const [productId, quantity] of regularQuantitiesByProductId) {
+      const product = await ProductService.getProductById(productId);
+      if (!await ProductService.checkStock(productId, quantity)) {
+        throw new Error(`Insufficient stock for product ${product.name}`);
+      }
     }
 
     const customerSnapshot = documentType === 'consumer_final'
@@ -104,6 +181,8 @@ class InvoiceService {
       documentType,
       sriStatus: documentType === 'sri_invoice' ? 'pending' : 'not_applicable',
       total,
+      deliveryEvidence: deliveryEvidence || null,
+      hasDeliveryEvidence: Boolean(deliveryEvidence),
       ...customerSnapshot,
     }, items);
 
@@ -123,21 +202,24 @@ class InvoiceService {
       }
     }
 
-    for (const item of items) {
-      await ProductService.updateStock(item.productId, -item.quantity);
+    for (const [productId, quantity] of regularQuantitiesByProductId) {
+      await ProductService.updateStock(productId, -quantity);
+    }
 
-      if (item.orderItemId) {
-        const orderItem = await OrderItem.findByPk(item.orderItemId);
-        if (orderItem) {
-          const newProcessed = (orderItem.quantityProcessed || 0) + item.quantity;
-          const newStatus = newProcessed === orderItem.quantityRequested ? 'facturado' : 'en_transito';
-          await orderItem.update({
-            quantityProcessed: newProcessed,
-            status: newStatus
-          });
-          await OrderService.checkOrderCompletion(orderItem.orderId);
-        }
-      }
+    for (const [orderItemId, quantity] of quantitiesByOrderItemId) {
+      const orderItem = orderItemsById.get(orderItemId);
+      const newProcessed = Number(orderItem.quantityProcessed || 0) + quantity;
+      const newQuantityLoaded = Number(orderItem.quantityLoaded || 0) - quantity;
+      const isComplete = newProcessed === Number(orderItem.quantityRequested);
+      const dispatchStatus = isComplete ? 'entregado' : newQuantityLoaded > 0 ? 'en_local' : 'pendiente';
+      const status = isComplete ? 'facturado' : 'en_transito';
+      await orderItem.update({
+        quantityProcessed: newProcessed,
+        quantityLoaded: newQuantityLoaded,
+        dispatchStatus,
+        status
+      });
+      await OrderService.checkOrderCompletion(orderItem.orderId);
     }
 
     return invoice;
@@ -154,6 +236,15 @@ class InvoiceService {
       throw new Error('Invoice not found');
     }
     return invoice;
+  }
+
+  async getDeliveryEvidence(id) {
+    const invoice = await Invoice.findByPk(id, {
+      attributes: ['id', 'deliveryEvidence', 'hasDeliveryEvidence'],
+    });
+    if (!invoice) throw new Error('Invoice not found');
+    if (!invoice.deliveryEvidence) throw new Error('Esta factura no tiene evidencia de entrega');
+    return invoice.deliveryEvidence;
   }
 
   /**
@@ -231,7 +322,9 @@ class InvoiceService {
     }
 
     for (const item of invoice.items) {
-      await ProductService.updateStock(item.productId, item.quantity);
+      if (!invoice.hasDeliveryEvidence) {
+        await ProductService.updateStock(item.productId, item.quantity);
+      }
     }
 
     // Si la factura tiene una cuenta por cobrar, también cancelarla

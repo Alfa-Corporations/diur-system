@@ -1,0 +1,480 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { isAxiosError } from 'axios';
+import { Alert, Badge, Button, Form, Spinner } from 'react-bootstrap';
+import type { Customer } from '../interfaces/types';
+import type { Order } from '../../../shared/types';
+import apiService from '../services/apiService';
+
+type PendingProduct = {
+  order: Order;
+  item: NonNullable<Order['items']>[number];
+  remaining: number;
+};
+
+type SelectedProduct = PendingProduct & { quantity: number };
+
+type CustomerInvoiceGroup = {
+  key: string;
+  name: string;
+  order: Order;
+  products: SelectedProduct[];
+};
+
+const prepareDeliveryPhoto = async (file: File): Promise<string> => {
+  if (!file.type.startsWith('image/')) throw new Error('Selecciona un archivo de imagen válido.');
+  const image = await createImageBitmap(file);
+  const maxDimension = 1440;
+  const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const context = canvas.getContext('2d');
+  if (!context) {
+    image.close();
+    throw new Error('No se pudo procesar la foto en este dispositivo.');
+  }
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  image.close();
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(result => result ? resolve(result) : reject(new Error('No se pudo comprimir la foto.')), 'image/jpeg', 0.72);
+  });
+  if (blob.size > 2 * 1024 * 1024) throw new Error('La foto comprimida supera el límite de 2 MB.');
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('No se pudo leer la foto.'));
+    reader.onerror = () => reject(new Error('No se pudo leer la foto.'));
+    reader.readAsDataURL(blob);
+  });
+};
+
+const getCustomerName = (order: Order) => order.customer?.name || order.customerName || 'Cliente sin asignar';
+
+const getCustomerKey = (order: Order) => {
+  if (order.customer?.id != null || order.customerId != null) {
+    return `customer-${order.customer?.id ?? order.customerId}`;
+  }
+  const identification = String(order.customer?.identificationNumber || '').trim().toLocaleLowerCase();
+  if (identification) return `identification-${identification}`;
+  const name = String(order.customer?.name || order.customerName || '').trim().toLocaleLowerCase();
+  return name ? `name-${name}` : `order-${order.id}`;
+};
+
+const PendingProductsPage: React.FC = () => {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerFilter, setCustomerFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [quantities, setQuantities] = useState<Record<number, string>>({});
+  const [invoiceReferences, setInvoiceReferences] = useState<Record<string, string>>({});
+  const [deliveryPhotos, setDeliveryPhotos] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [creatingInvoices, setCreatingInvoices] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadData = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const [orderResult, customerResult] = await Promise.all([
+          apiService.getOrders(),
+          apiService.getCustomers(),
+        ]);
+        if (active) {
+          setOrders(orderResult.orders);
+          setCustomers(customerResult.customers);
+        }
+      } catch (loadError) {
+        if (active) {
+          setError(loadError instanceof Error ? loadError.message : 'No se pudieron cargar los productos pendientes.');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void loadData();
+    return () => {
+      active = false;
+    };
+  }, [refreshKey]);
+
+  const pendingProducts = useMemo<PendingProduct[]>(() => orders
+    .filter(order => order.type !== 'compra' && order.status !== 'cancelado')
+    .flatMap(order => (order.items || [])
+      .map(item => ({
+        order,
+        item,
+        remaining: Math.max(0, Number(item.quantityRequested) - Number(item.quantityProcessed)),
+      }))
+      .filter(row => row.remaining > 0 && row.item.dispatchStatus === 'en_local')), [orders]);
+
+  const filteredProducts = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    return pendingProducts.filter(({ order, item }) => {
+      if (customerFilter && String(order.customerId ?? order.customer?.id ?? '') !== customerFilter) return false;
+      if (!query) return true;
+      const customerName = getCustomerName(order);
+      return [
+        item.product?.name,
+        item.product?.partnumber,
+        item.product?.barcode,
+        customerName,
+        order.id,
+      ].some(value => String(value ?? '').toLocaleLowerCase().includes(query));
+    });
+  }, [customerFilter, pendingProducts, search]);
+
+  const selectedProducts = useMemo<SelectedProduct[]>(() => pendingProducts.flatMap(row => {
+    const quantity = Number(quantities[row.item.id]);
+    const availableToDeliver = Math.min(row.remaining, Number(row.item.quantityLoaded));
+    return Number.isSafeInteger(quantity) && quantity > 0 && quantity <= availableToDeliver
+      ? [{ ...row, quantity }]
+      : [];
+  }), [pendingProducts, quantities]);
+
+  const invalidQuantity = pendingProducts.find(({ item, remaining }) => {
+    const value = quantities[item.id];
+    if (value === undefined || value === '' || value === '0') return false;
+    const quantity = Number(value);
+    return !Number.isSafeInteger(quantity) || quantity < 0 || quantity > Math.min(remaining, Number(item.quantityLoaded));
+  });
+
+  const selectedCustomerGroups = useMemo<CustomerInvoiceGroup[]>(() => {
+    const groups = new Map<string, CustomerInvoiceGroup>();
+    selectedProducts.forEach(product => {
+      const key = getCustomerKey(product.order);
+      const existing = groups.get(key);
+      if (existing) existing.products.push(product);
+      else groups.set(key, {
+        key,
+        name: getCustomerName(product.order),
+        order: product.order,
+        products: [product],
+      });
+    });
+    return Array.from(groups.values()).sort((first, second) => first.name.localeCompare(second.name));
+  }, [selectedProducts]);
+
+  const pendingUnits = filteredProducts.reduce((total, row) => total + row.remaining, 0);
+  const selectedUnits = selectedProducts.reduce((total, row) => total + row.quantity, 0);
+
+  const updateQuantity = (itemId: number, value: string) => {
+    setQuantities(current => ({ ...current, [itemId]: value }));
+  };
+
+  const updateInvoiceReference = (customerKey: string, value: string) => {
+    setInvoiceReferences(current => ({ ...current, [customerKey]: value }));
+  };
+
+  const handleDeliveryPhoto = async (customerKey: string, file?: File) => {
+    if (!file) return;
+    setError('');
+    try {
+      const photo = await prepareDeliveryPhoto(file);
+      setDeliveryPhotos(current => ({ ...current, [customerKey]: photo }));
+    } catch (photoError) {
+      setError(photoError instanceof Error ? photoError.message : 'No se pudo preparar la foto de entrega.');
+    }
+  };
+
+  const handleCreateInvoices = async () => {
+    if (!isOnline || !navigator.onLine || selectedProducts.length === 0 || creatingInvoices) return;
+
+    if (invalidQuantity) {
+      setError(`La cantidad de ${invalidQuantity.item.product?.name || `producto #${invalidQuantity.item.productId}`} debe ser un entero entre 0 y ${invalidQuantity.remaining}.`);
+      setSuccess('');
+      return;
+    }
+
+    const missingReference = selectedCustomerGroups.find(group => !invoiceReferences[group.key]?.trim());
+    if (missingReference) {
+      setError(`Ingresa la referencia de factura para ${missingReference.name}.`);
+      setSuccess('');
+      return;
+    }
+
+    const missingPhoto = selectedCustomerGroups.find(group => !deliveryPhotos[group.key]);
+    if (missingPhoto) {
+      setError(`Adjunta la foto de entrega para ${missingPhoto.name}.`);
+      setSuccess('');
+      return;
+    }
+
+    const references = selectedCustomerGroups.map(group =>
+      String(invoiceReferences[group.key].trim()).padStart(10, '0')
+    );
+    if (new Set(references).size !== references.length) {
+      setError('Cada cliente debe tener una referencia de factura distinta.');
+      setSuccess('');
+      return;
+    }
+
+    setCreatingInvoices(true);
+    setError('');
+    setSuccess('');
+    const createdInvoices: string[] = [];
+
+    try {
+      for (const group of selectedCustomerGroups) {
+        const customer = group.order.customer;
+        const reference = invoiceReferences[group.key].trim();
+        try {
+          const invoice = await apiService.createInvoice({
+            invoiceNumberExternal: `001-011-${String(reference).padStart(10, '0')}`,
+            deliveryEvidence: deliveryPhotos[group.key],
+            documentType: customer?.name || group.order.customerName ? 'sales_note' : 'consumer_final',
+            customer: {
+              name: customer?.name || group.order.customerName || 'Cliente ocasional',
+              email: customer?.email || undefined,
+              phone: customer?.phone || undefined,
+              identificationType: customer?.identificationType || 'none',
+              identificationNumber: customer?.identificationNumber || undefined,
+              address: customer?.address || group.order.customerAddress || undefined,
+            },
+            items: group.products.map(({ item, quantity }) => ({
+              productId: item.productId,
+              quantity,
+              price: Number(item.unitPrice || item.product?.price || 0),
+              orderItemId: item.id,
+            })),
+          });
+
+          createdInvoices.push(`${group.name}: ${invoice.invoiceNumber || `#${invoice.id}`}`);
+          const completedItemIds = new Set(group.products.map(product => product.item.id));
+          setQuantities(current => Object.fromEntries(
+            Object.entries(current).filter(([itemId]) => !completedItemIds.has(Number(itemId)))
+          ));
+          setInvoiceReferences(current => {
+            const next = { ...current };
+            delete next[group.key];
+            return next;
+          });
+          setDeliveryPhotos(current => {
+            const next = { ...current };
+            delete next[group.key];
+            return next;
+          });
+        } catch (invoiceError) {
+          const message = isAxiosError<{ message?: string }>(invoiceError)
+            ? invoiceError.response?.data?.message || invoiceError.message
+            : invoiceError instanceof Error
+              ? invoiceError.message
+              : 'No se pudo crear la factura.';
+          const uncertainResult = isAxiosError(invoiceError) && !invoiceError.response
+            ? ' La conexión se interrumpió durante el envío; verifica en Facturas si se registró antes de reintentar.'
+            : '';
+          setError(`No se pudo crear la factura de ${group.name}: ${message}${createdInvoices.length ? ' Las facturas creadas antes de este error ya actualizaron sus órdenes e inventario.' : ''}${uncertainResult}`);
+          break;
+        }
+      }
+    } finally {
+      setCreatingInvoices(false);
+      if (createdInvoices.length > 0) {
+        setSuccess(`Facturas creadas: ${createdInvoices.join(' · ')}. Las cantidades se descontaron de sus órdenes correspondientes.`);
+        setRefreshKey(current => current + 1);
+      }
+    }
+  };
+
+  return (
+    <main className='pending-products-page'>
+      <header className='pending-products-header'>
+        <div>
+          <p className='pending-products-eyebrow'>INVENTARIO · DESPACHOS</p>
+          <h1>Productos pendientes de entregar</h1>
+          <p>Selecciona los productos recibidos en el local, registra la referencia de factura y adjunta la foto de entrega. Se generará una factura por cliente.</p>
+        </div>
+        <Button variant='outline-primary' onClick={() => setRefreshKey(current => current + 1)} disabled={loading || creatingInvoices}>
+          Actualizar
+        </Button>
+      </header>
+
+      {!isOnline && <Alert variant='warning'>Sin conexión: puedes consultar los pendientes, pero para generar facturas y confirmar despachos debes conectarte.</Alert>}
+      {error && <Alert variant='danger' dismissible onClose={() => setError('')}>{error}</Alert>}
+      {success && <Alert variant='success' dismissible onClose={() => setSuccess('')}>{success}</Alert>}
+      {!loading && pendingProducts.length === 0 && (
+        <Alert variant='info'>Los productos aparecen aquí después de registrarlos en bodega y marcar su llegada al local principal.</Alert>
+      )}
+      {invalidQuantity && (
+        <Alert variant='warning'>
+          La cantidad de {invalidQuantity.item.product?.name || `producto #${invalidQuantity.item.productId}`} en la orden #{invalidQuantity.order.id} debe ser un entero entre 0 y {invalidQuantity.remaining}.
+        </Alert>
+      )}
+
+      <section className='pending-products-summary' aria-label='Resumen de pendientes'>
+        <div><span>Productos pendientes</span><strong>{loading ? '—' : filteredProducts.length}</strong></div>
+        <div><span>Unidades por entregar</span><strong>{loading ? '—' : pendingUnits}</strong></div>
+        <div><span>Unidades seleccionadas</span><strong>{selectedUnits}</strong></div>
+      </section>
+
+      <section className='pending-products-filters' aria-label='Filtros'>
+        <Form.Group>
+          <Form.Label htmlFor='pending-products-customer'>Cliente</Form.Label>
+          <Form.Select
+            id='pending-products-customer'
+            value={customerFilter}
+            onChange={event => setCustomerFilter(event.target.value)}
+          >
+            <option value=''>Todos los clientes</option>
+            {customers.map(customer => (
+              <option key={customer.id} value={customer.id}>{customer.name} · #{customer.id}</option>
+            ))}
+          </Form.Select>
+        </Form.Group>
+        <Form.Group>
+          <Form.Label htmlFor='pending-products-search'>Buscar</Form.Label>
+          <Form.Control
+            id='pending-products-search'
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            placeholder='Producto, código u orden'
+          />
+        </Form.Group>
+      </section>
+
+      {selectedCustomerGroups.length > 0 && (
+        <section className='pending-products-invoices' aria-label='Facturas por crear'>
+          <div className='pending-products-invoices-heading'>
+            <div>
+              <span className='pending-products-eyebrow'>DESPACHO SELECCIONADO</span>
+              <h2>Facturas por cliente</h2>
+            </div>
+            <Badge bg='primary'>{selectedCustomerGroups.length} cliente(s) · {selectedUnits} unidad(es)</Badge>
+          </div>
+          {selectedCustomerGroups.map(group => {
+            const groupTotal = group.products.reduce((total, product) =>
+              total + product.quantity * Number(product.item.unitPrice || product.item.product?.price || 0), 0);
+            const orderIds = Array.from(new Set(group.products.map(product => product.order.id)));
+            return (
+              <div className='pending-products-invoice-group' key={group.key}>
+                <div>
+                  <strong>{group.name}</strong>
+                  <small>{group.products.length} producto(s) · órdenes {orderIds.map(id => `#${id}`).join(', ')} · ${groupTotal.toFixed(2)}</small>
+                </div>
+                <Form.Group>
+                  <Form.Label htmlFor={`invoice-reference-${group.key}`}>Referencia de factura</Form.Label>
+                  <Form.Control
+                    id={`invoice-reference-${group.key}`}
+                    value={invoiceReferences[group.key] || ''}
+                    onChange={event => updateInvoiceReference(group.key, event.target.value)}
+                    placeholder='Ej. 123'
+                    inputMode='numeric'
+                    disabled={creatingInvoices}
+                  />
+                </Form.Group>
+                <Form.Group>
+                  <Form.Label htmlFor={`delivery-photo-${group.key}`}>Foto de entrega *</Form.Label>
+                  <Form.Control
+                    id={`delivery-photo-${group.key}`}
+                    type='file'
+                    accept='image/*'
+                    capture='environment'
+                    onChange={event => {
+                      const input = event.currentTarget;
+                      if (input instanceof HTMLInputElement) void handleDeliveryPhoto(group.key, input.files?.[0]);
+                    }}
+                    disabled={creatingInvoices}
+                  />
+                  {deliveryPhotos[group.key] && (
+                    <img className='pending-products-delivery-preview' src={deliveryPhotos[group.key]} alt={`Evidencia de entrega de ${group.name}`} />
+                  )}
+                </Form.Group>
+              </div>
+            );
+          })}
+          <Button
+            variant='success'
+            onClick={() => void handleCreateInvoices()}
+            disabled={!isOnline || !navigator.onLine || creatingInvoices || Boolean(invalidQuantity) || selectedCustomerGroups.some(group => !invoiceReferences[group.key]?.trim() || !deliveryPhotos[group.key])}
+          >
+            {creatingInvoices
+              ? <><Spinner animation='border' size='sm' className='me-2' />Creando facturas…</>
+              : `Crear ${selectedCustomerGroups.length === 1 ? 'factura' : 'facturas'} y confirmar despacho`}
+          </Button>
+        </section>
+      )}
+
+      <section className='pending-products-table-card'>
+        {loading ? (
+          <div className='pending-products-state'><Spinner animation='border' role='status' /><span>Cargando productos pendientes…</span></div>
+        ) : filteredProducts.length === 0 ? (
+          <div className='pending-products-state'>
+            <strong>No hay productos pendientes</strong>
+            <span>{customerFilter || search ? 'Prueba cambiando los filtros.' : 'Las órdenes de venta están al día.'}</span>
+          </div>
+        ) : (
+          <div className='table-responsive'>
+            <table className='table pending-products-table mb-0'>
+              <thead>
+                <tr>
+                  <th scope='col'>Cliente</th>
+                  <th scope='col'>Orden</th>
+                  <th scope='col'>Producto</th>
+                  <th scope='col'>Pendiente de orden</th>
+                  <th scope='col'>Cargado</th>
+                  <th scope='col'>Cantidad a entregar</th>
+                  <th scope='col'>Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.map(({ order, item, remaining }) => {
+                  const customerName = getCustomerName(order);
+                  return (
+                    <tr key={`${order.id}-${item.id}`}>
+                      <td data-label='Cliente'>
+                        <strong>{customerName}</strong>
+                        <small>{order.customer?.identificationNumber || (order.customerId ? `Código #${order.customerId}` : 'Sin código de cliente')}</small>
+                      </td>
+                      <td data-label='Orden'><Badge bg='light' text='dark'>#{order.id}</Badge></td>
+                      <td data-label='Producto'>
+                        <strong>{item.product?.name || `Producto #${item.productId}`}</strong>
+                        {item.product?.partnumber && <small>{item.product.partnumber}</small>}
+                      </td>
+                      <td data-label='Pendiente de orden'><Badge bg='warning' text='dark'>{remaining}</Badge></td>
+                      <td data-label='Cargado'>{item.quantityLoaded}</td>
+                      <td data-label='Cantidad a entregar'>
+                        <Form.Control
+                          className='pending-products-quantity'
+                          type='number'
+                          min={0}
+                          max={Math.min(remaining, Number(item.quantityLoaded))}
+                          step={1}
+                          value={quantities[item.id] ?? '0'}
+                          onChange={event => updateQuantity(item.id, event.target.value)}
+                          aria-label={`Cantidad a entregar de ${item.product?.name || `producto ${item.productId}`} en orden ${order.id}`}
+                          disabled={creatingInvoices}
+                        />
+                      </td>
+                      <td data-label='Fecha'>{new Date(order.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </main>
+  );
+};
+
+export default PendingProductsPage;

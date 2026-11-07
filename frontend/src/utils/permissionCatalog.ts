@@ -28,7 +28,8 @@ export const rolePermissionReferences: Record<User['role'], string[]> = {
     'acceso_pos', 'ver_totales', 'leer_orden'
   ],
   bodega: [
-    'leer_producto', 'actualizar_producto', 'leer_orden', 'actualizar_orden', 'gestionar_items_orden', 'crear_factura'
+    'leer_producto', 'actualizar_producto', 'leer_orden', 'actualizar_orden', 'gestionar_items_orden',
+    'leer_clientes', 'crear_factura', 'leer_factura'
   ],
   vendedor: [
     'leer_producto', 'crear_clientes', 'leer_clientes', 'actualizar_clientes',
