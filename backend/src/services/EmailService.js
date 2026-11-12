@@ -13,7 +13,7 @@ class EmailService {
     const username = escapeHtml(user.username);
     const safePassword = escapeHtml(password);
     const appUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
-    const loginUrl = `${appUrl}/login`;
+    const loginUrl = `${appUrl}`;
     const safeLoginUrl = escapeHtml(loginUrl);
     await mailer.sendMail({
       to: user.email,
