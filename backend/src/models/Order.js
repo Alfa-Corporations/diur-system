@@ -55,6 +55,10 @@ const Order = db.define('Order', {
     type: DataTypes.TEXT,
     allowNull: true,
   },
+  note: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
   deliveryUserId: {
     type: DataTypes.INTEGER,
     allowNull: true,

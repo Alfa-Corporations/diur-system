@@ -1,7 +1,7 @@
 const InvoiceRepository = require('../repositories/InvoiceRepository');
 const ProductService = require('./ProductService');
 const OrderService = require('./OrderService');
-const { Customer, Invoice, Order, OrderItem, AccountsReceivable, AccountsReceivablePayment } = require('../models');
+const { Customer, Order, OrderItem, AccountsReceivable, AccountsReceivablePayment } = require('../models');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -62,18 +62,17 @@ class InvoiceService {
    * @param {Array} items - Items de la factura
    * @returns {Promise<Object>} Factura creada
    */
-  async createInvoice(invoiceData, items) {
+  async createInvoice(invoiceData, items, userRole) {
     const { customer: customerData = {}, documentType = 'consumer_final', ...baseInvoiceData } = invoiceData;
 
     if (!Array.isArray(items) || items.length === 0) {
       throw new Error('La factura debe incluir al menos un producto');
     }
 
-    const deliveryEvidence = baseInvoiceData.deliveryEvidence;
     delete baseInvoiceData.deliveryEvidence;
+    delete baseInvoiceData.hasDeliveryEvidence;
     const orderItemsById = new Map();
     const quantitiesByOrderItemId = new Map();
-    const dispatchOrderItemIds = new Set();
     const regularQuantitiesByProductId = new Map();
     for (const item of items) {
       if (!Number.isSafeInteger(Number(item.quantity)) || Number(item.quantity) <= 0) {
@@ -123,18 +122,8 @@ class InvoiceService {
       if (quantity > Number(orderItem.quantityLoaded)) {
         throw new Error(`La cantidad supera lo cargado en el vehículo para la orden ${orderItem.orderId}`);
       }
-      dispatchOrderItemIds.add(orderItemId);
-    }
-
-    if (dispatchOrderItemIds.size > 0 && !deliveryEvidence) {
-      throw new Error('Debes adjuntar una foto de la entrega para facturar productos despachados');
-    }
-    if (deliveryEvidence !== undefined) {
-      const evidenceMatch = typeof deliveryEvidence === 'string'
-        ? deliveryEvidence.match(/^data:image\/jpeg;base64,([A-Za-z0-9+/]+={0,2})$/)
-        : null;
-      if (!evidenceMatch || Buffer.byteLength(evidenceMatch[1], 'base64') > 2 * 1024 * 1024) {
-        throw new Error('La evidencia debe ser una imagen JPEG válida de máximo 2 MB');
+      if (userRole !== 'admin' && quantity !== Number(orderItem.quantityLoaded)) {
+        throw new Error('Solo el administrador puede modificar la cantidad cargada para despacho');
       }
     }
 
@@ -181,8 +170,6 @@ class InvoiceService {
       documentType,
       sriStatus: documentType === 'sri_invoice' ? 'pending' : 'not_applicable',
       total,
-      deliveryEvidence: deliveryEvidence || null,
-      hasDeliveryEvidence: Boolean(deliveryEvidence),
       ...customerSnapshot,
     }, items);
 
@@ -236,15 +223,6 @@ class InvoiceService {
       throw new Error('Invoice not found');
     }
     return invoice;
-  }
-
-  async getDeliveryEvidence(id) {
-    const invoice = await Invoice.findByPk(id, {
-      attributes: ['id', 'deliveryEvidence', 'hasDeliveryEvidence'],
-    });
-    if (!invoice) throw new Error('Invoice not found');
-    if (!invoice.deliveryEvidence) throw new Error('Esta factura no tiene evidencia de entrega');
-    return invoice.deliveryEvidence;
   }
 
   /**
@@ -322,7 +300,7 @@ class InvoiceService {
     }
 
     for (const item of invoice.items) {
-      if (!invoice.hasDeliveryEvidence) {
+      if (!item.orderItemId && !invoice.hasDeliveryEvidence) {
         await ProductService.updateStock(item.productId, item.quantity);
       }
     }

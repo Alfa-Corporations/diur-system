@@ -114,7 +114,6 @@ export interface Invoice {
   customerIdentificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
   customerIdentification?: string;
   customerAddress?: string;
-  hasDeliveryEvidence?: boolean;
   emailSentAt?: string;
   user?: User;
   customer?: Customer;
@@ -135,6 +134,7 @@ export interface Order {
   supplier?: number;
   customerName?: string;
   customerAddress?: string;
+  note?: string | null;
   deliveryUserId?: number;
   user?: User;
   deliveryUser?: User;
@@ -169,6 +169,7 @@ export type CreateOrderDTO = {
   customerId?: number;
   supplier?: number;
   customerAddress?: string;
+  note?: string;
 };
 
 // Permiso
@@ -229,7 +230,6 @@ export interface CreateInvoiceRequest {
     price?: number;
     orderItemId?: number;
   }>;
-  deliveryEvidence?: string;
   invoiceNumberExternal?: string;
   documentType?: InvoiceDocumentType;
   customer?: {

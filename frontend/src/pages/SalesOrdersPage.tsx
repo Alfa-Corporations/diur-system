@@ -32,6 +32,7 @@ const WholesaleSalesPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(canCreateOrder && requestedCustomerId > 0);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<Array<{ productId: number; quantity: number }>>([]);
+  const [orderNote, setOrderNote] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(requestedCustomerId > 0 ? requestedCustomerId : null);
   const [invoiceQuantities, setInvoiceQuantities] = useState<{ [key: number]: number }>({});
   const [invoicePriceTier, setInvoicePriceTier] = useState<{ [key: number]: 1 | 2 | 3 }>({});
@@ -162,6 +163,7 @@ const WholesaleSalesPage: React.FC = () => {
       type: 'venta al mayor' as const,
       customerId: selectedCustomerId,
       customerName: customer?.name || '',
+      note: orderNote.trim() || undefined,
       items: orderItems.map(i => ({
         productId: i.productId,
         quantityRequested: i.quantity
@@ -179,6 +181,7 @@ const WholesaleSalesPage: React.FC = () => {
       setShowCreateModal(false);
       setOrderItems([]);
       setSelectedCustomerId(null);
+      setOrderNote('');
     } catch {
       dispatch(createOrderFailure('Error'));
     }
@@ -194,6 +197,7 @@ const WholesaleSalesPage: React.FC = () => {
   const handleInvoiceItem = async (orderId: number, item: OrderItem) => {
     const product = item.product as any;
     const remaining = item.quantityRequested - item.quantityProcessed;
+    const availableToDeliver = Math.min(remaining, Number(item.quantityLoaded || 0));
     const quantity = invoiceQuantities[item.productId] || 0;
     const tier = invoicePriceTier[item.productId] || 1;
 
@@ -202,8 +206,8 @@ const WholesaleSalesPage: React.FC = () => {
       return;
     }
 
-    if (quantity > remaining) {
-      alert('La cantidad no puede ser mayor al restante.');
+    if (item.dispatchStatus !== 'en_local' || quantity > availableToDeliver) {
+      alert(`La cantidad no puede superar las ${availableToDeliver} unidades cargadas y recibidas en el local.`);
       return;
     }
 
@@ -253,7 +257,8 @@ const WholesaleSalesPage: React.FC = () => {
       selectedOrder.items?.filter(item => {
         const quantity = invoiceQuantities[item.productId] || 0;
         const remaining = item.quantityRequested - item.quantityProcessed;
-        return quantity > 0 && quantity <= remaining;
+        const availableToDeliver = Math.min(remaining, Number(item.quantityLoaded || 0));
+        return item.dispatchStatus === 'en_local' && quantity > 0 && quantity <= availableToDeliver;
       }) || [];
 
     if (itemsToInvoice.length === 0) {
@@ -466,6 +471,18 @@ const WholesaleSalesPage: React.FC = () => {
                 ))}
               </Form.Select>
             </Form.Group>
+            <Form.Group className='mb-3'>
+              <Form.Label htmlFor='sales-order-note'>Nota adicional (opcional)</Form.Label>
+              <Form.Control
+                id='sales-order-note'
+                as='textarea'
+                rows={3}
+                maxLength={2000}
+                value={orderNote}
+                onChange={event => setOrderNote(event.target.value)}
+                placeholder='Agrega detalles importantes para esta orden'
+              />
+            </Form.Group>
 
             {/* 🔍 BUSCADOR */}
             {selectedCustomerId && (
@@ -613,6 +630,12 @@ const WholesaleSalesPage: React.FC = () => {
                   <span>Total</span>
                   <strong>${selectedOrder.total}</strong>
                 </div>
+                {selectedOrder.note && (
+                  <div className='mt-2'>
+                    <span>Nota</span>
+                    <p className='mb-0'>{selectedOrder.note}</p>
+                  </div>
+                )}
 
                 <div className='mt-2 text-muted' style={{ fontSize: '0.85rem' }}>
                   {new Date(selectedOrder.createdAt).toLocaleString()}
@@ -668,6 +691,11 @@ const WholesaleSalesPage: React.FC = () => {
                         <div>{item.quantityProcessed}</div>
                       </div>
 
+                      <div>
+                        <small className='text-muted'>Cargado</small>
+                        <div>{item.quantityLoaded}</div>
+                      </div>
+
                       <div className='text-end'>
                         <small className='text-muted'>Estado</small>
                         <div>{selectedOrder.status === 'cancelado' ? getStatusBadge('cancelado') : getItemStatusBadge(item.status)}</div>
@@ -697,7 +725,7 @@ const WholesaleSalesPage: React.FC = () => {
                       <Form.Control
                         type='number'
                         min={1}
-                        max={item.quantityRequested - item.quantityProcessed}
+                        max={Math.min(item.quantityRequested - item.quantityProcessed, Number(item.quantityLoaded || 0))}
                         placeholder='Cantidad a facturar'
                         value={invoiceQuantities[item.productId] || ''}
                         onChange={e =>
@@ -707,11 +735,11 @@ const WholesaleSalesPage: React.FC = () => {
                           })
                         }
                         style={{ maxWidth: '120px' }}
-                        disabled={selectedOrder.status === 'cancelado' || item.quantityProcessed === item.quantityRequested}
+                        disabled={selectedOrder.status === 'cancelado' || item.quantityProcessed === item.quantityRequested || item.dispatchStatus !== 'en_local' || Number(item.quantityLoaded) <= 0}
                       />
 
                       <Button
-                        disabled={selectedOrder.status === 'cancelado' || item.quantityProcessed === item.quantityRequested || invoiceLoading}
+                        disabled={selectedOrder.status === 'cancelado' || item.quantityProcessed === item.quantityRequested || item.dispatchStatus !== 'en_local' || Number(item.quantityLoaded) <= 0 || invoiceLoading}
                         variant='outline-success'
                         size='sm'
                         className='w-100'

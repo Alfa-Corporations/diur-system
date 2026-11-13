@@ -372,14 +372,6 @@ class ApiService {
     return response.data.invoice;
   }
 
-  async getInvoiceEvidence(id: number): Promise<string> {
-    if (this.isOffline()) {
-      throw new Error('La evidencia de entrega solo está disponible con conexión.');
-    }
-    const response = await this.api.get<{ evidence: string }>(`/invoices/${id}/evidence`);
-    return response.data.evidence;
-  }
-
   async createInvoice(invoiceData: CreateInvoiceRequest): Promise<Invoice> {
     if (this.isOffline()) {
       const user = this.getStoredUser();

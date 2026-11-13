@@ -24,6 +24,7 @@ const compraOrdersPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<Array<{ productId: number; quantity: number }>>([]);
+  const [orderNote, setOrderNote] = useState('');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -107,6 +108,7 @@ const compraOrdersPage: React.FC = () => {
         type: 'compra' as const,
         supplier: selectedSupplierId || 0,
         customerName: name[0].name,
+        note: orderNote.trim() || undefined,
         items: orderItems.map(item => ({
           productId: item.productId,
           quantityRequested: item.quantity
@@ -122,6 +124,7 @@ const compraOrdersPage: React.FC = () => {
       setShowCreateModal(false);
       setOrderItems([]);
       setSelectedSupplierId(null);
+      setOrderNote('');
     } catch {
       dispatch(createOrderFailure('Error al crear pedido'));
     }
@@ -290,6 +293,18 @@ const compraOrdersPage: React.FC = () => {
                 ))}
               </Form.Select>
             </Form.Group>
+            <Form.Group className='mb-3'>
+              <Form.Label htmlFor='purchase-order-note'>Nota adicional (opcional)</Form.Label>
+              <Form.Control
+                id='purchase-order-note'
+                as='textarea'
+                rows={3}
+                maxLength={2000}
+                value={orderNote}
+                onChange={e => setOrderNote(e.target.value)}
+                placeholder='Agrega detalles importantes para esta orden'
+              />
+            </Form.Group>
 
             {/* 🔍 BUSCADOR */}
             {selectedSupplierId && (
@@ -415,6 +430,12 @@ const compraOrdersPage: React.FC = () => {
                   <strong>Estado</strong>
                   {getStatusBadge(selectedOrder.status)}
                 </div>
+                {selectedOrder.note && (
+                  <div className='mb-2'>
+                    <span>Nota</span>
+                    <p className='mb-0'>{selectedOrder.note}</p>
+                  </div>
+                )}
 
                 <div className='d-flex justify-content-between'>
                   <span>Total</span>

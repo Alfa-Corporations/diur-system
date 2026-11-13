@@ -11,7 +11,7 @@ class OrderController {
    */
   async createOrder(req, res) {
     try {
-      const { type, items, customerId } = req.body;
+      const { type, items, customerId, note } = req.body;
       const userId = req.user?.id;
 
       if (!userId) {
@@ -21,11 +21,15 @@ class OrderController {
       if (!type || !items || items.length === 0) {
         return res.status(400).json({ message: 'Type and items are required' });
       }
+      if (note !== undefined && (typeof note !== 'string' || note.length > 2000)) {
+        return res.status(400).json({ message: 'La nota debe ser texto de máximo 2000 caracteres' });
+      }
 
       const orderData = {
         userId,
         type,
         customerId,
+        note: typeof note === 'string' ? note.trim() || null : null,
       };
 
       const order = await OrderService.createOrder(orderData, items);

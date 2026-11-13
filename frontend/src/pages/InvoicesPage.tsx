@@ -7,7 +7,7 @@ import { fetchProductsStart, fetchProductsSuccess, fetchProductsFailure } from '
 import apiService from '../services/apiService';
 import localDBService from '../services/localDBService';
 import type { CreateInvoiceRequest, Invoice, InvoiceItem } from '../../../shared/types';
-import { Accordion, Modal, Spinner } from 'react-bootstrap';
+import { Accordion } from 'react-bootstrap';
 
 const PAYMENT_OPTIONS = [
   { value: 'credit', label: 'Crédito' },
@@ -70,25 +70,6 @@ const InvoicesPage: React.FC = () => {
   const [customerIdentification, setCustomerIdentification] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
   const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
-  const [evidenceInvoice, setEvidenceInvoice] = useState<Invoice | null>(null);
-  const [evidenceImage, setEvidenceImage] = useState('');
-  const [evidenceLoading, setEvidenceLoading] = useState(false);
-  const [evidenceError, setEvidenceError] = useState('');
-
-  const openDeliveryEvidence = async (invoice: Invoice) => {
-    setEvidenceInvoice(invoice);
-    setEvidenceImage('');
-    setEvidenceError('');
-    setEvidenceLoading(true);
-    try {
-      setEvidenceImage(await apiService.getInvoiceEvidence(invoice.id));
-    } catch (loadError) {
-      setEvidenceError(loadError instanceof Error ? loadError.message : 'No se pudo cargar la evidencia.');
-    } finally {
-      setEvidenceLoading(false);
-    }
-  };
-
   const adjustLocalProductStock = async (items: InvoiceItem[], multiplier: 1 | -1) => {
     const currentProducts = await localDBService.getProducts();
     const updatedProducts = currentProducts
@@ -895,11 +876,6 @@ const InvoicesPage: React.FC = () => {
                               <small>Vuelto: {formatCurrency(invoice.changeAmount)}</small>
                             </div>
                           </div>
-                          {invoice.hasDeliveryEvidence && (
-                            <button className='btn btn-sm btn-outline-primary mt-3' onClick={() => void openDeliveryEvidence(invoice)}>
-                              📷 Ver foto de entrega
-                            </button>
-                          )}
                         </Accordion.Body>
                       </Accordion.Item>
                     </Accordion>
@@ -992,11 +968,6 @@ const InvoicesPage: React.FC = () => {
                         <td>{invoice.paymentMethod || '—'}</td>
                         <td>
                           {invoice.items?.length ?? 0}
-                          {invoice.hasDeliveryEvidence && (
-                            <button className='btn btn-sm btn-outline-primary d-block mt-2' onClick={() => void openDeliveryEvidence(invoice)}>
-                              📷 Evidencia
-                            </button>
-                          )}
                         </td>
                         {canPayInvoices && (
                           <td>
@@ -1040,17 +1011,6 @@ const InvoicesPage: React.FC = () => {
           </>
         )}
       </div>
-
-      <Modal show={Boolean(evidenceInvoice)} onHide={() => setEvidenceInvoice(null)} centered size='lg'>
-        <Modal.Header closeButton>
-          <Modal.Title>Evidencia de entrega · {evidenceInvoice?.invoiceNumber || `#${evidenceInvoice?.id}`}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body className='text-center'>
-          {evidenceLoading && <Spinner animation='border' role='status' />}
-          {evidenceError && <div className='alert alert-danger'>{evidenceError}</div>}
-          {evidenceImage && <img className='img-fluid rounded' src={evidenceImage} alt={`Foto de evidencia de entrega de la factura ${evidenceInvoice?.invoiceNumber || evidenceInvoice?.id}`} />}
-        </Modal.Body>
-      </Modal>
 
       {showModal && (
         <div className='modal show d-block' tabIndex={-1}>

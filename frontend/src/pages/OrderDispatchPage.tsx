@@ -126,6 +126,7 @@ const OrderDispatchPage: React.FC = () => {
         <div className='order-dispatch-line__info'>
           <strong>{item.product?.name || `Producto #${item.productId}`}</strong>
           <span>{order.customer?.name || order.customerName || 'Cliente sin asignar'} · Orden #{order.id}</span>
+          {order.note && <small>Nota: {order.note}</small>}
           <small>Solicitado: {item.quantityRequested} · Facturado: {item.quantityProcessed} · Pendiente: {remaining}</small>
         </div>
         <div className='order-dispatch-line__action'>

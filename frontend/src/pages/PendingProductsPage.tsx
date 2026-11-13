@@ -3,6 +3,7 @@ import { isAxiosError } from 'axios';
 import { Alert, Badge, Button, Form, Spinner } from 'react-bootstrap';
 import type { Customer } from '../interfaces/types';
 import type { Order } from '../../../shared/types';
+import { useAppSelector } from '../hooks/redux';
 import apiService from '../services/apiService';
 
 type PendingProduct = {
@@ -20,35 +21,6 @@ type CustomerInvoiceGroup = {
   products: SelectedProduct[];
 };
 
-const prepareDeliveryPhoto = async (file: File): Promise<string> => {
-  if (!file.type.startsWith('image/')) throw new Error('Selecciona un archivo de imagen válido.');
-  const image = await createImageBitmap(file);
-  const maxDimension = 1440;
-  const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(image.width * scale));
-  canvas.height = Math.max(1, Math.round(image.height * scale));
-  const context = canvas.getContext('2d');
-  if (!context) {
-    image.close();
-    throw new Error('No se pudo procesar la foto en este dispositivo.');
-  }
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
-  image.close();
-
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(result => result ? resolve(result) : reject(new Error('No se pudo comprimir la foto.')), 'image/jpeg', 0.72);
-  });
-  if (blob.size > 2 * 1024 * 1024) throw new Error('La foto comprimida supera el límite de 2 MB.');
-
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('No se pudo leer la foto.'));
-    reader.onerror = () => reject(new Error('No se pudo leer la foto.'));
-    reader.readAsDataURL(blob);
-  });
-};
-
 const getCustomerName = (order: Order) => order.customer?.name || order.customerName || 'Cliente sin asignar';
 
 const getCustomerKey = (order: Order) => {
@@ -62,13 +34,14 @@ const getCustomerKey = (order: Order) => {
 };
 
 const PendingProductsPage: React.FC = () => {
+  const { user } = useAppSelector(state => state.auth);
+  const isAdmin = user?.role === 'admin';
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerFilter, setCustomerFilter] = useState('');
   const [search, setSearch] = useState('');
   const [quantities, setQuantities] = useState<Record<number, string>>({});
   const [invoiceReferences, setInvoiceReferences] = useState<Record<string, string>>({});
-  const [deliveryPhotos, setDeliveryPhotos] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [creatingInvoices, setCreatingInvoices] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -144,7 +117,7 @@ const PendingProductsPage: React.FC = () => {
   }, [customerFilter, pendingProducts, search]);
 
   const selectedProducts = useMemo<SelectedProduct[]>(() => pendingProducts.flatMap(row => {
-    const quantity = Number(quantities[row.item.id]);
+    const quantity = Number(quantities[row.item.id] ?? row.item.quantityLoaded);
     const availableToDeliver = Math.min(row.remaining, Number(row.item.quantityLoaded));
     return Number.isSafeInteger(quantity) && quantity > 0 && quantity <= availableToDeliver
       ? [{ ...row, quantity }]
@@ -152,7 +125,7 @@ const PendingProductsPage: React.FC = () => {
   }), [pendingProducts, quantities]);
 
   const invalidQuantity = pendingProducts.find(({ item, remaining }) => {
-    const value = quantities[item.id];
+    const value = quantities[item.id] ?? String(item.quantityLoaded);
     if (value === undefined || value === '' || value === '0') return false;
     const quantity = Number(value);
     return !Number.isSafeInteger(quantity) || quantity < 0 || quantity > Math.min(remaining, Number(item.quantityLoaded));
@@ -174,7 +147,10 @@ const PendingProductsPage: React.FC = () => {
     return Array.from(groups.values()).sort((first, second) => first.name.localeCompare(second.name));
   }, [selectedProducts]);
 
-  const pendingUnits = filteredProducts.reduce((total, row) => total + row.remaining, 0);
+  const pendingUnits = filteredProducts.reduce(
+    (total, row) => total + Math.min(row.remaining, Number(row.item.quantityLoaded)),
+    0
+  );
   const selectedUnits = selectedProducts.reduce((total, row) => total + row.quantity, 0);
 
   const updateQuantity = (itemId: number, value: string) => {
@@ -185,22 +161,11 @@ const PendingProductsPage: React.FC = () => {
     setInvoiceReferences(current => ({ ...current, [customerKey]: value }));
   };
 
-  const handleDeliveryPhoto = async (customerKey: string, file?: File) => {
-    if (!file) return;
-    setError('');
-    try {
-      const photo = await prepareDeliveryPhoto(file);
-      setDeliveryPhotos(current => ({ ...current, [customerKey]: photo }));
-    } catch (photoError) {
-      setError(photoError instanceof Error ? photoError.message : 'No se pudo preparar la foto de entrega.');
-    }
-  };
-
   const handleCreateInvoices = async () => {
     if (!isOnline || !navigator.onLine || selectedProducts.length === 0 || creatingInvoices) return;
 
     if (invalidQuantity) {
-      setError(`La cantidad de ${invalidQuantity.item.product?.name || `producto #${invalidQuantity.item.productId}`} debe ser un entero entre 0 y ${invalidQuantity.remaining}.`);
+      setError(`La cantidad de ${invalidQuantity.item.product?.name || `producto #${invalidQuantity.item.productId}`} debe ser un entero entre 0 y ${Math.min(invalidQuantity.remaining, Number(invalidQuantity.item.quantityLoaded))}.`);
       setSuccess('');
       return;
     }
@@ -208,13 +173,6 @@ const PendingProductsPage: React.FC = () => {
     const missingReference = selectedCustomerGroups.find(group => !invoiceReferences[group.key]?.trim());
     if (missingReference) {
       setError(`Ingresa la referencia de factura para ${missingReference.name}.`);
-      setSuccess('');
-      return;
-    }
-
-    const missingPhoto = selectedCustomerGroups.find(group => !deliveryPhotos[group.key]);
-    if (missingPhoto) {
-      setError(`Adjunta la foto de entrega para ${missingPhoto.name}.`);
       setSuccess('');
       return;
     }
@@ -240,7 +198,6 @@ const PendingProductsPage: React.FC = () => {
         try {
           const invoice = await apiService.createInvoice({
             invoiceNumberExternal: `001-011-${String(reference).padStart(10, '0')}`,
-            deliveryEvidence: deliveryPhotos[group.key],
             documentType: customer?.name || group.order.customerName ? 'sales_note' : 'consumer_final',
             customer: {
               name: customer?.name || group.order.customerName || 'Cliente ocasional',
@@ -264,11 +221,6 @@ const PendingProductsPage: React.FC = () => {
             Object.entries(current).filter(([itemId]) => !completedItemIds.has(Number(itemId)))
           ));
           setInvoiceReferences(current => {
-            const next = { ...current };
-            delete next[group.key];
-            return next;
-          });
-          setDeliveryPhotos(current => {
             const next = { ...current };
             delete next[group.key];
             return next;
@@ -301,7 +253,7 @@ const PendingProductsPage: React.FC = () => {
         <div>
           <p className='pending-products-eyebrow'>INVENTARIO · DESPACHOS</p>
           <h1>Productos pendientes de entregar</h1>
-          <p>Selecciona los productos recibidos en el local, registra la referencia de factura y adjunta la foto de entrega. Se generará una factura por cliente.</p>
+          <p>Selecciona los productos recibidos en el local y registra la referencia de factura. Solo se despachan las cantidades registradas en la preparación del camión.</p>
         </div>
         <Button variant='outline-primary' onClick={() => setRefreshKey(current => current + 1)} disabled={loading || creatingInvoices}>
           Actualizar
@@ -309,6 +261,7 @@ const PendingProductsPage: React.FC = () => {
       </header>
 
       {!isOnline && <Alert variant='warning'>Sin conexión: puedes consultar los pendientes, pero para generar facturas y confirmar despachos debes conectarte.</Alert>}
+      {!isAdmin && <Alert variant='info'>La cantidad quedó fijada según la preparación de despacho. Solo un administrador puede ajustarla.</Alert>}
       {error && <Alert variant='danger' dismissible onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert variant='success' dismissible onClose={() => setSuccess('')}>{success}</Alert>}
       {!loading && pendingProducts.length === 0 && (
@@ -316,7 +269,7 @@ const PendingProductsPage: React.FC = () => {
       )}
       {invalidQuantity && (
         <Alert variant='warning'>
-          La cantidad de {invalidQuantity.item.product?.name || `producto #${invalidQuantity.item.productId}`} en la orden #{invalidQuantity.order.id} debe ser un entero entre 0 y {invalidQuantity.remaining}.
+          La cantidad de {invalidQuantity.item.product?.name || `producto #${invalidQuantity.item.productId}`} en la orden #{invalidQuantity.order.id} debe ser un entero entre 0 y {Math.min(invalidQuantity.remaining, Number(invalidQuantity.item.quantityLoaded))}.
         </Alert>
       )}
 
@@ -381,30 +334,13 @@ const PendingProductsPage: React.FC = () => {
                     disabled={creatingInvoices}
                   />
                 </Form.Group>
-                <Form.Group>
-                  <Form.Label htmlFor={`delivery-photo-${group.key}`}>Foto de entrega *</Form.Label>
-                  <Form.Control
-                    id={`delivery-photo-${group.key}`}
-                    type='file'
-                    accept='image/*'
-                    capture='environment'
-                    onChange={event => {
-                      const input = event.currentTarget;
-                      if (input instanceof HTMLInputElement) void handleDeliveryPhoto(group.key, input.files?.[0]);
-                    }}
-                    disabled={creatingInvoices}
-                  />
-                  {deliveryPhotos[group.key] && (
-                    <img className='pending-products-delivery-preview' src={deliveryPhotos[group.key]} alt={`Evidencia de entrega de ${group.name}`} />
-                  )}
-                </Form.Group>
               </div>
             );
           })}
           <Button
             variant='success'
             onClick={() => void handleCreateInvoices()}
-            disabled={!isOnline || !navigator.onLine || creatingInvoices || Boolean(invalidQuantity) || selectedCustomerGroups.some(group => !invoiceReferences[group.key]?.trim() || !deliveryPhotos[group.key])}
+            disabled={!isOnline || !navigator.onLine || creatingInvoices || Boolean(invalidQuantity) || selectedCustomerGroups.some(group => !invoiceReferences[group.key]?.trim())}
           >
             {creatingInvoices
               ? <><Spinner animation='border' size='sm' className='me-2' />Creando facturas…</>
@@ -444,7 +380,10 @@ const PendingProductsPage: React.FC = () => {
                         <strong>{customerName}</strong>
                         <small>{order.customer?.identificationNumber || (order.customerId ? `Código #${order.customerId}` : 'Sin código de cliente')}</small>
                       </td>
-                      <td data-label='Orden'><Badge bg='light' text='dark'>#{order.id}</Badge></td>
+                      <td data-label='Orden'>
+                        <Badge bg='light' text='dark'>#{order.id}</Badge>
+                        {order.note && <small>{order.note}</small>}
+                      </td>
                       <td data-label='Producto'>
                         <strong>{item.product?.name || `Producto #${item.productId}`}</strong>
                         {item.product?.partnumber && <small>{item.product.partnumber}</small>}
@@ -458,10 +397,10 @@ const PendingProductsPage: React.FC = () => {
                           min={0}
                           max={Math.min(remaining, Number(item.quantityLoaded))}
                           step={1}
-                          value={quantities[item.id] ?? '0'}
+                          value={quantities[item.id] ?? String(item.quantityLoaded)}
                           onChange={event => updateQuantity(item.id, event.target.value)}
                           aria-label={`Cantidad a entregar de ${item.product?.name || `producto ${item.productId}`} en orden ${order.id}`}
-                          disabled={creatingInvoices}
+                          disabled={creatingInvoices || !isAdmin}
                         />
                       </td>
                       <td data-label='Fecha'>{new Date(order.createdAt).toLocaleDateString()}</td>

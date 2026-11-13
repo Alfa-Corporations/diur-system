@@ -66,7 +66,6 @@ router.delete('/products/:id', authorize('eliminar_producto', 'gestionar_product
 // Rutas de facturas
 router.post('/invoices', authorize('crear_factura'), InvoiceController.createInvoice);
 router.get('/invoices', authorize('leer_factura'), InvoiceController.getInvoices);
-router.get('/invoices/:id/evidence', authorize('leer_factura'), InvoiceController.getDeliveryEvidence);
 router.get('/invoices/:id', authorize('leer_factura'), InvoiceController.getInvoice);
 router.patch('/invoices/:id/status', authorize('actualizar_factura'), InvoiceController.updateInvoiceStatus);
 router.delete('/invoices/:id', authorize('cancelar_factura'), InvoiceController.cancelInvoice);

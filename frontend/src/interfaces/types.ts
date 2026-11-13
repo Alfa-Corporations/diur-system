@@ -96,6 +96,7 @@ export interface Order {
   total: number;
   customerName?: string;
   customerAddress?: string;
+  note?: string | null;
   deliveryUserId?: number;
   deliveryUser?: User;
   createdAt: string;

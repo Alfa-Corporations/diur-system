@@ -24,6 +24,7 @@ const POSPage: React.FC = () => {
   const [receiveNow, setReceiveNow] = useState(false);
   const [receivedAmount, setReceivedAmount] = useState<number | ''>('');
   const [receivedMethod, setReceivedMethod] = useState<'cash' | 'transfer' | 'other'>('cash');
+  const [orderNote, setOrderNote] = useState('');
   const [showAlert, setShowAlert] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [filters, setFilters] = useState({ search: '' });
@@ -185,6 +186,7 @@ const POSPage: React.FC = () => {
     setCart([]);
     setShowPayment(false);
     setShowCart(false);
+    setOrderNote('');
     // reset payment fields
     setPaymentMethod('cash');
     setReceiveNow(false);
@@ -196,6 +198,7 @@ const POSPage: React.FC = () => {
     if (!cart.length) return;
     const order: CreateOrderDTO = {
       type: 'venta',
+      note: orderNote.trim() || undefined,
       items: cart.map(item => ({ productId: item.product.id, quantityRequested: item.quantity }))
     };
 
@@ -212,6 +215,7 @@ const POSPage: React.FC = () => {
     setCart([]);
     setShowPayment(false);
     setShowCart(false);
+    setOrderNote('');
   };
 
   return (
@@ -414,6 +418,19 @@ const POSPage: React.FC = () => {
                   )}
                 </div>
               )}
+
+              <div>
+                <label className='form-label' htmlFor='pos-order-note'>Nota de la orden (opcional)</label>
+                <textarea
+                  id='pos-order-note'
+                  className='form-control'
+                  rows={3}
+                  maxLength={2000}
+                  value={orderNote}
+                  onChange={event => setOrderNote(event.target.value)}
+                  placeholder='Se guardará únicamente si eliges “Guardar como orden”'
+                />
+              </div>
 
               <div className='mt-2'>
                 <strong>Total:</strong> ${total.toFixed(2)}

@@ -43,6 +43,7 @@ const isSameCustomer = (firstOrder: Order, secondOrder: Order) => {
 const PendingDeliveriesPage: React.FC = () => {
   const { hasPermission } = usePermissions();
   const { user } = useAppSelector(state => state.auth);
+  const isAdmin = user?.role === 'admin';
   const canDispatch = hasPermission('actualizar_orden') || hasPermission('gestionar_items_orden') || user?.role === 'admin';
   const canCreateInvoice = hasPermission('crear_factura') || user?.role === 'admin';
   const [orders, setOrders] = useState<Order[]>([]);
@@ -95,8 +96,15 @@ const PendingDeliveriesPage: React.FC = () => {
       .filter(order => order.type !== 'compra' && order.status !== 'cancelado')
       .flatMap(order =>
         (order.items || [])
-          .map(item => ({ order, item, remaining: Math.max(0, item.quantityRequested - item.quantityProcessed) }))
-          .filter(delivery => delivery.remaining > 0)
+          .map(item => ({
+            order,
+            item,
+            remaining: Math.min(
+              Math.max(0, item.quantityRequested - item.quantityProcessed),
+              Number(item.quantityLoaded || 0)
+            ),
+          }))
+          .filter(delivery => delivery.remaining > 0 && delivery.item.dispatchStatus === 'en_local')
       );
   }, [orders]);
 
@@ -258,6 +266,7 @@ const PendingDeliveriesPage: React.FC = () => {
       {!isOnline && <Alert variant='warning'>Modo sin conexión: puedes consultar los datos guardados, pero no despachar.</Alert>}
       {!canDispatch && <Alert variant='info'>Tu usuario puede consultar los pendientes, pero no tiene permiso para despachar.</Alert>}
       {canDispatch && !canCreateInvoice && <Alert variant='info'>Para despachar productos desde este módulo también necesitas permiso para crear facturas.</Alert>}
+      {canDispatch && canCreateInvoice && !isAdmin && <Alert variant='info'>Solo se muestran productos recibidos y cantidades cargadas. Solo un administrador puede modificar la cantidad.</Alert>}
       {error && <Alert variant='danger' dismissible onClose={() => setError(null)}>{error}</Alert>}
       {success && <Alert variant='success' dismissible onClose={() => setSuccess(null)}>{success}</Alert>}
 
@@ -364,7 +373,7 @@ const PendingDeliveriesPage: React.FC = () => {
                       <div className='pending-delivery-main'>
                         <div className='pending-delivery-product'>
                           <strong>{delivery.item.product?.name || `Producto #${delivery.item.productId}`}</strong>
-                          <span>{delivery.remaining} por entregar</span>
+                          <span>{delivery.remaining} cargadas en el camión</span>
                         </div>
                         <div className='pending-delivery-order'>
                           <span>Orden #{delivery.order.id}</span>
@@ -381,9 +390,9 @@ const PendingDeliveriesPage: React.FC = () => {
                             max={delivery.remaining}
                             step={1}
                             aria-label={`Cantidad a despachar de ${delivery.item.product?.name || 'producto'}`}
-                            value={quantities[delivery.item.id] ?? delivery.remaining}
+                            value={quantities[delivery.item.id] ?? String(delivery.item.quantityLoaded)}
                             onChange={event => updateQuantity(delivery.item.id, event.target.value)}
-                            disabled={!isOnline || !canDispatch || !canCreateInvoice || invoiceLoading}
+                            disabled={!isOnline || !canDispatch || !canCreateInvoice || invoiceLoading || !isAdmin}
                           />
                           <Button
                             variant='primary'
@@ -397,11 +406,13 @@ const PendingDeliveriesPage: React.FC = () => {
                       <div className={`pending-delivery-details${expanded ? ' is-expanded' : ''}`}>
                         <span>Solicitado: <strong>{delivery.item.quantityRequested}</strong></span>
                         <span>Despachado: <strong>{delivery.item.quantityProcessed}</strong></span>
+                        <span>Cargado en camión: <strong>{delivery.item.quantityLoaded}</strong></span>
                         <span>Estado: {getOrderBadge(delivery.order.status)}</span>
                         <span>Fecha: <strong>{new Date(delivery.order.createdAt).toLocaleDateString()}</strong></span>
                         <span>Precio unitario: <strong>${Number(delivery.item.unitPrice || 0).toFixed(2)}</strong></span>
                         <span>Total de la orden: <strong>${Number(delivery.order.total || 0).toFixed(2)}</strong></span>
                         {delivery.item.product?.partnumber && <span>Código: <strong>{delivery.item.product.partnumber}</strong></span>}
+                        {delivery.order.note && <span>Nota de la orden: <strong>{delivery.order.note}</strong></span>}
                         {(delivery.order.customer?.phone || delivery.order.customerAddress || delivery.order.customer?.address) && (
                           <span className='pending-delivery-contact'>
                             Contacto: <strong>{delivery.order.customer?.phone || '—'}</strong>
