@@ -402,6 +402,9 @@ class ApiService {
         customerIdentificationType: invoiceData.customer?.identificationType || invoiceData.customerIdentificationType,
         customerIdentification: invoiceData.customer?.identificationNumber || invoiceData.customerIdentification,
         customerAddress: invoiceData.customer?.address || invoiceData.customerAddress,
+        deliveryStatus: invoiceData.deliveryStatus || 'pending',
+        deliveryEvidence: invoiceData.deliveryEvidence,
+        hasDeliveryEvidence: Boolean(invoiceData.deliveryEvidence),
         items: invoiceData.items.map((item, index) => ({
           id: index + 1,
           invoiceId: id,

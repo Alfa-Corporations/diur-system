@@ -81,6 +81,9 @@ export interface Invoice {
   customerIdentificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
   customerIdentification?: string;
   customerAddress?: string;
+  deliveryStatus?: 'pending' | 'delivered';
+  deliveryEvidence?: string;
+  hasDeliveryEvidence?: boolean;
   emailSentAt?: string;
   user?: User;
   customer?: Customer;

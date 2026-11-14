@@ -30,6 +30,8 @@ const IDENTIFICATION_OPTIONS = [
   { value: 'passport', label: 'Pasaporte' }
 ] as const;
 
+const MAX_DELIVERY_PHOTO_SIZE = 2 * 1024 * 1024;
+
 type PaymentMethod = (typeof PAYMENT_OPTIONS)[number]['value'];
 type InvoiceDocumentType = Extract<NonNullable<Invoice['documentType']>, 'consumer_final' | 'sales_note'>;
 type CustomerIdentificationType = NonNullable<Invoice['customerIdentificationType']>;
@@ -69,6 +71,10 @@ const InvoicesPage: React.FC = () => {
   const [customerIdentificationType, setCustomerIdentificationType] = useState<CustomerIdentificationType>('none');
   const [customerIdentification, setCustomerIdentification] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
+  const [deliveryStatus, setDeliveryStatus] = useState<NonNullable<Invoice['deliveryStatus']>>('pending');
+  const [deliveryEvidence, setDeliveryEvidence] = useState('');
+  const [deliveryEvidenceError, setDeliveryEvidenceError] = useState('');
+  const [readingDeliveryEvidence, setReadingDeliveryEvidence] = useState(false);
   const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
   const adjustLocalProductStock = async (items: InvoiceItem[], multiplier: 1 | -1) => {
     const currentProducts = await localDBService.getProducts();
@@ -237,7 +243,44 @@ const InvoicesPage: React.FC = () => {
     setCustomerIdentificationType('none');
     setCustomerIdentification('');
     setCustomerAddress('');
+    setDeliveryStatus('pending');
+    setDeliveryEvidence('');
+    setDeliveryEvidenceError('');
+    setReadingDeliveryEvidence(false);
     resetPaymentState();
+  };
+
+  const handleDeliveryEvidenceChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    setDeliveryEvidenceError('');
+    setDeliveryEvidence('');
+    setReadingDeliveryEvidence(false);
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setDeliveryEvidenceError('Selecciona una imagen JPG, PNG o WebP.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_DELIVERY_PHOTO_SIZE) {
+      setDeliveryEvidenceError('La foto no debe superar los 2 MB.');
+      event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    setReadingDeliveryEvidence(true);
+    reader.onerror = () => {
+      setDeliveryEvidenceError('No se pudo leer la foto seleccionada.');
+      setReadingDeliveryEvidence(false);
+    };
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setDeliveryEvidence(reader.result);
+      else setDeliveryEvidenceError('No se pudo leer la foto seleccionada.');
+      setReadingDeliveryEvidence(false);
+    };
+    reader.readAsDataURL(file);
   };
 
   const persistInvoiceLocally = async (invoice: Invoice) => {
@@ -322,6 +365,13 @@ const InvoicesPage: React.FC = () => {
       return;
     }
 
+    if (readingDeliveryEvidence) return;
+
+    if (deliveryEvidenceError) {
+      alert(deliveryEvidenceError);
+      return;
+    }
+
     if (targetStatus === 'paid' && (receivedAmount === undefined || receivedAmount < invoiceTotal)) {
       alert('El monto recibido no puede ser menor al total de la factura.');
       return;
@@ -332,11 +382,13 @@ const InvoicesPage: React.FC = () => {
       customer: customerPayload,
       customerName: customerPayload.name,
       customerEmail: customerPayload.email,
+      deliveryStatus,
       items: invoiceItems.map(item => ({
         productId: item.productId,
         quantity: item.quantity
       }))
     };
+    if (deliveryEvidence) invoiceData.deliveryEvidence = deliveryEvidence;
 
     // Siempre incluir método de pago y monto recibido cuando se use crédito;
     // si la factura queda pagada, también enviar método y montos.
@@ -367,6 +419,9 @@ const InvoicesPage: React.FC = () => {
               customerIdentificationType: customerPayload.identificationType,
               customerIdentification: customerPayload.identificationNumber,
               customerAddress: customerPayload.address,
+              deliveryStatus,
+              hasDeliveryEvidence: Boolean(deliveryEvidence),
+              deliveryEvidence: deliveryEvidence || editingInvoice.deliveryEvidence,
               updatedAt: eventTimestampIso,
               paymentMethod: invoiceData.paymentMethod,
               amountReceived: invoiceData.amountReceived,
@@ -407,6 +462,9 @@ const InvoicesPage: React.FC = () => {
               customerIdentificationType: customerPayload.identificationType,
               customerIdentification: customerPayload.identificationNumber,
               customerAddress: customerPayload.address,
+              deliveryStatus,
+              hasDeliveryEvidence: Boolean(deliveryEvidence),
+              deliveryEvidence: deliveryEvidence || undefined,
               items: invoiceItems,
               createdAt: eventTimestampIso,
               updatedAt: eventTimestampIso
@@ -454,6 +512,8 @@ const InvoicesPage: React.FC = () => {
         customerIdentificationType: savedInvoice.customerIdentificationType || customerPayload.identificationType,
         customerIdentification: savedInvoice.customerIdentification || customerPayload.identificationNumber,
         customerAddress: savedInvoice.customerAddress || customerPayload.address,
+        deliveryStatus: savedInvoice.deliveryStatus || deliveryStatus,
+        hasDeliveryEvidence: savedInvoice.hasDeliveryEvidence ?? Boolean(deliveryEvidence),
         paymentMethod: invoiceData.paymentMethod ?? savedInvoice.paymentMethod,
         paymentReference: targetStatus === 'paid' ? paymentReference : savedInvoice.paymentReference,
         amountReceived: invoiceData.amountReceived ?? savedInvoice.amountReceived,
@@ -492,6 +552,10 @@ const InvoicesPage: React.FC = () => {
     setCustomerIdentificationType((invoice.customerIdentificationType as CustomerIdentificationType) || 'none');
     setCustomerIdentification(invoice.customerIdentification || '');
     setCustomerAddress(invoice.customerAddress || '');
+    setDeliveryStatus(invoice.deliveryStatus || 'pending');
+    setDeliveryEvidence(invoice.deliveryEvidence || '');
+    setDeliveryEvidenceError('');
+    setReadingDeliveryEvidence(false);
     setInvoiceStatusSelection(invoice.status);
     setPaymentMethod((invoice.paymentMethod as PaymentMethod) || 'cash');
     setPaymentReference(invoice.paymentReference || '');
@@ -875,6 +939,11 @@ const InvoicesPage: React.FC = () => {
                               <strong>{invoice.paymentReference || 'Sin referencia'}</strong>
                               <small>Vuelto: {formatCurrency(invoice.changeAmount)}</small>
                             </div>
+                            <div className='invoice-mobile-meta__item'>
+                              <span className='invoice-mobile-meta__label'>Entrega</span>
+                              <strong>{invoice.deliveryStatus === 'delivered' ? 'Entregada' : 'Pendiente'}</strong>
+                              <small>{invoice.hasDeliveryEvidence ? 'Con foto' : 'Sin foto'}</small>
+                            </div>
                           </div>
                         </Accordion.Body>
                       </Accordion.Item>
@@ -938,6 +1007,7 @@ const InvoicesPage: React.FC = () => {
                     <th>Documento</th>
                     <th>Total</th>
                     <th>Estado</th>
+                    <th>Entrega</th>
                     <th>Método</th>
                     <th>Items</th>
                     {canPayInvoices && <th>Acciones</th>}
@@ -948,7 +1018,7 @@ const InvoicesPage: React.FC = () => {
                     <React.Fragment key={invoice.id}>
                       {(index === 0 || visibleInvoices[index - 1].status !== invoice.status) && (
                         <tr className='table-light'>
-                          <th colSpan={canPayInvoices ? 9 : 8}>
+                          <th colSpan={canPayInvoices ? 10 : 9}>
                             {getInvoiceGroupLabel(invoice.status)} ({getInvoiceGroupCount(invoice.status)})
                           </th>
                         </tr>
@@ -964,6 +1034,12 @@ const InvoicesPage: React.FC = () => {
                         <td>{formatCurrency(invoice.total)}</td>
                         <td>
                           <span className={`badge ${getInvoiceStatusClass(invoice.status)}`}>{getInvoiceStatusLabel(invoice.status)}</span>
+                        </td>
+                        <td>
+                          <span className={`badge ${invoice.deliveryStatus === 'delivered' ? 'bg-success' : 'bg-secondary'}`}>
+                            {invoice.deliveryStatus === 'delivered' ? 'Entregada' : 'Pendiente'}
+                          </span>
+                          {invoice.hasDeliveryEvidence && <small className='d-block text-muted'>Con foto</small>}
                         </td>
                         <td>{invoice.paymentMethod || '—'}</td>
                         <td>
@@ -1163,6 +1239,36 @@ const InvoicesPage: React.FC = () => {
                     )}
                   </div>
 
+                  <div className='row g-3 mb-4'>
+                    <div className='col-12 col-md-4'>
+                      <label className='form-label' htmlFor='invoice-delivery-status'>Estado de entrega</label>
+                      <select
+                        id='invoice-delivery-status'
+                        className='form-select'
+                        value={deliveryStatus}
+                        onChange={event => setDeliveryStatus(event.target.value as NonNullable<Invoice['deliveryStatus']>)}
+                      >
+                        <option value='pending'>Pendiente</option>
+                        <option value='delivered'>Entregada</option>
+                      </select>
+                    </div>
+                    <div className='col-12 col-md-8'>
+                      <label className='form-label' htmlFor='invoice-delivery-photo'>Foto de entrega (opcional)</label>
+                      <input
+                        id='invoice-delivery-photo'
+                        type='file'
+                        className='form-control'
+                        accept='image/jpeg,image/png,image/webp'
+                        onChange={handleDeliveryEvidenceChange}
+                        disabled={readingDeliveryEvidence}
+                      />
+                      <small className='text-muted'>Puedes registrar la entrega con o sin foto. Máximo 2 MB.</small>
+                      {deliveryEvidenceError && <div className='text-danger small'>{deliveryEvidenceError}</div>}
+                      {readingDeliveryEvidence && <div className='text-muted small'>Leyendo foto…</div>}
+                      {deliveryEvidence && <div className='text-success small'>Foto lista para guardar.</div>}
+                    </div>
+                  </div>
+
                   {invoiceItems.length === 0 ? (
                     <p className='text-muted'>No hay productos agregados.</p>
                   ) : (
@@ -1207,7 +1313,7 @@ const InvoicesPage: React.FC = () => {
                   <button type='button' className='btn btn-secondary' onClick={() => setShowModal(false)}>
                     Cancelar
                   </button>
-                  <button type='submit' className='btn btn-primary' disabled={invoiceItems.length === 0}>
+                  <button type='submit' className='btn btn-primary' disabled={invoiceItems.length === 0 || readingDeliveryEvidence}>
                     {editingInvoice ? 'Guardar factura' : 'Crear factura'}
                   </button>
                 </div>

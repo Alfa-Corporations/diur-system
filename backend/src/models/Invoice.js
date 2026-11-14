@@ -116,6 +116,11 @@ const Invoice = db.define('Invoice', {
     allowNull: false,
     defaultValue: false,
   },
+  deliveryStatus: {
+    type: DataTypes.ENUM('pending', 'delivered'),
+    allowNull: false,
+    defaultValue: 'pending',
+  },
   emailSentAt: {
     type: DataTypes.DATE,
     allowNull: true,

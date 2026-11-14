@@ -69,8 +69,22 @@ class InvoiceService {
       throw new Error('La factura debe incluir al menos un producto');
     }
 
-    delete baseInvoiceData.deliveryEvidence;
-    delete baseInvoiceData.hasDeliveryEvidence;
+    const deliveryEvidence = baseInvoiceData.deliveryEvidence;
+    if (deliveryEvidence !== undefined && deliveryEvidence !== null && deliveryEvidence !== '') {
+      if (
+        typeof deliveryEvidence !== 'string'
+        || deliveryEvidence.length > 2800000
+        || !/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(deliveryEvidence)
+      ) {
+        throw new Error('La foto de entrega no es válida o supera el tamaño permitido');
+      }
+    }
+    baseInvoiceData.deliveryEvidence = deliveryEvidence || null;
+    baseInvoiceData.hasDeliveryEvidence = Boolean(deliveryEvidence);
+    baseInvoiceData.deliveryStatus = baseInvoiceData.deliveryStatus || 'pending';
+    if (!['pending', 'delivered'].includes(baseInvoiceData.deliveryStatus)) {
+      throw new Error('El estado de entrega no es válido');
+    }
     const orderItemsById = new Map();
     const quantitiesByOrderItemId = new Map();
     const regularQuantitiesByProductId = new Map();

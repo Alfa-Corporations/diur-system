@@ -26,6 +26,7 @@ db.sync({ force: false, alter: process.env.NODE_ENV !== 'production' })
             await db.query('ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "dispatchStatus" VARCHAR(20) NOT NULL DEFAULT \'pendiente\'');
             await db.query('ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "deliveryEvidence" TEXT');
             await db.query('ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "hasDeliveryEvidence" BOOLEAN NOT NULL DEFAULT FALSE');
+            await db.query('ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "deliveryStatus" VARCHAR(20) NOT NULL DEFAULT \'pending\'');
             await db.query(`
                 CREATE TABLE IF NOT EXISTS "push_subscriptions" (
                     "id" SERIAL PRIMARY KEY,

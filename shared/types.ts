@@ -114,6 +114,9 @@ export interface Invoice {
   customerIdentificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
   customerIdentification?: string;
   customerAddress?: string;
+  deliveryStatus?: 'pending' | 'delivered';
+  deliveryEvidence?: string;
+  hasDeliveryEvidence?: boolean;
   emailSentAt?: string;
   user?: User;
   customer?: Customer;
@@ -250,6 +253,8 @@ export interface CreateInvoiceRequest {
   paymentReference?: string;
   amountReceived?: number;
   changeAmount?: number;
+  deliveryStatus?: 'pending' | 'delivered';
+  deliveryEvidence?: string;
 }
 
 export interface UpdateStockRequest {
