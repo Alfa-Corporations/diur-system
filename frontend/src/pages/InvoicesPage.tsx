@@ -30,8 +30,6 @@ const IDENTIFICATION_OPTIONS = [
   { value: 'passport', label: 'Pasaporte' }
 ] as const;
 
-const MAX_DELIVERY_PHOTO_SIZE = 2 * 1024 * 1024;
-
 type PaymentMethod = (typeof PAYMENT_OPTIONS)[number]['value'];
 type InvoiceDocumentType = Extract<NonNullable<Invoice['documentType']>, 'consumer_final' | 'sales_note'>;
 type CustomerIdentificationType = NonNullable<Invoice['customerIdentificationType']>;
@@ -72,9 +70,6 @@ const InvoicesPage: React.FC = () => {
   const [customerIdentification, setCustomerIdentification] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState<NonNullable<Invoice['deliveryStatus']>>('pending');
-  const [deliveryEvidence, setDeliveryEvidence] = useState('');
-  const [deliveryEvidenceError, setDeliveryEvidenceError] = useState('');
-  const [readingDeliveryEvidence, setReadingDeliveryEvidence] = useState(false);
   const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
   const adjustLocalProductStock = async (items: InvoiceItem[], multiplier: 1 | -1) => {
     const currentProducts = await localDBService.getProducts();
@@ -244,43 +239,7 @@ const InvoicesPage: React.FC = () => {
     setCustomerIdentification('');
     setCustomerAddress('');
     setDeliveryStatus('pending');
-    setDeliveryEvidence('');
-    setDeliveryEvidenceError('');
-    setReadingDeliveryEvidence(false);
     resetPaymentState();
-  };
-
-  const handleDeliveryEvidenceChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    setDeliveryEvidenceError('');
-    setDeliveryEvidence('');
-    setReadingDeliveryEvidence(false);
-    if (!file) return;
-
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setDeliveryEvidenceError('Selecciona una imagen JPG, PNG o WebP.');
-      event.target.value = '';
-      return;
-    }
-
-    if (file.size > MAX_DELIVERY_PHOTO_SIZE) {
-      setDeliveryEvidenceError('La foto no debe superar los 2 MB.');
-      event.target.value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-    setReadingDeliveryEvidence(true);
-    reader.onerror = () => {
-      setDeliveryEvidenceError('No se pudo leer la foto seleccionada.');
-      setReadingDeliveryEvidence(false);
-    };
-    reader.onload = () => {
-      if (typeof reader.result === 'string') setDeliveryEvidence(reader.result);
-      else setDeliveryEvidenceError('No se pudo leer la foto seleccionada.');
-      setReadingDeliveryEvidence(false);
-    };
-    reader.readAsDataURL(file);
   };
 
   const persistInvoiceLocally = async (invoice: Invoice) => {
@@ -365,13 +324,6 @@ const InvoicesPage: React.FC = () => {
       return;
     }
 
-    if (readingDeliveryEvidence) return;
-
-    if (deliveryEvidenceError) {
-      alert(deliveryEvidenceError);
-      return;
-    }
-
     if (targetStatus === 'paid' && (receivedAmount === undefined || receivedAmount < invoiceTotal)) {
       alert('El monto recibido no puede ser menor al total de la factura.');
       return;
@@ -388,7 +340,6 @@ const InvoicesPage: React.FC = () => {
         quantity: item.quantity
       }))
     };
-    if (deliveryEvidence) invoiceData.deliveryEvidence = deliveryEvidence;
 
     // Siempre incluir método de pago y monto recibido cuando se use crédito;
     // si la factura queda pagada, también enviar método y montos.
@@ -420,8 +371,6 @@ const InvoicesPage: React.FC = () => {
               customerIdentification: customerPayload.identificationNumber,
               customerAddress: customerPayload.address,
               deliveryStatus,
-              hasDeliveryEvidence: Boolean(deliveryEvidence),
-              deliveryEvidence: deliveryEvidence || editingInvoice.deliveryEvidence,
               updatedAt: eventTimestampIso,
               paymentMethod: invoiceData.paymentMethod,
               amountReceived: invoiceData.amountReceived,
@@ -463,8 +412,6 @@ const InvoicesPage: React.FC = () => {
               customerIdentification: customerPayload.identificationNumber,
               customerAddress: customerPayload.address,
               deliveryStatus,
-              hasDeliveryEvidence: Boolean(deliveryEvidence),
-              deliveryEvidence: deliveryEvidence || undefined,
               items: invoiceItems,
               createdAt: eventTimestampIso,
               updatedAt: eventTimestampIso
@@ -513,7 +460,6 @@ const InvoicesPage: React.FC = () => {
         customerIdentification: savedInvoice.customerIdentification || customerPayload.identificationNumber,
         customerAddress: savedInvoice.customerAddress || customerPayload.address,
         deliveryStatus: savedInvoice.deliveryStatus || deliveryStatus,
-        hasDeliveryEvidence: savedInvoice.hasDeliveryEvidence ?? Boolean(deliveryEvidence),
         paymentMethod: invoiceData.paymentMethod ?? savedInvoice.paymentMethod,
         paymentReference: targetStatus === 'paid' ? paymentReference : savedInvoice.paymentReference,
         amountReceived: invoiceData.amountReceived ?? savedInvoice.amountReceived,
@@ -553,9 +499,6 @@ const InvoicesPage: React.FC = () => {
     setCustomerIdentification(invoice.customerIdentification || '');
     setCustomerAddress(invoice.customerAddress || '');
     setDeliveryStatus(invoice.deliveryStatus || 'pending');
-    setDeliveryEvidence(invoice.deliveryEvidence || '');
-    setDeliveryEvidenceError('');
-    setReadingDeliveryEvidence(false);
     setInvoiceStatusSelection(invoice.status);
     setPaymentMethod((invoice.paymentMethod as PaymentMethod) || 'cash');
     setPaymentReference(invoice.paymentReference || '');
@@ -942,7 +885,6 @@ const InvoicesPage: React.FC = () => {
                             <div className='invoice-mobile-meta__item'>
                               <span className='invoice-mobile-meta__label'>Entrega</span>
                               <strong>{invoice.deliveryStatus === 'delivered' ? 'Entregada' : 'Pendiente'}</strong>
-                              <small>{invoice.hasDeliveryEvidence ? 'Con foto' : 'Sin foto'}</small>
                             </div>
                           </div>
                         </Accordion.Body>
@@ -1039,7 +981,6 @@ const InvoicesPage: React.FC = () => {
                           <span className={`badge ${invoice.deliveryStatus === 'delivered' ? 'bg-success' : 'bg-secondary'}`}>
                             {invoice.deliveryStatus === 'delivered' ? 'Entregada' : 'Pendiente'}
                           </span>
-                          {invoice.hasDeliveryEvidence && <small className='d-block text-muted'>Con foto</small>}
                         </td>
                         <td>{invoice.paymentMethod || '—'}</td>
                         <td>
@@ -1252,21 +1193,6 @@ const InvoicesPage: React.FC = () => {
                         <option value='delivered'>Entregada</option>
                       </select>
                     </div>
-                    <div className='col-12 col-md-8'>
-                      <label className='form-label' htmlFor='invoice-delivery-photo'>Foto de entrega (opcional)</label>
-                      <input
-                        id='invoice-delivery-photo'
-                        type='file'
-                        className='form-control'
-                        accept='image/jpeg,image/png,image/webp'
-                        onChange={handleDeliveryEvidenceChange}
-                        disabled={readingDeliveryEvidence}
-                      />
-                      <small className='text-muted'>Puedes registrar la entrega con o sin foto. Máximo 2 MB.</small>
-                      {deliveryEvidenceError && <div className='text-danger small'>{deliveryEvidenceError}</div>}
-                      {readingDeliveryEvidence && <div className='text-muted small'>Leyendo foto…</div>}
-                      {deliveryEvidence && <div className='text-success small'>Foto lista para guardar.</div>}
-                    </div>
                   </div>
 
                   {invoiceItems.length === 0 ? (
@@ -1313,7 +1239,7 @@ const InvoicesPage: React.FC = () => {
                   <button type='button' className='btn btn-secondary' onClick={() => setShowModal(false)}>
                     Cancelar
                   </button>
-                  <button type='submit' className='btn btn-primary' disabled={invoiceItems.length === 0 || readingDeliveryEvidence}>
+                  <button type='submit' className='btn btn-primary' disabled={invoiceItems.length === 0}>
                     {editingInvoice ? 'Guardar factura' : 'Crear factura'}
                   </button>
                 </div>
