@@ -137,7 +137,13 @@ class InvoiceController {
           console.error('Could not clean up failed invoice delivery image:', cleanupError);
         });
       }
-      res.status(error.message === 'Factura no encontrada.' ? 404 : 400).json({ message: error.message });
+      const status = error.message === 'Factura no encontrada.' ? 404
+        : error.code === 'INVALID_IMAGE' ? 400
+          : error.code ? 500 : 400;
+      if (status === 500) console.error('Could not save invoice delivery image:', error);
+      res.status(status).json({
+        message: status === 500 ? 'No se pudo guardar la foto de entrega.' : error.message,
+      });
     }
   }
 

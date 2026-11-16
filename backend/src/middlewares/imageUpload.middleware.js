@@ -14,8 +14,13 @@ const upload = multer({
 module.exports = (req, res, next) => {
   upload.single('image')(req, res, error => {
     if (error instanceof multer.MulterError) {
-      const status = error.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
-      return res.status(status).json({ message: 'La imagen supera el límite permitido de 8 MB.' });
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ message: 'La imagen supera el límite permitido de 8 MB.' });
+      }
+      if (error.code === 'LIMIT_FILE_COUNT' || error.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ message: 'Solo se permite una imagen en el campo image.' });
+      }
+      return res.status(400).json({ message: 'No se pudo recibir la imagen.' });
     }
     if (error) {
       return res.status(400).json({ message: error.message });

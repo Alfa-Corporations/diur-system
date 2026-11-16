@@ -47,11 +47,11 @@ const readImage = async (file: File): Promise<DecodedImage> => {
   }
 };
 
-const canvasToJpeg = (canvas: HTMLCanvasElement, quality: number): Promise<Blob> => new Promise((resolve, reject) => {
+const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> => new Promise((resolve, reject) => {
   canvas.toBlob(blob => {
     if (blob) resolve(blob);
     else reject(new Error('No se pudo convertir la imagen.'));
-  }, 'image/jpeg', quality);
+  }, type, quality);
 });
 
 export const compressImage = async (file: File): Promise<File> => {
@@ -76,22 +76,33 @@ export const compressImage = async (file: File): Promise<File> => {
     const context = canvas.getContext('2d');
     if (!context) throw new Error('No se pudo preparar la imagen para guardarla.');
 
-    context.fillStyle = '#fff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(image.source, 0, 0, canvas.width, canvas.height);
 
     let blob: Blob | undefined;
     for (const quality of [0.82, 0.7, 0.55, 0.4]) {
-      blob = await canvasToJpeg(canvas, quality);
-      if (blob.size <= MAX_FILE_SIZE) break;
+      blob = await canvasToBlob(canvas, 'image/webp', quality);
+      if (blob.type !== 'image/webp' || blob.size <= MAX_FILE_SIZE) break;
     }
 
-    if (!blob || blob.size > MAX_FILE_SIZE) {
+    if (!blob || (blob.type !== 'image/png' && blob.size > MAX_FILE_SIZE)) {
+      context.globalCompositeOperation = 'destination-over';
+      context.fillStyle = '#fff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.globalCompositeOperation = 'source-over';
+
+      for (const quality of [0.82, 0.7, 0.55, 0.4]) {
+        blob = await canvasToBlob(canvas, 'image/jpeg', quality);
+        if (blob.size <= MAX_FILE_SIZE) break;
+      }
+    }
+
+    if (!blob || blob.size > MAX_FILE_SIZE || !['image/jpeg', 'image/png', 'image/webp'].includes(blob.type)) {
       throw new Error('No se pudo reducir la imagen al límite de 8 MB.');
     }
 
+    const extension = blob.type === 'image/webp' ? 'webp' : blob.type === 'image/png' ? 'png' : 'jpg';
     const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
-    return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg', lastModified: file.lastModified });
+    return new File([blob], `${baseName}.${extension}`, { type: blob.type, lastModified: file.lastModified });
   } finally {
     image.release();
   }
