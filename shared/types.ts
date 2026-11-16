@@ -34,6 +34,7 @@ export interface Product {
   price: number;
   stock: number;
   category?: string;
+  foto?: string | null;
   partnumber: string;
   barcode?: string;
   isActive: boolean;

@@ -1,4 +1,5 @@
 const ProductService = require('../services/ProductService');
+const imageStorage = require('../utils/imageStorage');
 
 /**
  * Controlador de Productos
@@ -86,6 +87,54 @@ class ProductController {
       });
     } catch (error) {
       res.status(400).json({ message: error.message });
+    }
+  }
+
+  async uploadImage(req, res) {
+    let storedImage;
+    let saved = false;
+    try {
+      const { id } = req.params;
+      const product = await ProductService.getProductById(id);
+      storedImage = await imageStorage.storeImage('products', id, req.file.buffer);
+      const updatedProduct = await ProductService.updateProduct(id, {
+        foto: `/media/products/${storedImage.filename}`,
+      });
+      saved = true;
+
+      if (product.foto) {
+        const previousFilename = product.foto.split('/').pop();
+        await imageStorage.removeStoredImage('products', previousFilename).catch(error => {
+          console.error('Could not remove previous product image:', error);
+        });
+      }
+
+      res.json({ message: 'Foto del producto guardada.', product: updatedProduct });
+    } catch (error) {
+      if (storedImage && !saved) {
+        await imageStorage.removeStoredImage('products', storedImage.filename).catch(cleanupError => {
+          console.error('Could not clean up failed product image:', cleanupError);
+        });
+      }
+      res.status(error.message === 'Product not found' ? 404 : 400).json({ message: error.message });
+    }
+  }
+
+  async removeImage(req, res) {
+    try {
+      const { id } = req.params;
+      const product = await ProductService.getProductById(id);
+      let updatedProduct = product;
+      if (product.foto) {
+        updatedProduct = await ProductService.updateProduct(id, { foto: null });
+        const filename = product.foto.split('/').pop();
+        await imageStorage.removeStoredImage('products', filename).catch(error => {
+          console.error('Could not remove deleted product image:', error);
+        });
+      }
+      res.json({ message: 'Foto del producto eliminada.', product: updatedProduct });
+    } catch (error) {
+      res.status(error.message === 'Product not found' ? 404 : 400).json({ message: error.message });
     }
   }
 

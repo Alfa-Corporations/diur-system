@@ -1,7 +1,7 @@
 const InvoiceRepository = require('../repositories/InvoiceRepository');
 const ProductService = require('./ProductService');
 const OrderService = require('./OrderService');
-const { Customer, Order, OrderItem, AccountsReceivable, AccountsReceivablePayment } = require('../models');
+const { Customer, Invoice, Order, OrderItem, AccountsReceivable, AccountsReceivablePayment } = require('../models');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -10,6 +10,22 @@ const { v4: uuidv4 } = require('uuid');
  * Incluye creación, cálculo de totales y validaciones de stock.
  */
 class InvoiceService {
+  async saveDeliveryEvidence(id, filename) {
+    const invoice = await Invoice.findByPk(id);
+    if (!invoice) throw new Error('Factura no encontrada.');
+    if (invoice.status === 'cancelled') throw new Error('No se puede adjuntar una foto a una factura eliminada.');
+
+    const previousFilename = invoice.deliveryEvidence;
+    await invoice.update({ deliveryEvidence: filename, hasDeliveryEvidence: true });
+    return { invoice: await this.getInvoiceById(id), previousFilename };
+  }
+
+  async getDeliveryEvidenceReference(id) {
+    return await Invoice.findByPk(id, {
+      attributes: ['id', 'deliveryEvidence', 'hasDeliveryEvidence', 'status'],
+    });
+  }
+
   async resolveCustomer(customerData = {}, documentType = 'consumer_final') {
     if (documentType === 'consumer_final') {
       const [customer] = await Customer.findOrCreate({
@@ -300,6 +316,10 @@ class InvoiceService {
    */
   async getInvoices(filters = {}, limit = 10, offset = 0) {
     return await InvoiceRepository.findAll(filters, limit, offset);
+  }
+
+  async countInvoices(filters = {}) {
+    return await InvoiceRepository.count(filters);
   }
 
   /**

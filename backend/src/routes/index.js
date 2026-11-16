@@ -13,6 +13,7 @@ const CustomerController = require('../controllers/CustomerController');
 const VisitController = require('../controllers/VisitController');
 const NotificationController = require('../controllers/NotificationController');
 const changeNotification = require('../middlewares/changeNotification.middleware');
+const imageUpload = require('../middlewares/imageUpload.middleware');
 
 const router = express.Router();
 
@@ -42,6 +43,7 @@ router.post('/customers', authorize('crear_clientes'), CustomerController.create
 router.get('/customers', authorize('leer_clientes'), CustomerController.getCustomers);
 router.put('/customers/:id', authorize('actualizar_clientes'), CustomerController.updateCustomer);
 router.delete('/customers/:id', authorize('eliminar_clientes'), CustomerController.deleteCustomer);
+router.post('/customers/import', authorize('crear_clientes'), authorize('actualizar_clientes'), CustomerController.importCustomers);
 
 router.post('/visits', authorize('gestionar_visitas'), VisitController.create);
 router.get('/visits', authorize('leer_visitas'), VisitController.list);
@@ -60,6 +62,8 @@ router.post('/products/bulk', authorize('crear_producto', 'gestionar_productos')
 router.get('/products', authorize('leer_producto', 'gestionar_productos'), ProductController.getProducts);
 router.get('/products/:id', authorize('leer_producto', 'gestionar_productos'), ProductController.getProduct);
 router.put('/products/:id', authorize('actualizar_producto', 'gestionar_productos'), ProductController.updateProduct);
+router.post('/products/:id/image', authorize('actualizar_producto', 'gestionar_productos'), imageUpload, ProductController.uploadImage);
+router.delete('/products/:id/image', authorize('actualizar_producto', 'gestionar_productos'), ProductController.removeImage);
 router.patch('/products/:id/stock', authorize('actualizar_producto', 'gestionar_productos'), ProductController.updateStock);
 router.delete('/products/:id', authorize('eliminar_producto', 'gestionar_productos'), ProductController.deleteProduct);
 
@@ -67,6 +71,8 @@ router.delete('/products/:id', authorize('eliminar_producto', 'gestionar_product
 router.post('/invoices', authorize('crear_factura'), InvoiceController.createInvoice);
 router.get('/invoices', authorize('leer_factura'), InvoiceController.getInvoices);
 router.get('/invoices/:id', authorize('leer_factura'), InvoiceController.getInvoice);
+router.post('/invoices/:id/delivery-evidence', authorize('actualizar_factura', 'gestionar_items_orden', 'actualizar_orden'), imageUpload, InvoiceController.uploadDeliveryEvidence);
+router.get('/invoices/:id/delivery-evidence', authorize('actualizar_factura', 'gestionar_items_orden', 'actualizar_orden'), InvoiceController.getDeliveryEvidence);
 router.patch('/invoices/:id/status', authorize('actualizar_factura'), InvoiceController.updateInvoiceStatus);
 router.delete('/invoices/:id', authorize('cancelar_factura'), InvoiceController.cancelInvoice);
 router.post('/invoices/:id/send-email', authorize('leer_factura'), InvoiceController.sendInvoiceEmail);

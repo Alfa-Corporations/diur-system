@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { Alert, Badge, Button, Form, Spinner } from 'react-bootstrap';
 import type { Customer } from '../interfaces/types';
-import type { Order } from '../../../shared/types';
+import type { Invoice, Order } from '../../../shared/types';
 import { useAppSelector } from '../hooks/redux';
 import apiService from '../services/apiService';
 
@@ -48,6 +48,9 @@ const PendingProductsPage: React.FC = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [recentlyCreatedInvoices, setRecentlyCreatedInvoices] = useState<Invoice[]>([]);
+  const [uploadingEvidenceId, setUploadingEvidenceId] = useState<number | null>(null);
+  const [evidenceUploadErrors, setEvidenceUploadErrors] = useState<Record<number, string>>({});
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -161,6 +164,32 @@ const PendingProductsPage: React.FC = () => {
     setInvoiceReferences(current => ({ ...current, [customerKey]: value }));
   };
 
+  const attachDeliveryPhoto = async (invoiceId: number, image: File | undefined) => {
+    if (!image) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(image.type) || image.size > 8 * 1024 * 1024) {
+      setEvidenceUploadErrors(current => ({
+        ...current,
+        [invoiceId]: 'Selecciona una imagen JPEG, PNG o WebP de 8 MB o menos.',
+      }));
+      return;
+    }
+    setUploadingEvidenceId(invoiceId);
+    setEvidenceUploadErrors(current => ({ ...current, [invoiceId]: '' }));
+    try {
+      const updatedInvoice = await apiService.uploadInvoiceDeliveryEvidence(invoiceId, image);
+      setRecentlyCreatedInvoices(current => current.map(invoice =>
+        invoice.id === invoiceId ? updatedInvoice : invoice
+      ));
+    } catch (uploadError) {
+      setEvidenceUploadErrors(current => ({
+        ...current,
+        [invoiceId]: uploadError instanceof Error ? uploadError.message : 'No se pudo guardar la foto.',
+      }));
+    } finally {
+      setUploadingEvidenceId(null);
+    }
+  };
+
   const handleCreateInvoices = async () => {
     if (!isOnline || !navigator.onLine || selectedProducts.length === 0 || creatingInvoices) return;
 
@@ -189,7 +218,7 @@ const PendingProductsPage: React.FC = () => {
     setCreatingInvoices(true);
     setError('');
     setSuccess('');
-    const createdInvoices: string[] = [];
+    const createdInvoiceRecords: Invoice[] = [];
 
     try {
       for (const group of selectedCustomerGroups) {
@@ -215,7 +244,7 @@ const PendingProductsPage: React.FC = () => {
             })),
           });
 
-          createdInvoices.push(`${group.name}: ${invoice.invoiceNumber || `#${invoice.id}`}`);
+          createdInvoiceRecords.push(invoice);
           const completedItemIds = new Set(group.products.map(product => product.item.id));
           setQuantities(current => Object.fromEntries(
             Object.entries(current).filter(([itemId]) => !completedItemIds.has(Number(itemId)))
@@ -234,14 +263,15 @@ const PendingProductsPage: React.FC = () => {
           const uncertainResult = isAxiosError(invoiceError) && !invoiceError.response
             ? ' La conexión se interrumpió durante el envío; verifica en Facturas si se registró antes de reintentar.'
             : '';
-          setError(`No se pudo crear la factura de ${group.name}: ${message}${createdInvoices.length ? ' Las facturas creadas antes de este error ya actualizaron sus órdenes e inventario.' : ''}${uncertainResult}`);
+          setError(`No se pudo crear la factura de ${group.name}: ${message}${createdInvoiceRecords.length ? ' Las facturas creadas antes de este error ya actualizaron sus órdenes e inventario.' : ''}${uncertainResult}`);
           break;
         }
       }
     } finally {
       setCreatingInvoices(false);
-      if (createdInvoices.length > 0) {
-        setSuccess(`Facturas creadas: ${createdInvoices.join(' · ')}. Las cantidades se descontaron de sus órdenes correspondientes.`);
+      if (createdInvoiceRecords.length > 0) {
+        setRecentlyCreatedInvoices(current => [...createdInvoiceRecords, ...current].slice(0, 20));
+        setSuccess(`Facturas creadas: ${createdInvoiceRecords.map(invoice => invoice.invoiceNumber || `#${invoice.id}`).join(' · ')}. Las cantidades se descontaron de sus órdenes correspondientes.`);
         setRefreshKey(current => current + 1);
       }
     }
@@ -264,6 +294,60 @@ const PendingProductsPage: React.FC = () => {
       {!isAdmin && <Alert variant='info'>La cantidad quedó fijada según la preparación de despacho. Solo un administrador puede ajustarla.</Alert>}
       {error && <Alert variant='danger' dismissible onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert variant='success' dismissible onClose={() => setSuccess('')}>{success}</Alert>}
+      {recentlyCreatedInvoices.length > 0 && (
+        <section className='pending-products-invoices mb-4' aria-label='Fotos de facturas recién creadas'>
+          <div className='pending-products-invoices-heading'>
+            <div>
+              <span className='pending-products-eyebrow'>EVIDENCIA DE ENTREGA</span>
+              <h2>Facturas recién creadas</h2>
+            </div>
+          </div>
+          <p className='text-muted'>Adjunta una foto ahora; desde un teléfono puedes tomarla con la cámara o elegir una imagen.</p>
+          <div className='d-grid gap-2'>
+            {recentlyCreatedInvoices.map(invoice => (
+              <article className='pending-products-invoice-group' key={invoice.id}>
+                <div>
+                  <strong>{invoice.invoiceNumber || `Factura #${invoice.id}`}</strong>
+                  <small>{invoice.customerName || 'Consumidor Final'} · {invoice.hasDeliveryEvidence ? 'Foto adjunta' : 'Sin foto de entrega'}</small>
+                  {evidenceUploadErrors[invoice.id] && <small className='text-danger'>{evidenceUploadErrors[invoice.id]}</small>}
+                </div>
+                <div className='d-flex flex-wrap gap-2'>
+                  <label className='btn btn-sm btn-outline-primary mb-0'>
+                    Tomar foto
+                    <input
+                      className='visually-hidden'
+                      type='file'
+                      accept='image/jpeg,image/png,image/webp'
+                      capture='environment'
+                      disabled={!isOnline || uploadingEvidenceId === invoice.id}
+                      onChange={event => {
+                        const image = event.currentTarget.files?.[0];
+                        event.currentTarget.value = '';
+                        void attachDeliveryPhoto(invoice.id, image);
+                      }}
+                    />
+                  </label>
+                  <label className='btn btn-sm btn-primary mb-0'>
+                    Subir foto
+                    <input
+                      className='visually-hidden'
+                      type='file'
+                      accept='image/jpeg,image/png,image/webp'
+                      disabled={!isOnline || uploadingEvidenceId === invoice.id}
+                      onChange={event => {
+                        const image = event.currentTarget.files?.[0];
+                        event.currentTarget.value = '';
+                        void attachDeliveryPhoto(invoice.id, image);
+                      }}
+                    />
+                  </label>
+                  {uploadingEvidenceId === invoice.id && <Spinner animation='border' size='sm' role='status' />}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
       {!loading && pendingProducts.length === 0 && (
         <Alert variant='info'>Los productos aparecen aquí después de registrarlos en bodega y marcar su llegada al local principal.</Alert>
       )}

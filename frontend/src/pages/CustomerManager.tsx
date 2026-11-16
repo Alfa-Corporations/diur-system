@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Modal, Form, Alert } from 'react-bootstrap';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
@@ -8,6 +8,7 @@ import type { RootState } from '../redux/store';
 import { fetchCustomersStart, fetchCustomersSuccess, fetchCustomersFailure } from '../redux/slices/customerSlice';
 import apiService from '../services/apiService';
 import type { Customer } from '../interfaces/types';
+import CustomerXmlImporter from '../components/CustomerXmlImporter';
 
 const CustomerManager: React.FC = () => {
   const navigate = useNavigate();
@@ -17,10 +18,12 @@ const CustomerManager: React.FC = () => {
   const { hasPermission } = usePermissions();
   const canCreateCustomer = user?.role === 'admin' || hasPermission('crear_clientes');
   const canUpdateCustomer = user?.role === 'admin' || hasPermission('actualizar_clientes');
+  const canImportCustomers = canCreateCustomer && canUpdateCustomer;
   const canDeleteCustomer = user?.role === 'admin' || hasPermission('eliminar_clientes');
   const canViewCustomerHistory = user?.role === 'admin' || (hasPermission('leer_factura') && hasPermission('leer_orden'));
 
   const [showModal, setShowModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [error, setError] = useState('');
 
@@ -29,7 +32,7 @@ const CustomerManager: React.FC = () => {
     identificationType: 'cedula'
   });
 
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     dispatch(fetchCustomersStart());
     try {
       const res = await apiService.getCustomers();
@@ -37,11 +40,11 @@ const CustomerManager: React.FC = () => {
     } catch {
       dispatch(fetchCustomersFailure('Error al cargar clientes'));
     }
-  };
+  }, [dispatch]);
 
   useEffect(() => {
-    loadCustomers();
-  }, []);
+    void loadCustomers();
+  }, [loadCustomers]);
 
   const handleSave = async () => {
     if (!formData.name || !formData.identificationType) return;
@@ -123,9 +126,12 @@ const CustomerManager: React.FC = () => {
 
   return (
     <div className='mt-4'>
-      <div className='d-flex justify-content-between mb-3'>
+      <div className='customer-manager-header d-flex justify-content-between align-items-center mb-3'>
         <h4>Clientes</h4>
-        {canCreateCustomer && <Button onClick={() => setShowModal(true)}>Nuevo Cliente</Button>}
+        <div className='d-flex gap-2'>
+          {canImportCustomers && <Button variant='outline-primary' onClick={() => setShowImportModal(true)}>Importar XML</Button>}
+          {canCreateCustomer && <Button onClick={() => setShowModal(true)}>Nuevo Cliente</Button>}
+        </div>
       </div>
 
       <div className='row'>
@@ -265,6 +271,11 @@ const CustomerManager: React.FC = () => {
           <Button onClick={handleSave}>Guardar</Button>
         </Modal.Footer>
       </Modal>
+      <CustomerXmlImporter
+        show={showImportModal}
+        onHide={() => setShowImportModal(false)}
+        onImported={() => void loadCustomers()}
+      />
     </div>
   );
 };

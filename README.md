@@ -113,6 +113,12 @@ VAPID_SUBJECT=mailto:admin@tu-dominio.com
 
 No compartas ni subas la clave privada al repositorio. Los pedidos nuevos y el inicio o finalización de visitas tienen mensajes específicos; los demás cambios muestran el módulo afectado y el usuario que realizó la operación.
 
+### Importar clientes e imágenes
+
+En **Clientes → Importar XML** puedes seleccionar hasta 20 XML (máximo 5 MB cada uno). La vista previa permite relacionar las etiquetas del archivo con nombre, identificación, tipo, correo, teléfono y dirección; la selección se guarda en el navegador. Los registros con la misma identificación se actualizan, y si no tienen identificación se compara el nombre. La importación requiere los permisos de crear y actualizar clientes. Para enseñar nuevas etiquetas a la detección automática, agrega sus nombres normalizados en `FIELD_ALIASES` de `frontend/src/components/CustomerXmlImporter.tsx`; también se pueden seleccionar directamente en el formulario de mapeo.
+
+Las fotos opcionales de productos y las evidencias de entrega se guardan en `backend/uploads/products` y `backend/uploads/invoices`. El servidor convierte imágenes JPEG, PNG o WebP a WebP, las limita a 1280 × 1280 y aplica compresión antes de guardarlas. El límite de carga es 8 MB. Las fotos de producto se sirven como archivos públicos del catálogo; la evidencia de factura se entrega solo a usuarios autorizados. En producción, conserva `backend/uploads` en un volumen persistente y agrégalo a los respaldos: la base de datos conserva las referencias, no el contenido de los archivos.
+
 ### Instalar la aplicación y trabajar sin conexión
 
 La aplicación es una PWA: en Android y escritorio, usa **Instalar app** o la opción de instalación del navegador. En iPhone/iPad, abre el sitio en Safari, toca **Compartir** y selecciona **Añadir a pantalla de inicio**. La instalación y la carga inicial necesitan HTTPS y una conexión.

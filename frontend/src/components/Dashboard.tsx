@@ -18,6 +18,7 @@ const Dashboard: React.FC = () => {
   const { user, isAuthenticated } = useAppSelector(state => state.auth);
   const { notifications } = useAppSelector(state => state.sync);
   const { hasPermission } = usePermissions();
+  const canViewInvoices = user?.role === 'admin' || hasPermission('leer_factura');
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -56,6 +57,23 @@ const Dashboard: React.FC = () => {
   );
   const [pendingAccounts, setPendingAccounts] = useState<number | null>(null);
   const [pendingDeliveryUnits, setPendingDeliveryUnits] = useState<number | null>(null);
+  const [pendingInvoices, setPendingInvoices] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!canViewInvoices) return;
+    let mounted = true;
+    apiService.getInvoices({ status: 'pending', limit: 1000 })
+      .then(result => {
+        if (mounted) setPendingInvoices(result.totalCount);
+      })
+      .catch(() => {
+        if (mounted) setPendingInvoices(null);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [canViewInvoices]);
 
   useEffect(() => {
     let mounted = true;
@@ -161,7 +179,7 @@ const Dashboard: React.FC = () => {
               </div>
               {(user.role === 'admin' || hasPermission('leer_factura')) && (
                 <div className='col-12 col-md-4'>
-                  <div className='stat-card clickable' onClick={() => navigate('/accounts-receivable')} style={{ cursor: 'pointer' }}>
+                  <button type='button' className='stat-card stat-card-button clickable' onClick={() => navigate('/accounts-receivable')}>
                     <div className='d-flex justify-content-between align-items-start'>
                       <div>
                         <div className='metric-label'>Cuentas por Cobrar</div>
@@ -170,12 +188,26 @@ const Dashboard: React.FC = () => {
                       <span className='metric-icon'>💳</span>
                     </div>
                     <div className='small text-muted mt-2'>Ver y registrar pagos pendientes</div>
-                  </div>
+                  </button>
+                </div>
+              )}
+              {canViewInvoices && (
+                <div className='col-12 col-md-4'>
+                  <button type='button' className='stat-card stat-card-button clickable' onClick={() => navigate('/invoices?status=pending')}>
+                    <div className='d-flex justify-content-between align-items-start'>
+                      <div>
+                        <div className='metric-label'>Facturas pendientes</div>
+                        <div className='metric-value'>{pendingInvoices === null ? '—' : pendingInvoices}</div>
+                      </div>
+                      <span className='metric-icon'>🧾</span>
+                    </div>
+                    <div className='small text-muted mt-2'>Abrir todas las facturas pendientes</div>
+                  </button>
                 </div>
               )}
               {(user.role === 'admin' || hasPermission('leer_orden')) && (
                 <div className='col-12 col-md-4'>
-                  <div className='stat-card clickable' onClick={() => navigate('/orders/dispatch')} style={{ cursor: 'pointer' }}>
+                  <button type='button' className='stat-card stat-card-button clickable' onClick={() => navigate('/orders/dispatch')}>
                     <div className='d-flex justify-content-between align-items-start'>
                       <div>
                         <div className='metric-label'>Unidades por despachar</div>
@@ -184,7 +216,7 @@ const Dashboard: React.FC = () => {
                       <span className='metric-icon'>🚚</span>
                     </div>
                     <div className='small text-muted mt-2'>Ver pendientes agrupados por cliente</div>
-                  </div>
+                  </button>
                 </div>
               )}
               {/* <div className='col-12 col-md-4'>
@@ -199,7 +231,7 @@ const Dashboard: React.FC = () => {
                 </div>
               </div> */}
               <div className='col-12 col-md-4'>
-                <div className='stat-card'>
+                <button type='button' className='stat-card stat-card-button clickable' onClick={() => document.getElementById('recent-notifications')?.scrollIntoView({ behavior: 'smooth' })}>
                   <div className='d-flex justify-content-between align-items-start'>
                     <div>
                       <div className='metric-label'>Notificaciones</div>
@@ -207,11 +239,11 @@ const Dashboard: React.FC = () => {
                     </div>
                     <span className='metric-icon'>🔔</span>
                   </div>
-                </div>
+                </button>
               </div>
             </div>
 
-            <div className='section-card mt-4'>
+            <div className='section-card mt-4' id='recent-notifications'>
               <div className='d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3'>
                 <div>
                   <h5 className='mb-1'>Notificaciones recientes</h5>

@@ -24,6 +24,15 @@ class CustomerController {
     }
   }
 
+  static async importCustomers(req, res) {
+    try {
+      const result = await CustomerService.importCustomers(req.body?.customers);
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
+  }
+
   static async updateCustomer(req, res) {
     try {
       const { id } = req.params;

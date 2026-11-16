@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
-import { Button, Table, Badge, Alert, Row, Col, Card } from 'react-bootstrap';
+import { Button, Table, Badge, Alert, Row, Col } from 'react-bootstrap';
 import type { RootState } from '../redux/store';
 import { fetchOrdersStart, fetchOrdersSuccess, fetchOrdersFailure } from '../redux/slices/orderSlice';
 import type { Order, OrderItem, RealtimeNotification } from '../../../shared/types';
@@ -13,6 +14,7 @@ import socketService from '../services/socketService';
  * Vista global de todos los pedidos con estados individuales
  */
 const OrdersDashboardPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useAppDispatch();
   const { orders, loading, error } = useAppSelector((state: RootState) => state.orders);
 
@@ -58,10 +60,18 @@ const OrdersDashboardPage: React.FC = () => {
     };
   }, [loadOrders]);
 
-  const filteredOrders = orders.filter(order => {
-    if (filterType === 'all') return true;
-    return order.type === filterType;
-  });
+  const rawStatus = searchParams.get('status');
+  const statuses: Order['status'][] = ['pendiente', 'parcial', 'completado', 'cancelado'];
+  const requestedStatus = statuses.includes(rawStatus as Order['status']) ? rawStatus : null;
+  const filteredOrders = orders.filter(order =>
+    (filterType === 'all' || (filterType === 'compra' ? order.type === 'compra' : order.type !== 'compra')) &&
+    (!requestedStatus || order.status === requestedStatus)
+  );
+  const filterByStatus = (status?: Order['status']) => setSearchParams(status ? { status } : {});
+  const filterByType = (type: 'all' | 'compra' | 'venta') => {
+    setFilterType(type);
+    setSearchParams({});
+  };
 
   const getStatusBadge = (status: Order['status']) => {
     const variants: Record<Order['status'], string> = {
@@ -95,13 +105,17 @@ const OrdersDashboardPage: React.FC = () => {
     partial: orders.filter(o => o.status === 'parcial').length,
     completed: orders.filter(o => o.status === 'completado').length,
     compra: orders.filter(o => o.type === 'compra').length,
-    venta: orders.filter(o => o.type === 'venta').length
+    venta: orders.filter(o => o.type !== 'compra').length
   };
 
   return (
     <div className='container mt-4'>
-      <div className='d-flex justify-content-between align-items-center mb-4'>
-        <h2>📊 Dashboard de Pedidos</h2>
+      <div className='orders-dashboard-header'>
+        <div>
+          <span className='pending-products-eyebrow'>OPERACIONES · RESUMEN</span>
+          <h1>Dashboard de pedidos</h1>
+          <p>Selecciona un indicador para consultar los pedidos que lo componen.</p>
+        </div>
       </div>
 
       {!isOnline && (
@@ -111,68 +125,57 @@ const OrdersDashboardPage: React.FC = () => {
       )}
 
       {/* Estadísticas */}
-      <Row className='mb-4 gap-1 d-grid' style={{gridTemplateColumns: '1fr 1fr'}}>
-        <Col md={2}>
-          <Card className='text-center'>
-            <Card.Body>
-              <Card.Title className='h3 text-primary'>{stats.total}</Card.Title>
-              <Card.Text>Total Pedidos</Card.Text>
-            </Card.Body>
-          </Card>
+      <Row className='orders-dashboard-stats mb-4 g-3'>
+        <Col xs={6} md={4} xl={2}>
+          <button type='button' className='stat-card stat-card-button text-center' onClick={() => filterByType('all')} aria-pressed={!requestedStatus && filterType === 'all'}>
+            <div className='metric-value text-primary'>{stats.total}</div>
+            <div>Total pedidos</div>
+          </button>
         </Col>
-        <Col md={2}>
-          <Card className='text-center'>
-            <Card.Body>
-              <Card.Title className='h3 text-warning'>{stats.pending}</Card.Title>
-              <Card.Text>Pendientes</Card.Text>
-            </Card.Body>
-          </Card>
+        <Col xs={6} md={4} xl={2}>
+          <button type='button' className='stat-card stat-card-button text-center' onClick={() => filterByStatus('pendiente')} aria-pressed={requestedStatus === 'pendiente'}>
+            <div className='metric-value text-warning'>{stats.pending}</div>
+            <div>Pendientes</div>
+          </button>
         </Col>
-        <Col md={2}>
-          <Card className='text-center'>
-            <Card.Body>
-              <Card.Title className='h3 text-info'>{stats.partial}</Card.Title>
-              <Card.Text>Parciales</Card.Text>
-            </Card.Body>
-          </Card>
+        <Col xs={6} md={4} xl={2}>
+          <button type='button' className='stat-card stat-card-button text-center' onClick={() => filterByStatus('parcial')} aria-pressed={requestedStatus === 'parcial'}>
+            <div className='metric-value text-info'>{stats.partial}</div>
+            <div>Parciales</div>
+          </button>
         </Col>
-        <Col md={2}>
-          <Card className='text-center'>
-            <Card.Body>
-              <Card.Title className='h3 text-success'>{stats.completed}</Card.Title>
-              <Card.Text>Completados</Card.Text>
-            </Card.Body>
-          </Card>
+        <Col xs={6} md={4} xl={2}>
+          <button type='button' className='stat-card stat-card-button text-center' onClick={() => filterByStatus('completado')} aria-pressed={requestedStatus === 'completado'}>
+            <div className='metric-value text-success'>{stats.completed}</div>
+            <div>Completados</div>
+          </button>
         </Col>
-        <Col md={2}>
-          <Card className='text-center'>
-            <Card.Body>
-              <Card.Title className='h3 text-info'>{stats.compra}</Card.Title>
-              <Card.Text>Compras</Card.Text>
-            </Card.Body>
-          </Card>
+        <Col xs={6} md={4} xl={2}>
+          <button type='button' className='stat-card stat-card-button text-center' onClick={() => filterByType('compra')} aria-pressed={filterType === 'compra'}>
+            <div className='metric-value text-info'>{stats.compra}</div>
+            <div>Compras</div>
+          </button>
         </Col>
-        <Col md={2}>
-          <Card className='text-center'>
-            <Card.Body>
-              <Card.Title className='h3 text-success'>{stats.venta}</Card.Title>
-              <Card.Text>Ventas</Card.Text>
-            </Card.Body>
-          </Card>
+        <Col xs={6} md={4} xl={2}>
+          <button type='button' className='stat-card stat-card-button text-center' onClick={() => filterByType('venta')} aria-pressed={filterType === 'venta'}>
+            <div className='metric-value text-success'>{stats.venta}</div>
+            <div>Ventas</div>
+          </button>
         </Col>
       </Row>
 
       {/* Filtros */}
-      <div className='mb-3'>
-        <Button variant={filterType === 'all' ? 'primary' : 'outline-primary'} className='me-2' onClick={() => setFilterType('all')}>
+      <div className='orders-dashboard-filters mb-3'>
+        <Button variant={filterType === 'all' ? 'primary' : 'outline-primary'} onClick={() => filterByType('all')}>
           Todos
         </Button>
-        <Button variant={filterType === 'compra' ? 'primary' : 'outline-primary'} className='me-2' onClick={() => setFilterType('compra')}>
+        <Button variant={filterType === 'compra' ? 'primary' : 'outline-primary'} onClick={() => filterByType('compra')}>
           Compras
         </Button>
-        <Button variant={filterType === 'venta' ? 'primary' : 'outline-primary'} onClick={() => setFilterType('venta')}>
+        <Button variant={filterType === 'venta' ? 'primary' : 'outline-primary'} onClick={() => filterByType('venta')}>
           Ventas
         </Button>
+        {requestedStatus && <Button variant='outline-secondary' onClick={() => filterByStatus()}>Quitar filtro de estado</Button>}
       </div>
 
       {error && <Alert variant='danger'>{error}</Alert>}
@@ -193,6 +196,9 @@ const OrdersDashboardPage: React.FC = () => {
             </tr>
           </thead>
           <tbody>
+            {filteredOrders.length === 0 && (
+              <tr><td colSpan={7} className='text-center text-muted py-4'>No hay pedidos para este filtro.</td></tr>
+            )}
             {filteredOrders.map(order => (
               <tr key={order.id}>
                 <td>{order.id}</td>

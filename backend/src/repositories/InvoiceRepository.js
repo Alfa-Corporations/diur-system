@@ -109,6 +109,18 @@ class InvoiceRepository {
       ]
     });
   }
+
+  async count(filters = {}) {
+    const where = {};
+    if (filters.userId) where.userId = filters.userId;
+    if (filters.customerId) where.customerId = filters.customerId;
+    if (filters.status) {
+      where.status = Array.isArray(filters.status) ? { [Op.in]: filters.status } : filters.status;
+    } else if (filters.excludeStatuses?.length) {
+      where.status = { [Op.notIn]: filters.excludeStatuses };
+    }
+    return await Invoice.count({ where });
+  }
 }
 
 module.exports = new InvoiceRepository();

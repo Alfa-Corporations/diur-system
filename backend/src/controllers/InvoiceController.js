@@ -1,5 +1,7 @@
 const InvoiceService = require('../services/InvoiceService');
 const mailer = require('../utils/mailer');
+const fs = require('fs/promises');
+const imageStorage = require('../utils/imageStorage');
 
 const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({
   '&': '&amp;',
@@ -113,6 +115,60 @@ const buildInvoiceEmailHtml = invoice => {
  * Maneja las rutas relacionadas con gestión de facturas.
  */
 class InvoiceController {
+  async uploadDeliveryEvidence(req, res) {
+    let storedImage;
+    let saved = false;
+    try {
+      const { id } = req.params;
+      storedImage = await imageStorage.storeImage('invoices', id, req.file.buffer);
+      const { invoice, previousFilename } = await InvoiceService.saveDeliveryEvidence(id, storedImage.filename);
+      saved = true;
+
+      if (previousFilename && !previousFilename.startsWith('data:image/')) {
+        await imageStorage.removeStoredImage('invoices', previousFilename).catch(error => {
+          console.error('Could not remove previous invoice delivery image:', error);
+        });
+      }
+      res.json({ message: 'Foto de entrega guardada.', invoice });
+    } catch (error) {
+      if (storedImage && !saved) {
+        await imageStorage.removeStoredImage('invoices', storedImage.filename).catch(cleanupError => {
+          console.error('Could not clean up failed invoice delivery image:', cleanupError);
+        });
+      }
+      res.status(error.message === 'Factura no encontrada.' ? 404 : 400).json({ message: error.message });
+    }
+  }
+
+  async getDeliveryEvidence(req, res) {
+    try {
+      const invoice = await InvoiceService.getDeliveryEvidenceReference(req.params.id);
+      if (!invoice || !invoice.hasDeliveryEvidence || !invoice.deliveryEvidence) {
+        return res.status(404).json({ message: 'La factura no tiene una foto de entrega.' });
+      }
+
+      const legacyEvidence = invoice.deliveryEvidence.match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/);
+      if (legacyEvidence) {
+        res.set('Cache-Control', 'private, no-store');
+        return res.type(`image/${legacyEvidence[1]}`).send(Buffer.from(legacyEvidence[2], 'base64'));
+      }
+
+      const filePath = imageStorage.getStoredImagePath('invoices', invoice.deliveryEvidence);
+      if (!filePath) {
+        return res.status(404).json({ message: 'No se encontró el archivo de la foto.' });
+      }
+      await fs.access(filePath);
+      res.set('Cache-Control', 'private, no-store');
+      return res.type('image/webp').sendFile(filePath);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return res.status(404).json({ message: 'No se encontró el archivo de la foto.' });
+      }
+      console.error('Could not read invoice delivery evidence:', error);
+      return res.status(500).json({ message: 'No se pudo cargar la foto de entrega.' });
+    }
+  }
+
   /**
    * Crea una nueva factura
    * POST /invoices
@@ -198,8 +254,11 @@ class InvoiceController {
         filters.excludeStatuses = ['cancelled'];
       }
 
-      const invoices = await InvoiceService.getInvoices(filters, parseInt(limit, 10), parseInt(offset, 10));
-      res.json({ invoices });
+      const [invoices, totalCount] = await Promise.all([
+        InvoiceService.getInvoices(filters, parseInt(limit, 10), parseInt(offset, 10)),
+        InvoiceService.countInvoices(filters),
+      ]);
+      res.json({ invoices, totalCount });
     } catch (error) {
       res.status(500).json({ message: 'Internal server error' });
     }

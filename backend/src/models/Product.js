@@ -145,7 +145,7 @@ const Product = db.define('Product', {
   },
 
   foto: {
-    type: DataTypes.STRING,
+    type: DataTypes.TEXT,
     allowNull: true,
   },
 

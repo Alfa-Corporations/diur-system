@@ -58,6 +58,9 @@ const ProductsPage: React.FC = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [productImageFile, setProductImageFile] = useState<File | null>(null);
+  const [productImagePreview, setProductImagePreview] = useState('');
+  const [saveError, setSaveError] = useState('');
 
   const [filters, setFilters] = useState({ search: '' });
   const [page, setPage] = useState(0);
@@ -85,6 +88,16 @@ const ProductsPage: React.FC = () => {
     importacion: false
   });
   const [barcodeTargetField, setBarcodeTargetField] = useState<'partnumber' | 'codigo1' | 'codigo2' | 'codigo3' | 'codigo4' | 'codigo5'>('partnumber');
+
+  useEffect(() => {
+    if (!productImageFile) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setProductImagePreview(reader.result);
+    };
+    reader.readAsDataURL(productImageFile);
+    return () => reader.abort();
+  }, [productImageFile]);
 
   // =========================
   // LOCAL STORAGE
@@ -336,13 +349,25 @@ const ProductsPage: React.FC = () => {
       importacion: formData.importacion
     };
 
+    let savedProduct: Product | null = null;
+    let recordSaved = false;
+    setSaveError('');
     try {
       if (editingProduct) {
         const updated = await apiService.updateProduct(editingProduct.id, data);
+        savedProduct = updated;
+        recordSaved = true;
         dispatch(updateProductSuccess(updated));
       } else {
         const created = await apiService.createProduct(data);
+        savedProduct = created;
+        recordSaved = true;
         dispatch(createProductSuccess(created));
+      }
+
+      if (productImageFile && savedProduct) {
+        savedProduct = await apiService.uploadProductImage(savedProduct.id, productImageFile);
+        dispatch(updateProductSuccess(savedProduct));
       }
 
       setShowModal(false);
@@ -350,11 +375,22 @@ const ProductsPage: React.FC = () => {
       await loadProducts();
     } catch (error) {
       console.error('Error al guardar producto:', error);
-      alert('Error al guardar el producto');
+      const message = error instanceof Error ? error.message : 'Error al guardar el producto.';
+      setSaveError(recordSaved ? `El producto se guardó, pero no se completó la foto: ${message}` : message);
+      if (recordSaved) {
+        if (savedProduct) {
+          setEditingProduct(savedProduct);
+          dispatch(updateProductSuccess(savedProduct));
+        }
+        await loadProducts();
+      }
     }
   };
 
   const resetForm = () => {
+    setProductImageFile(null);
+    setProductImagePreview('');
+    setSaveError('');
     setFormData({
       name: '',
       partnumber: '',
@@ -381,6 +417,8 @@ const ProductsPage: React.FC = () => {
 
   const handleEditClick = (product: Product) => {
     setEditingProduct(product);
+    setProductImageFile(null);
+    setProductImagePreview(apiService.getProductImageUrl(product.foto));
     setFormData({
       name: product.name || '',
       partnumber: product.partnumber || '',
@@ -403,6 +441,36 @@ const ProductsPage: React.FC = () => {
       importacion: (product as any).importacion || false
     });
     setShowModal(true);
+  };
+
+  const handleRemoveProductImage = async () => {
+    if (!editingProduct) return;
+    try {
+      const updatedProduct = await apiService.removeProductImage(editingProduct.id);
+      if (updatedProduct) {
+        setEditingProduct(updatedProduct);
+        setProductImagePreview('');
+        setProductImageFile(null);
+        dispatch(updateProductSuccess(updatedProduct));
+      }
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'No se pudo eliminar la foto.');
+    }
+  };
+
+  const selectProductImage = (image: File | undefined) => {
+    if (!image) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(image.type)) {
+      setSaveError('Selecciona una imagen JPEG, PNG o WebP.');
+      return;
+    }
+    if (image.size > 8 * 1024 * 1024) {
+      setSaveError('La imagen debe pesar 8 MB o menos.');
+      return;
+    }
+    setSaveError('');
+    setProductImagePreview('');
+    setProductImageFile(image);
   };
 
   const handleDelete = async (id: number) => {
@@ -627,7 +695,7 @@ const ProductsPage: React.FC = () => {
       </div>
 
       {/* LISTA */}
-      <div className='list-products' style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.5rem' }}>
+      <div className='list-products'>
         {filteredProducts.length === 0 ? (
           <div className='col-12'>
             <div className='alert alert-info text-center'>
@@ -639,6 +707,16 @@ const ProductsPage: React.FC = () => {
             <div key={p.id} className='mb-2 item'>
               <div className='card shadow-sm h-100' style={{ borderRadius: '12px', overflow: 'hidden', border: 'none', position: 'relative' }}>
                 <div className='card-body d-flex flex-column align-items-center' style={{ minHeight: '19rem' }}>
+                  {p.foto ? (
+                    <img
+                      className='product-card-image'
+                      src={apiService.getProductImageUrl(p.foto)}
+                      alt={`Foto de ${p.name}`}
+                      loading='lazy'
+                    />
+                  ) : (
+                    <div className='product-card-image product-card-image--empty' aria-hidden='true'>📦</div>
+                  )}
                   <h5 className='fs-6 fw-bold mb-2' style={{ maxHeight: '5rem', overflow: 'hidden' }}>
                     {p.name}
                   </h5>
@@ -771,6 +849,34 @@ const ProductsPage: React.FC = () => {
 
               <form onSubmit={handleSubmit}>
                 <div className='modal-body' style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+                  {saveError && <div className='alert alert-danger' role='alert'>{saveError}</div>}
+                  <section className='product-image-editor mb-4'>
+                    <div>
+                      <h6 className='fw-bold mb-1'>Foto del producto</h6>
+                      <small className='text-muted'>Opcional. Se optimiza y guarda en el servidor.</small>
+                    </div>
+                    {productImagePreview && (
+                      <img className='product-image-editor__preview' src={productImagePreview} alt='Vista previa del producto' />
+                    )}
+                    <input
+                      className='form-control'
+                      type='file'
+                      aria-label='Seleccionar foto del producto'
+                      accept='image/jpeg,image/png,image/webp'
+                      disabled={!isOnline}
+                      onChange={event => {
+                        selectProductImage(event.currentTarget.files?.[0]);
+                        event.currentTarget.value = '';
+                      }}
+                    />
+                    {!isOnline && <small className='text-warning'>Conéctate para cargar o cambiar la foto.</small>}
+                    {editingProduct?.foto && (
+                      <button type='button' className='btn btn-sm btn-outline-danger align-self-start' onClick={() => void handleRemoveProductImage()} disabled={!isOnline}>
+                        Quitar foto actual
+                      </button>
+                    )}
+                  </section>
+
                   {/* INFORMACIÓN BÁSICA */}
                   <div className='mb-4'>
                     <h6 className='fw-bold mb-3'>📋 Información Básica</h6>

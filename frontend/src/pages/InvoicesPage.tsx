@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 //import { useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+import { Alert, Button, Modal, ProgressBar, Spinner } from 'react-bootstrap';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { usePermissions } from '../hooks/permissions';
 import { fetchInvoicesStart, fetchInvoicesSuccess, fetchInvoicesFailure, createInvoiceSuccess, updateInvoiceSuccess, cancelInvoiceSuccess } from '../redux/slices/invoiceSlice';
@@ -35,6 +37,7 @@ type InvoiceDocumentType = Extract<NonNullable<Invoice['documentType']>, 'consum
 type CustomerIdentificationType = NonNullable<Invoice['customerIdentificationType']>;
 
 const InvoicesPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   //const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { invoices, loading, error } = useAppSelector(state => state.invoices);
@@ -48,6 +51,8 @@ const InvoicesPage: React.FC = () => {
   const canEditInvoices = isAdmin || hasPermission('actualizar_factura');
   const canCancelInvoices = isAdmin || hasPermission('cancelar_factura');
   const canViewTotals = isAdmin || hasPermission('ver_totales');
+  const canUploadEvidence = isAdmin || hasPermission('actualizar_factura') || hasPermission('gestionar_items_orden') || hasPermission('actualizar_orden');
+  const hasInvoiceActions = canPayInvoices || canUploadEvidence;
 
   const [showModal, setShowModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -71,6 +76,12 @@ const InvoicesPage: React.FC = () => {
   const [customerAddress, setCustomerAddress] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState<NonNullable<Invoice['deliveryStatus']>>('pending');
   const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
+  const [evidenceInvoice, setEvidenceInvoice] = useState<Invoice | null>(null);
+  const [evidencePreviewUrl, setEvidencePreviewUrl] = useState('');
+  const [evidenceRefreshKey, setEvidenceRefreshKey] = useState(0);
+  const [evidenceLoading, setEvidenceLoading] = useState(false);
+  const [evidenceUploading, setEvidenceUploading] = useState(false);
+  const [evidenceError, setEvidenceError] = useState('');
   const adjustLocalProductStock = async (items: InvoiceItem[], multiplier: 1 | -1) => {
     const currentProducts = await localDBService.getProducts();
     const updatedProducts = currentProducts
@@ -109,8 +120,17 @@ const InvoicesPage: React.FC = () => {
         const shouldPreferLocal = !isOnline || pendingEvents.length > 0;
 
         if (!shouldPreferLocal) {
-          const { invoices: activeInvoices } = await apiService.getInvoices({ limit: 1000 });
-          const { invoices: deletedInvoices = [] } = includeDeleted ? await apiService.getInvoices({ status: 'cancelled', limit: 1000 }) : { invoices: [] };
+          const fetchAllInvoices = async (status?: string) => {
+            const firstPage = await apiService.getInvoices({ status, limit: 1000, offset: 0 });
+            const allInvoices = [...firstPage.invoices];
+            for (let offset = allInvoices.length; offset < firstPage.totalCount; offset += 1000) {
+              const nextPage = await apiService.getInvoices({ status, limit: 1000, offset });
+              allInvoices.push(...nextPage.invoices);
+            }
+            return allInvoices;
+          };
+          const activeInvoices = await fetchAllInvoices();
+          const deletedInvoices = includeDeleted ? await fetchAllInvoices('cancelled') : [];
           const apiInvoices = [...activeInvoices, ...deletedInvoices];
           await localDBService.saveInvoices(apiInvoices);
           dispatch(fetchInvoicesSuccess({ invoices: apiInvoices, totalCount: apiInvoices.length }));
@@ -168,6 +188,75 @@ const InvoicesPage: React.FC = () => {
   useEffect(() => {
     void Promise.all([loadInvoices(isAdmin), loadProducts()]);
   }, [isAdmin, loadInvoices, loadProducts]);
+
+  useEffect(() => {
+    if (!evidenceInvoice?.hasDeliveryEvidence || !evidenceInvoice.id) {
+      setEvidencePreviewUrl('');
+      setEvidenceLoading(false);
+      return;
+    }
+
+    let active = true;
+    let previewUrl = '';
+    setEvidenceLoading(true);
+    apiService
+      .getInvoiceDeliveryEvidence(evidenceInvoice.id)
+      .then(blob => {
+        if (!active) return;
+        previewUrl = URL.createObjectURL(blob);
+        setEvidencePreviewUrl(previewUrl);
+      })
+      .catch(loadError => {
+        if (active) {
+          setEvidenceError(loadError instanceof Error ? loadError.message : 'No se pudo cargar la foto.');
+        }
+      })
+      .finally(() => {
+        if (active) setEvidenceLoading(false);
+      });
+
+    return () => {
+      active = false;
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [evidenceInvoice?.id, evidenceInvoice?.hasDeliveryEvidence, evidenceRefreshKey]);
+
+  const openEvidenceModal = (invoice: Invoice) => {
+    setEvidenceError('');
+    setEvidencePreviewUrl('');
+    setEvidenceInvoice(invoice);
+  };
+
+  const closeEvidenceModal = () => {
+    setEvidenceInvoice(null);
+    setEvidencePreviewUrl('');
+    setEvidenceError('');
+  };
+
+  const handleEvidenceUpload = async (image: File | undefined) => {
+    if (!image || !evidenceInvoice) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(image.type)) {
+      setEvidenceError('Selecciona una imagen JPEG, PNG o WebP.');
+      return;
+    }
+    if (image.size > 8 * 1024 * 1024) {
+      setEvidenceError('La imagen debe pesar 8 MB o menos.');
+      return;
+    }
+
+    setEvidenceUploading(true);
+    setEvidenceError('');
+    try {
+      const updatedInvoice = await apiService.uploadInvoiceDeliveryEvidence(evidenceInvoice.id, image);
+      dispatch(updateInvoiceSuccess(updatedInvoice));
+      setEvidenceInvoice(updatedInvoice);
+      setEvidenceRefreshKey(current => current + 1);
+    } catch (uploadError) {
+      setEvidenceError(uploadError instanceof Error ? uploadError.message : 'No se pudo guardar la foto.');
+    } finally {
+      setEvidenceUploading(false);
+    }
+  };
 
   const calculateTotal = (items: InvoiceItem[]) => items.reduce((sum, item) => sum + (toNumber(item.total) || toNumber(item.price) * toNumber(item.quantity)), 0);
 
@@ -738,6 +827,8 @@ const InvoicesPage: React.FC = () => {
   const paidInvoices = invoices.filter(invoice => invoice.status === 'paid');
   const deletedInvoices = isAdmin ? invoices.filter(invoice => invoice.status === 'cancelled') : [];
   const visibleInvoices = [...pendingInvoices, ...paidInvoices, ...deletedInvoices];
+  const requestedStatus = searchParams.get('status');
+  const filteredInvoices = requestedStatus === 'pending' || requestedStatus === 'paid' || (requestedStatus === 'cancelled' && isAdmin) ? visibleInvoices.filter(invoice => invoice.status === requestedStatus) : visibleInvoices;
   const totalBilled = [...pendingInvoices, ...paidInvoices].reduce((sum, invoice) => sum + toNumber(invoice.total), 0);
   const draftTotal = calculateTotal(invoiceItems);
   const paymentPreviewTotal = invoiceToPay ? toNumber(invoiceToPay.total) : draftTotal;
@@ -769,6 +860,10 @@ const InvoicesPage: React.FC = () => {
   };
 
   const getDocumentLabel = (invoice: Invoice) => (invoice.documentType === 'sales_note' ? 'Nota de venta' : 'Consumidor final');
+  const filterInvoicesByStatus = (status?: Invoice['status']) => {
+    if (status) setSearchParams({ status });
+    else setSearchParams({});
+  };
 
   return (
     <div className='page-shell container-fluid p-4'>
@@ -796,33 +891,33 @@ const InvoicesPage: React.FC = () => {
         </div>
       </div>
 
-      <div className='row g-3 mb-4' style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+      <div className='d-grid mb-4' style={{gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
         <div className='col-12 col-md-3'>
-          <div className='stat-card'>
+          <button type='button' className='stat-card stat-card-button' onClick={() => filterInvoicesByStatus('pending')} aria-pressed={requestedStatus === 'pending'}>
             <div className='metric-label'>Facturas pendientes</div>
             <div className='metric-value'>{pendingInvoices.length}</div>
-          </div>
+          </button>
         </div>
         <div className='col-12 col-md-3'>
-          <div className='stat-card'>
+          <button type='button' className='stat-card stat-card-button' onClick={() => filterInvoicesByStatus('paid')} aria-pressed={requestedStatus === 'paid'}>
             <div className='metric-label'>Facturas pagadas</div>
             <div className='metric-value'>{paidInvoices.length}</div>
-          </div>
+          </button>
         </div>
         {isAdmin && (
           <div className='col-12 col-md-3'>
-            <div className='stat-card'>
+            <button type='button' className='stat-card stat-card-button' onClick={() => filterInvoicesByStatus('cancelled')} aria-pressed={requestedStatus === 'cancelled'}>
               <div className='metric-label'>Facturas eliminadas</div>
               <div className='metric-value'>{deletedInvoices.length}</div>
-            </div>
+            </button>
           </div>
         )}
         {canViewTotals && (
           <div className='col-12 col-md-3'>
-            <div className='stat-card'>
+            <button type='button' className='stat-card stat-card-button' onClick={() => filterInvoicesByStatus()}>
               <div className='metric-label'>Monto total</div>
               <div className='metric-value'>{formatCurrency(totalBilled)}</div>
-            </div>
+            </button>
           </div>
         )}
       </div>
@@ -833,14 +928,14 @@ const InvoicesPage: React.FC = () => {
       <div className='section-card'>
         {loading ? (
           <div className='text-center py-4'>Cargando facturas...</div>
-        ) : visibleInvoices.length === 0 ? (
-          <div className='text-center py-4 text-muted'>No hay facturas registradas todavía.</div>
+        ) : filteredInvoices.length === 0 ? (
+          <div className='text-center py-4 text-muted'>{requestedStatus ? 'No hay facturas para este filtro.' : 'No hay facturas registradas todavía.'}</div>
         ) : (
           <>
             <div className='invoice-mobile-list d-grid gap-3 d-lg-none'>
-              {visibleInvoices.map((invoice, index) => (
+              {filteredInvoices.map((invoice, index) => (
                 <React.Fragment key={invoice.id}>
-                  {(index === 0 || visibleInvoices[index - 1].status !== invoice.status) && (
+                  {(index === 0 || filteredInvoices[index - 1].status !== invoice.status) && (
                     <h3 className='h6 text-uppercase text-muted mt-3 mb-0'>
                       {getInvoiceGroupLabel(invoice.status)} ({getInvoiceGroupCount(invoice.status)})
                     </h3>
@@ -934,6 +1029,11 @@ const InvoicesPage: React.FC = () => {
                         )}
                       </div>
                     )}
+                    {canUploadEvidence && invoice.status !== 'cancelled' && (
+                      <Button variant={invoice.hasDeliveryEvidence ? 'outline-success' : 'outline-primary'} className='w-100 mt-2' onClick={() => openEvidenceModal(invoice)}>
+                        {invoice.hasDeliveryEvidence ? 'Ver / cambiar foto de entrega' : 'Adjuntar foto de entrega'}
+                      </Button>
+                    )}
                   </article>
                 </React.Fragment>
               ))}
@@ -952,15 +1052,15 @@ const InvoicesPage: React.FC = () => {
                     <th>Entrega</th>
                     <th>Método</th>
                     <th>Items</th>
-                    {canPayInvoices && <th>Acciones</th>}
+                    {hasInvoiceActions && <th>Acciones</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleInvoices.map((invoice, index) => (
+                  {filteredInvoices.map((invoice, index) => (
                     <React.Fragment key={invoice.id}>
-                      {(index === 0 || visibleInvoices[index - 1].status !== invoice.status) && (
+                      {(index === 0 || filteredInvoices[index - 1].status !== invoice.status) && (
                         <tr className='table-light'>
-                          <th colSpan={canPayInvoices ? 10 : 9}>
+                          <th colSpan={hasInvoiceActions ? 10 : 9}>
                             {getInvoiceGroupLabel(invoice.status)} ({getInvoiceGroupCount(invoice.status)})
                           </th>
                         </tr>
@@ -978,31 +1078,29 @@ const InvoicesPage: React.FC = () => {
                           <span className={`badge ${getInvoiceStatusClass(invoice.status)}`}>{getInvoiceStatusLabel(invoice.status)}</span>
                         </td>
                         <td>
-                          <span className={`badge ${invoice.deliveryStatus === 'delivered' ? 'bg-success' : 'bg-secondary'}`}>
-                            {invoice.deliveryStatus === 'delivered' ? 'Entregada' : 'Pendiente'}
-                          </span>
+                          <span className={`badge ${invoice.deliveryStatus === 'delivered' ? 'bg-success' : 'bg-secondary'}`}>{invoice.deliveryStatus === 'delivered' ? 'Entregada' : 'Pendiente'}</span>
                         </td>
                         <td>{invoice.paymentMethod || '—'}</td>
-                        <td>
-                          {invoice.items?.length ?? 0}
-                        </td>
-                        {canPayInvoices && (
+                        <td>{invoice.items?.length ?? 0}</td>
+                        {hasInvoiceActions && (
                           <td>
                             <div className='d-flex flex-wrap gap-2'>
-                              {invoice.status === 'pending' && (
+                              {canPayInvoices && invoice.status === 'pending' && (
                                 <button className='btn btn-sm' onClick={() => openPaymentModal(invoice)}>
                                   💳 Pagar
                                 </button>
                               )}
-                              <button className='btn btn-sm' onClick={() => handlePrintInvoice(invoice)}>
-                                🖨️ Imprimir
-                              </button>
-                              {invoice.status !== 'cancelled' && (
+                              {canPayInvoices && (
+                                <button className='btn btn-sm' onClick={() => handlePrintInvoice(invoice)}>
+                                  🖨️ Imprimir
+                                </button>
+                              )}
+                              {canPayInvoices && invoice.status !== 'cancelled' && (
                                 <button className='btn btn-sm' onClick={() => void handleSendInvoiceEmail(invoice)} disabled={sendingEmailId === invoice.id}>
                                   {sendingEmailId === invoice.id ? 'Enviando...' : '✉️ Correo'}
                                 </button>
                               )}
-                              {canEditInvoices && invoice.status !== 'cancelled' && (
+                              {canPayInvoices && canEditInvoices && invoice.status !== 'cancelled' && (
                                 <>
                                   <button className='btn btn-sm' onClick={() => handleEdit(invoice)}>
                                     <svg xmlns='http://www.w3.org/2000/svg' height='30px' viewBox='0 -960 960 960' width='30px' fill='#314D1C'>
@@ -1015,6 +1113,11 @@ const InvoicesPage: React.FC = () => {
                                     </button>
                                   )}
                                 </>
+                              )}
+                              {canUploadEvidence && invoice.status !== 'cancelled' && (
+                                <button className='btn btn-sm btn-outline-primary' onClick={() => openEvidenceModal(invoice)}>
+                                  {invoice.hasDeliveryEvidence ? '📷 Ver / cambiar' : '📷 Adjuntar foto'}
+                                </button>
                               )}
                             </div>
                           </td>
@@ -1182,13 +1285,10 @@ const InvoicesPage: React.FC = () => {
 
                   <div className='row g-3 mb-4'>
                     <div className='col-12 col-md-4'>
-                      <label className='form-label' htmlFor='invoice-delivery-status'>Estado de entrega</label>
-                      <select
-                        id='invoice-delivery-status'
-                        className='form-select'
-                        value={deliveryStatus}
-                        onChange={event => setDeliveryStatus(event.target.value as NonNullable<Invoice['deliveryStatus']>)}
-                      >
+                      <label className='form-label' htmlFor='invoice-delivery-status'>
+                        Estado de entrega
+                      </label>
+                      <select id='invoice-delivery-status' className='form-select' value={deliveryStatus} onChange={event => setDeliveryStatus(event.target.value as NonNullable<Invoice['deliveryStatus']>)}>
                         <option value='pending'>Pendiente</option>
                         <option value='delivered'>Entregada</option>
                       </select>
@@ -1313,6 +1413,60 @@ const InvoicesPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <Modal show={Boolean(evidenceInvoice)} onHide={closeEvidenceModal} centered size='lg'>
+        <Modal.Header closeButton>
+          <Modal.Title>Foto de entrega · {evidenceInvoice?.invoiceNumber || `#${evidenceInvoice?.id}`}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className='text-muted'>Puedes tomar una foto con la cámara o seleccionar una imagen del dispositivo. Se comprime antes de guardarse.</p>
+          {evidenceError && <Alert variant='danger'>{evidenceError}</Alert>}
+          {evidenceLoading && (
+            <div className='text-center py-3'>
+              <Spinner animation='border' role='status' />
+            </div>
+          )}
+          {evidencePreviewUrl && <img className='invoice-evidence-preview mb-3' src={evidencePreviewUrl} alt='Evidencia fotográfica de entrega' />}
+          <div className='d-grid d-sm-flex gap-2'>
+            <label className='btn btn-outline-primary mb-0'>
+              Tomar foto
+              <input
+                className='visually-hidden'
+                type='file'
+                accept='image/jpeg,image/png,image/webp'
+                capture='environment'
+                disabled={evidenceUploading || !isOnline}
+                onChange={event => {
+                  const image = event.currentTarget.files?.[0];
+                  event.currentTarget.value = '';
+                  void handleEvidenceUpload(image);
+                }}
+              />
+            </label>
+            <label className='btn btn-primary mb-0'>
+              Subir foto
+              <input
+                className='visually-hidden'
+                type='file'
+                accept='image/jpeg,image/png,image/webp'
+                disabled={evidenceUploading || !isOnline}
+                onChange={event => {
+                  const image = event.currentTarget.files?.[0];
+                  event.currentTarget.value = '';
+                  void handleEvidenceUpload(image);
+                }}
+              />
+            </label>
+          </div>
+          {evidenceUploading && <ProgressBar animated now={100} label='Comprimiendo y guardando...' className='mt-3' />}
+          {!isOnline && <small className='text-warning d-block mt-2'>Se requiere conexión para guardar la foto.</small>}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant='secondary' onClick={closeEvidenceModal} disabled={evidenceUploading}>
+            Cerrar
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };

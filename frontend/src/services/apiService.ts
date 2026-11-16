@@ -343,6 +343,31 @@ class ApiService {
     await localDBService.deleteProduct(id);
   }
 
+  getProductImageUrl(imagePath?: string | null): string {
+    if (!imagePath) return '';
+    if (/^(?:https?:\/\/|data:image\/)/i.test(imagePath)) return imagePath;
+    return `${BACKEND_BASE_HINT}${imagePath.startsWith('/') ? imagePath : `/${imagePath}`}`;
+  }
+
+  async uploadProductImage(id: number, image: File): Promise<Product> {
+    if (this.isOffline()) throw new Error('Conéctate a internet para guardar la foto del producto.');
+    const body = new FormData();
+    body.append('image', image);
+    const response = await this.api.post<{ product: Product }>(`/products/${id}/image`, body, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    await localDBService.saveProduct(response.data.product);
+    return response.data.product;
+  }
+
+  async removeProductImage(id: number): Promise<Product | null> {
+    if (this.isOffline()) throw new Error('Conéctate a internet para eliminar la foto del producto.');
+    const response = await this.api.delete<{ product?: Product }>(`/products/${id}/image`);
+    const product = response.data.product || null;
+    if (product) await localDBService.saveProduct(product);
+    return product;
+  }
+
   // Métodos de facturas
   async getInvoices(params?: { limit?: number; offset?: number; status?: string; customerId?: number }): Promise<{ invoices: Invoice[]; totalCount: number }> {
     if (this.isOffline()) {
@@ -370,6 +395,25 @@ class ApiService {
     }
     const response = await this.api.get<{ invoice: Invoice }>(`/invoices/${id}`);
     return response.data.invoice;
+  }
+
+  async uploadInvoiceDeliveryEvidence(id: number, image: File): Promise<Invoice> {
+    if (this.isOffline()) throw new Error('Conéctate a internet para adjuntar la foto de entrega.');
+    const body = new FormData();
+    body.append('image', image);
+    const response = await this.api.post<{ invoice: Invoice }>(`/invoices/${id}/delivery-evidence`, body, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    await localDBService.saveInvoice(response.data.invoice);
+    return response.data.invoice;
+  }
+
+  async getInvoiceDeliveryEvidence(id: number): Promise<Blob> {
+    if (this.isOffline()) throw new Error('La foto de entrega requiere conexión a internet.');
+    const response = await this.api.get<Blob>(`/invoices/${id}/delivery-evidence`, {
+      responseType: 'blob',
+    });
+    return response.data;
   }
 
   async createInvoice(invoiceData: CreateInvoiceRequest): Promise<Invoice> {
@@ -821,6 +865,21 @@ class ApiService {
     }
     await this.api.delete(`/customers/${id}`);
     await localDBService.deleteCustomer(id);
+  }
+
+  async importCustomers(customers: Array<{
+    row: number;
+    source: string;
+    name: string;
+    identificationType?: 'none' | 'cedula' | 'ruc' | 'passport';
+    identificationNumber?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+  }>): Promise<{ created: number; updated: number; errors: Array<{ file?: string; row: number; message: string }> }> {
+    if (this.isOffline()) throw new Error('La importación masiva requiere conexión a internet.');
+    const response = await this.api.post('/customers/import', { customers });
+    return response.data;
   }
 
   async getVisits(params?: { customerId?: number; dateFrom?: string; dateTo?: string; userId?: number }): Promise<Visit[]> {

@@ -5,6 +5,7 @@ import { usePermissions } from '../hooks/permissions';
 import apiService from '../services/apiService';
 import type { User, Permission } from '../../../shared/types';
 import { groupPermissions, permissionLabels, roleLabels, rolePermissionReferences } from '../utils/permissionCatalog';
+import { Accordion } from 'react-bootstrap';
 
 const UserManagementPage: React.FC = () => {
   //const navigate = useNavigate();
@@ -165,13 +166,15 @@ const UserManagementPage: React.FC = () => {
     setSelectedPermissionIds(permissions.filter(permission => suggestedNames.has(permission.name)).map(permission => permission.id));
   };
 
-  const filteredPermissionGroups = groupPermissions(permissions).map(group => ({
-    ...group,
-    permissions: group.permissions.filter(permission => {
-      const search = permissionSearch.trim().toLocaleLowerCase();
-      return !search || `${permission.name} ${permission.description || ''} ${permissionLabels[permission.name] || ''}`.toLocaleLowerCase().includes(search);
-    })
-  })).filter(group => group.permissions.length > 0);
+  const filteredPermissionGroups = groupPermissions(permissions)
+    .map(group => ({
+      ...group,
+      permissions: group.permissions.filter(permission => {
+        const search = permissionSearch.trim().toLocaleLowerCase();
+        return !search || `${permission.name} ${permission.description || ''} ${permissionLabels[permission.name] || ''}`.toLocaleLowerCase().includes(search);
+      })
+    }))
+    .filter(group => group.permissions.length > 0);
 
   const savePermissions = async () => {
     if (!selectedPermissionUser) return;
@@ -279,7 +282,9 @@ const UserManagementPage: React.FC = () => {
             <div>
               <span className='eyebrow mb-2'>Accesos individuales</span>
               <h4 className='mb-1'>Permisos de {selectedPermissionUser.username}</h4>
-              <p className='mb-0'>Rol actual: <strong>{roleLabels[selectedPermissionUser.role]}</strong>. La referencia por rol solo propone un punto de partida; cada permiso se puede cambiar de forma independiente.</p>
+              <p className='mb-0'>
+                Rol actual: <strong>{roleLabels[selectedPermissionUser.role]}</strong>. La referencia por rol solo propone un punto de partida; cada permiso se puede cambiar de forma independiente.
+              </p>
             </div>
             <button className='btn btn-sm btn-outline-secondary' onClick={cancelPermissionSession}>
               Cerrar
@@ -294,9 +299,15 @@ const UserManagementPage: React.FC = () => {
             <>
               <div className='permission-reference-panel'>
                 <div>
-                  <label htmlFor='permission-reference-role' className='form-label mb-1'>Referencia de permisos por rol</label>
+                  <label htmlFor='permission-reference-role' className='form-label mb-1'>
+                    Referencia de permisos por rol
+                  </label>
                   <select id='permission-reference-role' className='form-select' value={referenceRole} onChange={event => setReferenceRole(event.target.value as User['role'])}>
-                    {Object.entries(roleLabels).map(([role, label]) => <option key={role} value={role}>{label}</option>)}
+                    {Object.entries(roleLabels).map(([role, label]) => (
+                      <option key={role} value={role}>
+                        {label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <button type='button' className='btn btn-outline-primary' onClick={applyRoleReference}>
@@ -306,18 +317,17 @@ const UserManagementPage: React.FC = () => {
               </div>
 
               <div className='permission-toolbar'>
-                <div className='permission-selection-count'>{selectedPermissionIds.length} permisos seleccionados de {permissions.length}</div>
+                <div className='permission-selection-count'>
+                  {selectedPermissionIds.length} permisos seleccionados de {permissions.length}
+                </div>
                 <div className='permission-toolbar-actions'>
-                  <input
-                    className='form-control'
-                    type='search'
-                    placeholder='Buscar permiso o módulo...'
-                    aria-label='Buscar permisos'
-                    value={permissionSearch}
-                    onChange={event => setPermissionSearch(event.target.value)}
-                  />
-                  <button type='button' className='btn btn-sm btn-outline-secondary' onClick={() => setSelectedPermissionIds(permissions.map(permission => permission.id))}>Seleccionar todos</button>
-                  <button type='button' className='btn btn-sm btn-outline-secondary' onClick={() => setSelectedPermissionIds([])}>Limpiar</button>
+                  <input className='form-control' type='search' placeholder='Buscar permiso o módulo...' aria-label='Buscar permisos' value={permissionSearch} onChange={event => setPermissionSearch(event.target.value)} />
+                  <button type='button' className='btn btn-sm btn-outline-secondary' onClick={() => setSelectedPermissionIds(permissions.map(permission => permission.id))}>
+                    Seleccionar todos
+                  </button>
+                  <button type='button' className='btn btn-sm btn-outline-secondary' onClick={() => setSelectedPermissionIds([])}>
+                    Limpiar
+                  </button>
                 </div>
               </div>
 
@@ -326,36 +336,31 @@ const UserManagementPage: React.FC = () => {
               ) : (
                 <div className='permission-groups'>
                   {filteredPermissionGroups.map(group => (
-                    <section className='permission-group' key={group.id}>
-                      <header>
-                        <h5>{group.title}</h5>
-                        <p>{group.description}</p>
-                      </header>
-                      <div className='permission-options'>
-                        {group.permissions.map(permission => {
-                          const suggestedFor = (Object.keys(rolePermissionReferences) as User['role'][]).filter(role => rolePermissionReferences[role].includes(permission.name));
-                          return (
-                            <label className={`permission-option${selectedPermissionIds.includes(permission.id) ? ' is-selected' : ''}`} key={permission.id} htmlFor={`perm-${permission.id}`}>
-                              <input
-                                id={`perm-${permission.id}`}
-                                type='checkbox'
-                                checked={selectedPermissionIds.includes(permission.id)}
-                                onChange={() => togglePermission(permission.id)}
-                              />
-                              <span className='permission-option-copy'>
-                                <strong>{permissionLabels[permission.name] || permission.name.replaceAll('_', ' ')}</strong>
-                                {permission.description && <small>{permission.description}</small>}
-                                {suggestedFor.length > 0 && (
-                                  <span className='permission-role-tags'>
-                                    Referencia: {suggestedFor.map(role => roleLabels[role]).join(', ')}
+                    <Accordion defaultActiveKey='1'>
+                      <Accordion.Item eventKey={group.id}>
+                        <Accordion.Header>
+                          <h5>{group.title}</h5>
+                          <p>{group.description}</p>
+                        </Accordion.Header>
+                        <Accordion.Body>
+                          <div className='permission-options'>
+                            {group.permissions.map(permission => {
+                              const suggestedFor = (Object.keys(rolePermissionReferences) as User['role'][]).filter(role => rolePermissionReferences[role].includes(permission.name));
+                              return (
+                                <label className={`permission-option${selectedPermissionIds.includes(permission.id) ? ' is-selected' : ''}`} key={permission.id} htmlFor={`perm-${permission.id}`}>
+                                  <input id={`perm-${permission.id}`} type='checkbox' checked={selectedPermissionIds.includes(permission.id)} onChange={() => togglePermission(permission.id)} />
+                                  <span className='permission-option-copy'>
+                                    <strong>{permissionLabels[permission.name] || permission.name.replaceAll('_', ' ')}</strong>
+                                    {permission.description && <small>{permission.description}</small>}
+                                    {suggestedFor.length > 0 && <span className='permission-role-tags'>Referencia: {suggestedFor.map(role => roleLabels[role]).join(', ')}</span>}
                                   </span>
-                                )}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </section>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </Accordion.Body>
+                      </Accordion.Item>
+                    </Accordion>
                   ))}
                 </div>
               )}

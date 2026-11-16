@@ -1,5 +1,6 @@
 
 const express = require('express');
+const path = require('path');
 const morgan = require('morgan');
 const cors = require('cors');
 const db = require('./utils/database');
@@ -14,6 +15,10 @@ const app = express();
 app.use(express.json({ limit: '4mb' }));
 app.use(morgan('dev'));
 app.use(cors());
+app.use('/media/products', express.static(path.resolve(__dirname, '../uploads/products'), {
+    immutable: true,
+    maxAge: '7d',
+  }));
 swaggerDocs(app);
 
 db.sync({ force: false, alter: process.env.NODE_ENV !== 'production' })
@@ -27,6 +32,7 @@ db.sync({ force: false, alter: process.env.NODE_ENV !== 'production' })
             await db.query('ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "deliveryEvidence" TEXT');
             await db.query('ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "hasDeliveryEvidence" BOOLEAN NOT NULL DEFAULT FALSE');
             await db.query('ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "deliveryStatus" VARCHAR(20) NOT NULL DEFAULT \'pending\'');
+            await db.query('ALTER TABLE "products" ALTER COLUMN "foto" TYPE TEXT');
             await db.query(`
                 CREATE TABLE IF NOT EXISTS "push_subscriptions" (
                     "id" SERIAL PRIMARY KEY,
