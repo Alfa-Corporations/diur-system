@@ -96,7 +96,7 @@ class ProductController {
     try {
       const { id } = req.params;
       const product = await ProductService.getProductById(id);
-      storedImage = await imageStorage.storeImage('products', id, req.file.buffer);
+      storedImage = await imageStorage.storeImage('products', id, req.file.buffer, req.file.mimetype);
       const updatedProduct = await ProductService.updateProduct(id, {
         foto: `/media/products/${storedImage.filename}`,
       });

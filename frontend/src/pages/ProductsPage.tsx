@@ -853,7 +853,7 @@ const ProductsPage: React.FC = () => {
                   <section className='product-image-editor mb-4'>
                     <div>
                       <h6 className='fw-bold mb-1'>Foto del producto</h6>
-                      <small className='text-muted'>Opcional. Se optimiza y guarda en el servidor.</small>
+                      <small className='text-muted'>Opcional. Se optimiza en este dispositivo antes de guardarse.</small>
                     </div>
                     {productImagePreview && (
                       <img className='product-image-editor__preview' src={productImagePreview} alt='Vista previa del producto' />

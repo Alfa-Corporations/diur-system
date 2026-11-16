@@ -4,6 +4,7 @@ import type { AxiosInstance } from 'axios';
 import { store } from '../redux/store';
 import { logout } from '../redux/slices/authSlice';
 import localDBService from './localDBService';
+import { compressImage } from '../utils/imageCompression';
 import type { LoginRequest, LoginResponse, RegisterRequest, CreateProductRequest, CreateInvoiceRequest, User, Product, Invoice, Order, OrderItem, Permission, CreateOrderDTO, Customer, Visit, SyncEvent } from '../../../shared/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://diursystem.alfauzcat.com/api/v1';
@@ -352,7 +353,7 @@ class ApiService {
   async uploadProductImage(id: number, image: File): Promise<Product> {
     if (this.isOffline()) throw new Error('Conéctate a internet para guardar la foto del producto.');
     const body = new FormData();
-    body.append('image', image);
+    body.append('image', await compressImage(image));
     const response = await this.api.post<{ product: Product }>(`/products/${id}/image`, body, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -400,7 +401,7 @@ class ApiService {
   async uploadInvoiceDeliveryEvidence(id: number, image: File): Promise<Invoice> {
     if (this.isOffline()) throw new Error('Conéctate a internet para adjuntar la foto de entrega.');
     const body = new FormData();
-    body.append('image', image);
+    body.append('image', await compressImage(image));
     const response = await this.api.post<{ invoice: Invoice }>(`/invoices/${id}/delivery-evidence`, body, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });

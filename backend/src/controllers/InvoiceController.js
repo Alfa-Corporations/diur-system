@@ -1,6 +1,7 @@
 const InvoiceService = require('../services/InvoiceService');
 const mailer = require('../utils/mailer');
 const fs = require('fs/promises');
+const path = require('path');
 const imageStorage = require('../utils/imageStorage');
 
 const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({
@@ -120,7 +121,7 @@ class InvoiceController {
     let saved = false;
     try {
       const { id } = req.params;
-      storedImage = await imageStorage.storeImage('invoices', id, req.file.buffer);
+      storedImage = await imageStorage.storeImage('invoices', id, req.file.buffer, req.file.mimetype);
       const { invoice, previousFilename } = await InvoiceService.saveDeliveryEvidence(id, storedImage.filename);
       saved = true;
 
@@ -159,7 +160,10 @@ class InvoiceController {
       }
       await fs.access(filePath);
       res.set('Cache-Control', 'private, no-store');
-      const contentType = filePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/webp';
+      const extension = path.extname(filePath).toLowerCase();
+      const contentType = extension === '.png' ? 'image/png'
+        : extension === '.jpg' ? 'image/jpeg'
+          : 'image/webp';
       return res.type(contentType).sendFile(filePath);
     } catch (error) {
       if (error.code === 'ENOENT') {

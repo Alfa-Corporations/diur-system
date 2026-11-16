@@ -1458,7 +1458,7 @@ const InvoicesPage: React.FC = () => {
               />
             </label>
           </div>
-          {evidenceUploading && <ProgressBar animated now={100} label='Comprimiendo y guardando...' className='mt-3' />}
+          {evidenceUploading && <ProgressBar animated now={100} label='Optimizando y guardando...' className='mt-3' />}
           {!isOnline && <small className='text-warning d-block mt-2'>Se requiere conexión para guardar la foto.</small>}
         </Modal.Body>
         <Modal.Footer>
