@@ -159,7 +159,8 @@ class InvoiceController {
       }
       await fs.access(filePath);
       res.set('Cache-Control', 'private, no-store');
-      return res.type('image/webp').sendFile(filePath);
+      const contentType = filePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/webp';
+      return res.type(contentType).sendFile(filePath);
     } catch (error) {
       if (error.code === 'ENOENT') {
         return res.status(404).json({ message: 'No se encontró el archivo de la foto.' });
